@@ -1,0 +1,67 @@
+# Terraform Registry Manifest
+# This file describes the provider for the Terraform Registry
+
+version: 1
+formatter: markdown
+
+header-from: docs/header.md
+footer-from: docs/footer.md
+
+sections:
+  show:
+    - providers
+    - resources
+    - data-sources
+
+content: |-
+  {{ .Header }}
+
+  {{ if .Providers -}}
+  ## Providers
+  
+  {{ range .Providers -}}
+  - [{{ .Name }}]({{ .URL }})
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .Resources -}}
+  ## Resources
+  
+  {{ range .Resources -}}
+  - [{{ .Name }}]({{ .URL }})
+  {{ end -}}
+  {{ end -}}
+
+  {{ if .DataSources -}}
+  ## Data Sources
+  
+  {{ range .DataSources -}}
+  - [{{ .Name }}]({{ .URL }})
+  {{ end -}}
+  {{ end -}}
+
+  {{ .Footer }}
+
+output:
+  file: README.md
+  mode: replace
+
+providers:
+  - name: pbs
+    path: fwprovider/provider.go
+
+resources:
+  - name: pbs_datastore
+    path: fwprovider/datastore_resource.go
+  - name: pbs_s3_endpoint
+    path: fwprovider/s3_endpoint_resource.go
+
+sort:
+  enabled: true
+  by: name
+
+settings:
+  anchor: true
+  color: true
+  escape: true
+  html: true

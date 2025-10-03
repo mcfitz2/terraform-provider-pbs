@@ -1,0 +1,112 @@
+# Terraform Provider Release Configuration
+# This file configures goreleaser for building and publishing provider binaries
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: terraform-provider-pbs
+    binary: "terraform-provider-pbs_v{{ .Version }}"
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}"
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - cmd: gpg
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+    artifacts: checksum
+    output: true
+
+release:
+  draft: false
+  prerelease: auto
+  mode: append
+  name_template: "v{{ .Version }}"
+  header: |
+    ## Terraform Provider for Proxmox Backup Server v{{ .Version }}
+    
+    ### Installation
+    
+    This provider is published to the Terraform Registry. To use it, add the following to your Terraform configuration:
+    
+    ```hcl
+    terraform {
+      required_providers {
+        pbs = {
+          source  = "mcfitz2/pbs"
+          version = "~> {{ .Major }}.{{ .Minor }}"
+        }
+      }
+    }
+    ```
+    
+    ### What's Changed
+    
+  footer: |
+    **Full Changelog**: https://github.com/mcfitz2/terraform-provider-pbs/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+changelog:
+  use: github
+  sort: asc
+  abbrev: 0
+  groups:
+    - title: "Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Documentation"
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "Other Changes"
+      order: 999
+  filters:
+    exclude:
+      - "^test:"
+      - "^chore:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
