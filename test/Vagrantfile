@@ -5,6 +5,9 @@ Vagrant.configure("2") do |config|
   # Use Debian 12 (Bookworm) which is the base for PBS
   config.vm.box = "debian/bookworm64"
   
+  # Disable default synced folder (not needed for PBS VM, avoids NFS issues in CI)
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
   # PBS VM configuration
   config.vm.define "pbs" do |pbs|
     pbs.vm.hostname = "pbs-test"
