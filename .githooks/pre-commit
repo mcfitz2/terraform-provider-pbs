@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pre-commit hook to scan for secrets using gitleaks
+# This prevents accidentally committing secrets to the repository
+
+set -e
+
+# Check if gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo "⚠️  gitleaks is not installed. Install it with:"
+    echo "   brew install gitleaks"
+    echo ""
+    echo "Skipping secret scan for now..."
+    exit 0
+fi
+
+# Run gitleaks on staged files
+echo "🔍 Scanning staged files for secrets..."
+
+if gitleaks protect --staged --verbose --redact --config .gitleaks.toml; then
+    echo "✅ No secrets detected in staged files"
+    exit 0
+else
+    echo ""
+    echo "❌ Secrets detected! Commit blocked."
+    echo ""
+    echo "If this is a false positive, you can:"
+    echo "  1. Add an allowlist entry to .gitleaks.toml"
+    echo "  2. Use 'git commit --no-verify' to bypass (NOT RECOMMENDED)"
+    echo ""
+    exit 1
+fi

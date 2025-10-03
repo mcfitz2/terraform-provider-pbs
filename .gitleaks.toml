@@ -1,0 +1,37 @@
+# Gitleaks configuration for terraform-provider-pbs
+# https://github.com/gitleaks/gitleaks
+
+title = "Gitleaks config for terraform-provider-pbs"
+
+# Use the default gitleaks rules
+[extend]
+useDefault = true
+
+# Allowlist patterns - these are safe to ignore
+[allowlist]
+description = "Allowlist for safe patterns"
+
+# Files to ignore (documentation about secrets, not actual new secrets)
+paths = [
+    '''.gitleaks\.toml''',
+    '''verify-security\.sh''',
+    '''SECURITY_CLEANUP\.md''',
+    '''PUBLICATION_CHECKLIST\.md''',
+    '''scan-secrets\.sh''',
+    '''cleanup-git-history\.sh''',
+    '''docs/SECRET_SCANNING\.md''',
+]
+
+# Content patterns to ignore (known safe values)
+regexes = [
+    '''pbspbs''',                  # Test password used in CI/workflows
+    '''your-secure-password''',    # Example placeholder text
+    '''your-''',                   # Example placeholder prefix
+    '''example\.com''',            # Example URLs
+    '''pbs\.example\.com''',       # Example hostnames  
+    '''backup-password''',         # Generic test string in code
+    '''os\.Getenv''',              # Code that reads env vars (not the values)
+]
+
+# Stop scanning at a specific commit (set after cleanup)
+# commits = ["YOUR_CLEAN_COMMIT_HASH_HERE"]

@@ -1,0 +1,20 @@
+terraform-provider-pbs
+test.test
+
+# Environment files with credentials
+.env
+*.env
+!*.env.example
+config.env
+!config.env.example
+
+# Vagrant
+.vagrant/
+*.vdi
+*.vmdk
+*.box
+
+# Test artifacts
+test/*.log
+test/.terraform/
+test/.terraform.lock.hcl

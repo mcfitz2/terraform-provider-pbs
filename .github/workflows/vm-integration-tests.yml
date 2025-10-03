@@ -1,0 +1,170 @@
+name: VM Integration Tests (Vagrant)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC to test with full VM
+    - cron: '0 2 * * 0'
+
+jobs:
+  vm-integration-tests:
+    name: VM Integration Tests (with ZFS)
+    runs-on: ubuntu-latest  # Ubuntu runners support KVM/libvirt natively
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22.10'
+        cache: true
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.7"
+        terraform_wrapper: false
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Install Vagrant and libvirt
+      run: |
+        # Install Vagrant
+        wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt-get update
+        sudo apt-get install -y vagrant
+        
+        # Install libvirt and dependencies (including dev package for vagrant-libvirt)
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients libvirt-dev bridge-utils virtinst virt-manager
+        
+        # Install vagrant-libvirt plugin
+        vagrant plugin install vagrant-libvirt
+        
+        # Add user to libvirt and kvm groups
+        sudo usermod -aG libvirt $USER
+        sudo usermod -aG kvm $USER
+        
+        # Start libvirt
+        sudo systemctl enable --now libvirtd
+        sudo systemctl status libvirtd
+        
+        # Set socket permissions to allow access
+        sudo chmod 666 /var/run/libvirt/libvirt-sock
+
+    - name: Verify Vagrant installation
+      run: |
+        vagrant --version
+        virsh version || true
+        ls -la /var/run/libvirt/libvirt-sock || true
+
+    - name: Start PBS VM with Vagrant
+      working-directory: ./test
+      run: |
+        echo "Starting PBS VM provisioning..."
+        # Use libvirt provider for KVM virtualization
+        vagrant up --provider libvirt
+        
+        echo "Waiting for PBS to be fully ready..."
+        sleep 30
+        
+        echo "Checking PBS VM status..."
+        vagrant status
+        
+        echo "Testing PBS API connectivity..."
+        for i in {1..10}; do
+          if curl -k -f -s https://localhost:8007 >/dev/null 2>&1; then
+            echo "✅ PBS API is accessible!"
+            break
+          fi
+          if [ $i -eq 10 ]; then
+            echo "❌ PBS API not accessible after 10 attempts"
+            vagrant ssh -c "sudo systemctl status proxmox-backup.service" || true
+            exit 1
+          fi
+          echo "Attempt $i/10: Waiting for PBS API..."
+          sleep 5
+        done
+
+    - name: Display PBS VM information
+      working-directory: ./test
+      run: |
+        echo "=== PBS VM Information ==="
+        vagrant ssh -c "sudo proxmox-backup-manager version"
+        vagrant ssh -c "sudo zpool list" || echo "No ZFS pools"
+        vagrant ssh -c "sudo systemctl status proxmox-backup.service --no-pager"
+        echo "========================="
+
+    - name: Run integration tests with VM PBS
+      env:
+        PBS_ADDRESS: "https://localhost:8007"
+        PBS_USERNAME: "admin@pbs"
+        PBS_PASSWORD: "pbspbs"
+        PBS_INSECURE_TLS: "true"
+        # S3 provider credentials from secrets (optional for S3 tests)
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+        B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+        B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+        B2_REGION: ${{ vars.B2_REGION || 'us-west-004' }}
+        SCALEWAY_ACCESS_KEY: ${{ secrets.SCALEWAY_ACCESS_KEY }}
+        SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}
+        SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
+      run: |
+        echo "Running full integration test suite with VM PBS..."
+        go test -v -timeout 45m ./test -run "TestIntegration|TestDatastoreZFS"
+
+    - name: Run ZFS-specific tests
+      if: always()
+      env:
+        PBS_ADDRESS: "https://localhost:8007"
+        PBS_USERNAME: "admin@pbs"
+        PBS_PASSWORD: "pbspbs"
+        PBS_INSECURE_TLS: "true"
+      run: |
+        echo "Running ZFS-specific tests..."
+        go test -v -timeout 15m ./test -run "TestDatastoreZFS"
+
+    - name: Collect PBS logs on failure
+      if: failure()
+      working-directory: ./test
+      run: |
+        echo "=== PBS Service Logs ==="
+        vagrant ssh -c "sudo journalctl -u proxmox-backup.service -n 100 --no-pager" || true
+        echo "=== PBS Proxy Logs ==="
+        vagrant ssh -c "sudo journalctl -u proxmox-backup-proxy.service -n 100 --no-pager" || true
+        echo "=== ZFS Status ==="
+        vagrant ssh -c "sudo zpool status" || true
+        vagrant ssh -c "sudo zfs list" || true
+
+    - name: Upload test logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vm-test-logs
+        path: |
+          test/*.log
+          terraform.log
+        retention-days: 7
+
+    - name: Cleanup PBS VM
+      if: always()
+      working-directory: ./test
+      run: |
+        echo "Destroying PBS VM..."
+        vagrant destroy -f || true
+        rm -f zfs-disk.vdi || true
