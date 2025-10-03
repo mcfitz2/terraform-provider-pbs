@@ -6,7 +6,8 @@ This directory contains integration tests that validate the Terraform provider a
 
 1. **Go 1.21+** - Required for running the tests
 2. **Terraform** - Must be installed and available in PATH
-3. **PBS Instance** - A running Proxmox Backup Server instance for testing
+3. **Provider Binary** - Build the provider first: `go build .` (run from project root)
+4. **PBS Instance** - A running Proxmox Backup Server instance for testing
 
 ## Setup Options
 
@@ -15,6 +16,9 @@ This directory contains integration tests that validate the Terraform provider a
 The easiest way to run tests is using the included Docker setup:
 
 ```bash
+# First, build the provider binary (from project root)
+go build .
+
 # Run all tests with Docker PBS container
 ./test/run_docker_tests.sh
 
