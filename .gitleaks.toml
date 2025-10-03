@@ -18,7 +18,8 @@ paths = [
 
 # Content patterns to ignore (known safe values)
 regexes = [
-    '''password123''',             # Test password used in CI/workflows/VM provisioning
+    '''pbspbs''',                  # Test password for Docker image (pre-configured)
+    '''password123''',             # Test password used in Vagrant/VM provisioning
     '''os\.Getenv''',              # Code that reads env vars (not the values)
 ]
 
