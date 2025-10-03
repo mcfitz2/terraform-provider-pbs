@@ -7,7 +7,7 @@ services:
     ports:
       - "8007:8007"
     environment:
-      - PBS_ROOT_PASSWORD=pbspbs
+      - PBS_ROOT_PASSWORD=password123
     mem_limit: 2G
     tmpfs:
       - /run

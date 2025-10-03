@@ -49,7 +49,7 @@ Vagrant.configure("2") do |config|
       echo "PBS VM provisioning complete!"
       echo "Access PBS at: https://localhost:8007"
       echo "Username: admin@pbs"
-      echo "Password: pbspbs"
+      echo "Password: password123"
     SHELL
   end
 end

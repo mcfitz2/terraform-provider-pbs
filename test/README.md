@@ -35,7 +35,7 @@ The easiest way to run tests is using the included Docker setup:
 **Default Docker Credentials:**
 - URL: `https://localhost:8007`
 - Username: `admin@pam`
-- Password: `pbspbs`
+- Password: `password123`
 
 ### Option 2: External PBS Instance
 

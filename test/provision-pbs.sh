@@ -72,14 +72,14 @@ log_success "Proxmox Backup Server installed"
 # Configure PBS admin user
 log_info "Configuring PBS admin user..."
 
-# Create admin user with password 'pbspbs'
+# Create admin user with password 'password123' (min 8 chars required)
 # PBS uses PAM authentication, but we need to set up the PBS realm
-proxmox-backup-manager user create admin@pbs --password pbspbs --email admin@example.com || true
+proxmox-backup-manager user create admin@pbs --password password123 --email admin@example.com || true
 
 # Make sure admin has proper permissions
 proxmox-backup-manager acl update / Admin --auth-id admin@pbs || true
 
-log_success "PBS admin user configured (admin@pbs / pbspbs)"
+log_success "PBS admin user configured (admin@pbs / password123)"
 
 # Set up ZFS pool for testing
 log_info "Setting up ZFS pool for testing..."
@@ -175,7 +175,7 @@ echo ""
 echo "PBS Access:"
 echo "  URL: https://localhost:8007"
 echo "  Username: admin@pbs"
-echo "  Password: pbspbs"
+echo "  Password: password123"
 echo "========================="
 
 log_success "PBS provisioning completed successfully!"

@@ -225,7 +225,7 @@ echo ""
 log_info "Connection Details:"
 echo "  URL:      https://localhost:8007"
 echo "  Username: admin@pbs"
-echo "  Password: pbspbs"
+echo "  Password: password123"
 echo "========================="
 
 # Check S3 credentials
@@ -253,7 +253,7 @@ if [[ "$START_ONLY" == "true" ]]; then
     echo "To run tests manually:"
     echo "  export PBS_ADDRESS=https://localhost:8007"
     echo "  export PBS_USERNAME=admin@pbs"
-    echo "  export PBS_PASSWORD=pbspbs"
+    echo "  export PBS_PASSWORD=password123"
     echo "  export PBS_INSECURE_TLS=true"
     echo "  cd .."
     echo "  go test $VERBOSE ./test -run \"\${TEST_PATTERN:-.*}\""
@@ -268,7 +268,7 @@ fi
 # Set up environment for tests
 export PBS_ADDRESS="https://localhost:8007"
 export PBS_USERNAME="admin@pbs"
-export PBS_PASSWORD="pbspbs"
+export PBS_PASSWORD="password123"
 export PBS_INSECURE_TLS="true"
 
 # Run tests
