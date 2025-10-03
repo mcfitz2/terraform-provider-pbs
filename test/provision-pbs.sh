@@ -31,6 +31,11 @@ log_info "Starting PBS provisioning on Debian VM..."
 # Update system
 log_info "Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
+
+# Enable contrib repository for ZFS support
+log_info "Enabling contrib repository for ZFS..."
+sed -i 's/main$/main contrib/g' /etc/apt/sources.list
+
 apt-get update -qq
 apt-get upgrade -y -qq
 
