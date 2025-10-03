@@ -41,7 +41,7 @@ jobs:
           - 8007:8007
         env:
           PBS_USER: admin@pbs
-          PBS_PASSWORD: password123
+          PBS_PASSWORD: pbspbs
         options: >-
           --memory=2g
           --tmpfs /run
@@ -88,7 +88,7 @@ jobs:
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
-        PBS_PASSWORD: "password123"
+        PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
       run: |
         go test -v -timeout 15m ./test -run "TestQuickSmoke|TestDatastore"
@@ -114,7 +114,7 @@ jobs:
           - 8007:8007
         env:
           PBS_USER: admin@pbs
-          PBS_PASSWORD: password123
+          PBS_PASSWORD: pbspbs
         options: >-
           --memory=2g
           --tmpfs /run
@@ -161,7 +161,7 @@ jobs:
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
-        PBS_PASSWORD: "password123"
+        PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -200,7 +200,7 @@ jobs:
           - 8007:8007
         env:
           PBS_USER: admin@pbs
-          PBS_PASSWORD: password123
+          PBS_PASSWORD: pbspbs
         options: >-
           --memory=2g
           --tmpfs /run
@@ -247,7 +247,7 @@ jobs:
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
-        PBS_PASSWORD: "password123"
+        PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
         B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
         B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
@@ -286,7 +286,7 @@ jobs:
           - 8007:8007
         env:
           PBS_USER: admin@pbs
-          PBS_PASSWORD: password123
+          PBS_PASSWORD: pbspbs
         options: >-
           --memory=2g
           --tmpfs /run
@@ -333,7 +333,7 @@ jobs:
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
-        PBS_PASSWORD: "password123"
+        PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
         SCALEWAY_ACCESS_KEY: ${{ secrets.SCALEWAY_ACCESS_KEY }}
         SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}

@@ -81,15 +81,27 @@ proxmox-backup-manager acl update / Admin --auth-id admin@pbs || true
 
 log_success "PBS admin user configured (admin@pbs / password123)"
 
+# Load ZFS kernel modules
+log_info "Loading ZFS kernel modules..."
+modprobe zfs || log_warning "Failed to load ZFS modules, ZFS functionality may be limited"
+
 # Set up ZFS pool for testing
 log_info "Setting up ZFS pool for testing..."
 
-# Check if additional disk exists (should be /dev/sdb)
-if [ -b /dev/sdb ]; then
-    log_info "Found additional disk /dev/sdb, creating ZFS pool 'testpool'..."
+# Check if additional disk exists (should be /dev/vdb for libvirt or /dev/sdb for virtualbox)
+if [ -b /dev/vdb ]; then
+    DISK="/dev/vdb"
+elif [ -b /dev/sdb ]; then
+    DISK="/dev/sdb"
+else
+    DISK=""
+fi
+
+if [ -n "$DISK" ]; then
+    log_info "Found additional disk $DISK, creating ZFS pool 'testpool'..."
     
     # Create ZFS pool
-    zpool create -f testpool /dev/sdb || {
+    zpool create -f testpool $DISK || {
         log_warning "ZFS pool creation failed, checking if it already exists..."
         if zpool list testpool >/dev/null 2>&1; then
             log_info "ZFS pool 'testpool' already exists"
@@ -115,7 +127,7 @@ if [ -b /dev/sdb ]; then
     zpool status testpool
     zfs list testpool
 else
-    log_warning "No additional disk found (/dev/sdb), ZFS tests will be limited"
+    log_warning "No additional disk found (/dev/vdb or /dev/sdb), ZFS tests will be limited"
     log_info "To enable full ZFS testing, ensure Vagrant creates a second disk"
 fi
 

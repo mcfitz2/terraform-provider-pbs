@@ -40,6 +40,9 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Build provider binary
+      run: go build .
+
     - name: Install Vagrant and libvirt
       run: |
         # Install Vagrant
