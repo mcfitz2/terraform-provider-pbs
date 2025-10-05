@@ -178,7 +178,7 @@ func (r *notificationEndpointResource) Read(ctx context.Context, req resource.Re
 
 	// Update state with values from API
 	state.Name = types.StringValue(endpoint.Name)
-	
+
 	if len(endpoint.Targets) > 0 {
 		targets, diags := types.ListValueFrom(ctx, types.StringType, endpoint.Targets)
 		resp.Diagnostics.Append(diags...)

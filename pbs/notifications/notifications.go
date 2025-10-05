@@ -38,19 +38,19 @@ const (
 
 // SMTPTarget represents an SMTP notification target configuration
 type SMTPTarget struct {
-	Name        string `json:"name"`
-	From        string `json:"from-address"`
-	To          string `json:"mailto"`
-	Mailto      string `json:"mailto-user,omitempty"`
-	Server      string `json:"server"`
-	Port        *int   `json:"port,omitempty"`
-	Mode        string `json:"mode,omitempty"` // insecure, starttls, tls
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty"`
-	Author      string `json:"author,omitempty"`
-	Comment     string `json:"comment,omitempty"`
-	Disable     *bool  `json:"disable,omitempty"`
-	MailtoUser  string `json:"mailto-user,omitempty"`
+	Name       string `json:"name"`
+	From       string `json:"from-address"`
+	To         string `json:"mailto"`
+	Mailto     string `json:"mailto-user,omitempty"`
+	Server     string `json:"server"`
+	Port       *int   `json:"port,omitempty"`
+	Mode       string `json:"mode,omitempty"` // insecure, starttls, tls
+	Username   string `json:"username,omitempty"`
+	Password   string `json:"password,omitempty"`
+	Author     string `json:"author,omitempty"`
+	Comment    string `json:"comment,omitempty"`
+	Disable    *bool  `json:"disable,omitempty"`
+	MailtoUser string `json:"mailto-user,omitempty"`
 }
 
 // GotifyTarget represents a Gotify notification target configuration
@@ -75,14 +75,14 @@ type SendmailTarget struct {
 
 // WebhookTarget represents a Webhook notification target configuration
 type WebhookTarget struct {
-	Name       string            `json:"name"`
-	URL        string            `json:"url"`
-	Body       string            `json:"body,omitempty"`
-	Method     string            `json:"method,omitempty"` // POST, PUT
-	Headers    map[string]string `json:"header,omitempty"`
-	Secret     string            `json:"secret,omitempty"`
-	Comment    string            `json:"comment,omitempty"`
-	Disable    *bool             `json:"disable,omitempty"`
+	Name    string            `json:"name"`
+	URL     string            `json:"url"`
+	Body    string            `json:"body,omitempty"`
+	Method  string            `json:"method,omitempty"` // POST, PUT
+	Headers map[string]string `json:"header,omitempty"`
+	Secret  string            `json:"secret,omitempty"`
+	Comment string            `json:"comment,omitempty"`
+	Disable *bool             `json:"disable,omitempty"`
 }
 
 // SMTP Target Methods
@@ -714,15 +714,15 @@ func (c *Client) DeleteNotificationEndpoint(ctx context.Context, name string) er
 
 // NotificationMatcher represents a notification matcher (routing rule)
 type NotificationMatcher struct {
-	Name             string   `json:"name"`
-	Targets          []string `json:"target,omitempty"`
-	MatchSeverity    []string `json:"match-severity,omitempty"`    // info, notice, warning, error
-	MatchField       []string `json:"match-field,omitempty"`       // field=value pairs
-	MatchCalendar    []string `json:"match-calendar,omitempty"`    // calendar IDs
-	Mode             string   `json:"mode,omitempty"`              // all, any
-	InvertMatch      *bool    `json:"invert-match,omitempty"`
-	Comment          string   `json:"comment,omitempty"`
-	Disable          *bool    `json:"disable,omitempty"`
+	Name          string   `json:"name"`
+	Targets       []string `json:"target,omitempty"`
+	MatchSeverity []string `json:"match-severity,omitempty"` // info, notice, warning, error
+	MatchField    []string `json:"match-field,omitempty"`    // field=value pairs
+	MatchCalendar []string `json:"match-calendar,omitempty"` // calendar IDs
+	Mode          string   `json:"mode,omitempty"`           // all, any
+	InvertMatch   *bool    `json:"invert-match,omitempty"`
+	Comment       string   `json:"comment,omitempty"`
+	Disable       *bool    `json:"disable,omitempty"`
 }
 
 // ListNotificationMatchers lists all notification matchers

@@ -36,20 +36,20 @@ const (
 
 // MetricsServer represents a metrics server configuration
 type MetricsServer struct {
-	Name           string            `json:"name"`
-	Type           MetricsServerType `json:"type"`
-	Enable         *bool             `json:"enable,omitempty"`
-	Server         string            `json:"server"`
-	Port           int               `json:"port"`
-	MTU            *int              `json:"mtu,omitempty"`
-	Organization   string            `json:"organization,omitempty"`   // InfluxDB HTTP only
-	Bucket         string            `json:"bucket,omitempty"`         // InfluxDB HTTP only
-	Token          string            `json:"token,omitempty"`          // InfluxDB HTTP only
-	MaxBodySize    *int              `json:"max-body-size,omitempty"`  // InfluxDB HTTP only
-	VerifyTLS      *bool             `json:"verify-tls,omitempty"`     // InfluxDB HTTP only
-	Timeout        *int              `json:"timeout,omitempty"`        // InfluxDB HTTP only
-	Protocol       string            `json:"proto,omitempty"`          // InfluxDB UDP only (udp/tcp)
-	Comment        string            `json:"comment,omitempty"`
+	Name         string            `json:"name"`
+	Type         MetricsServerType `json:"type"`
+	Enable       *bool             `json:"enable,omitempty"`
+	Server       string            `json:"server"`
+	Port         int               `json:"port"`
+	MTU          *int              `json:"mtu,omitempty"`
+	Organization string            `json:"organization,omitempty"`  // InfluxDB HTTP only
+	Bucket       string            `json:"bucket,omitempty"`        // InfluxDB HTTP only
+	Token        string            `json:"token,omitempty"`         // InfluxDB HTTP only
+	MaxBodySize  *int              `json:"max-body-size,omitempty"` // InfluxDB HTTP only
+	VerifyTLS    *bool             `json:"verify-tls,omitempty"`    // InfluxDB HTTP only
+	Timeout      *int              `json:"timeout,omitempty"`       // InfluxDB HTTP only
+	Protocol     string            `json:"proto,omitempty"`         // InfluxDB UDP only (udp/tcp)
+	Comment      string            `json:"comment,omitempty"`
 }
 
 // ListMetricsServers lists all metrics server configurations

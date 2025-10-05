@@ -30,21 +30,21 @@ func NewClient(apiClient *api.Client) *Client {
 
 // PruneJob represents a prune job configuration
 type PruneJob struct {
-	ID            string `json:"id"`
-	Store         string `json:"store"`
-	Schedule      string `json:"schedule"`
-	KeepLast      *int   `json:"keep-last,omitempty"`
-	KeepHourly    *int   `json:"keep-hourly,omitempty"`
-	KeepDaily     *int   `json:"keep-daily,omitempty"`
-	KeepWeekly    *int   `json:"keep-weekly,omitempty"`
-	KeepMonthly   *int   `json:"keep-monthly,omitempty"`
-	KeepYearly    *int   `json:"keep-yearly,omitempty"`
-	MaxDepth      *int   `json:"max-depth,omitempty"`
-	NamespaceRE   string `json:"ns,omitempty"`
-	BackupType    string `json:"backup-type,omitempty"` // vm, ct, host
-	BackupID      string `json:"backup-id,omitempty"`
-	Comment       string `json:"comment,omitempty"`
-	Disable       *bool  `json:"disable,omitempty"`
+	ID          string `json:"id"`
+	Store       string `json:"store"`
+	Schedule    string `json:"schedule"`
+	KeepLast    *int   `json:"keep-last,omitempty"`
+	KeepHourly  *int   `json:"keep-hourly,omitempty"`
+	KeepDaily   *int   `json:"keep-daily,omitempty"`
+	KeepWeekly  *int   `json:"keep-weekly,omitempty"`
+	KeepMonthly *int   `json:"keep-monthly,omitempty"`
+	KeepYearly  *int   `json:"keep-yearly,omitempty"`
+	MaxDepth    *int   `json:"max-depth,omitempty"`
+	NamespaceRE string `json:"ns,omitempty"`
+	BackupType  string `json:"backup-type,omitempty"` // vm, ct, host
+	BackupID    string `json:"backup-id,omitempty"`
+	Comment     string `json:"comment,omitempty"`
+	Disable     *bool  `json:"disable,omitempty"`
 }
 
 // ListPruneJobs lists all prune job configurations
@@ -220,19 +220,19 @@ func (c *Client) DeletePruneJob(ctx context.Context, id string) error {
 
 // SyncJob represents a sync job configuration
 type SyncJob struct {
-	ID              string   `json:"id"`
-	Store           string   `json:"store"`
-	Remote          string   `json:"remote"`
-	RemoteStore     string   `json:"remote-store"`
-	Schedule        string   `json:"schedule"`
-	NamespaceRE     string   `json:"ns,omitempty"`
-	MaxDepth        *int     `json:"max-depth,omitempty"`
-	GroupFilter     []string `json:"group-filter,omitempty"`
-	RemoveVanished  *bool    `json:"remove-vanished,omitempty"`
-	Comment         string   `json:"comment,omitempty"`
-	Disable         *bool    `json:"disable,omitempty"`
-	Owner           string   `json:"owner,omitempty"`
-	RateLimitKBPS   *int     `json:"rate-in,omitempty"`
+	ID             string   `json:"id"`
+	Store          string   `json:"store"`
+	Remote         string   `json:"remote"`
+	RemoteStore    string   `json:"remote-store"`
+	Schedule       string   `json:"schedule"`
+	NamespaceRE    string   `json:"ns,omitempty"`
+	MaxDepth       *int     `json:"max-depth,omitempty"`
+	GroupFilter    []string `json:"group-filter,omitempty"`
+	RemoveVanished *bool    `json:"remove-vanished,omitempty"`
+	Comment        string   `json:"comment,omitempty"`
+	Disable        *bool    `json:"disable,omitempty"`
+	Owner          string   `json:"owner,omitempty"`
+	RateLimitKBPS  *int     `json:"rate-in,omitempty"`
 }
 
 // ListSyncJobs lists all sync job configurations
@@ -398,15 +398,15 @@ func (c *Client) DeleteSyncJob(ctx context.Context, id string) error {
 
 // VerifyJob represents a verification job configuration
 type VerifyJob struct {
-	ID              string `json:"id"`
-	Store           string `json:"store"`
-	Schedule        string `json:"schedule"`
-	IgnoreVerified  *bool  `json:"ignore-verified,omitempty"`
-	OutdatedAfter   *int   `json:"outdated-after,omitempty"` // days
-	NamespaceRE     string `json:"ns,omitempty"`
-	MaxDepth        *int   `json:"max-depth,omitempty"`
-	Comment         string `json:"comment,omitempty"`
-	Disable         *bool  `json:"disable,omitempty"`
+	ID             string `json:"id"`
+	Store          string `json:"store"`
+	Schedule       string `json:"schedule"`
+	IgnoreVerified *bool  `json:"ignore-verified,omitempty"`
+	OutdatedAfter  *int   `json:"outdated-after,omitempty"` // days
+	NamespaceRE    string `json:"ns,omitempty"`
+	MaxDepth       *int   `json:"max-depth,omitempty"`
+	Comment        string `json:"comment,omitempty"`
+	Disable        *bool  `json:"disable,omitempty"`
 }
 
 // ListVerifyJobs lists all verify job configurations

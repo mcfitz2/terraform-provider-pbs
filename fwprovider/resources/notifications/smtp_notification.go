@@ -248,7 +248,7 @@ func (r *smtpNotificationResource) Read(ctx context.Context, req resource.ReadRe
 	// Update state with values from API
 	state.Server = types.StringValue(target.Server)
 	state.From = types.StringValue(target.From)
-	
+
 	if target.Port != nil {
 		state.Port = types.Int64Value(int64(*target.Port))
 	}

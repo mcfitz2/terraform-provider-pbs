@@ -44,13 +44,13 @@ type metricsServerResource struct {
 
 // metricsServerResourceModel maps the resource schema data.
 type metricsServerResourceModel struct {
-	Name        types.String `tfsdk:"name"`
-	Type        types.String `tfsdk:"type"`
-	Server      types.String `tfsdk:"server"`
-	Port        types.Int64  `tfsdk:"port"`
-	Enable      types.Bool   `tfsdk:"enable"`
-	MTU         types.Int64  `tfsdk:"mtu"`
-	Protocol    types.String `tfsdk:"protocol"`
+	Name         types.String `tfsdk:"name"`
+	Type         types.String `tfsdk:"type"`
+	Server       types.String `tfsdk:"server"`
+	Port         types.Int64  `tfsdk:"port"`
+	Enable       types.Bool   `tfsdk:"enable"`
+	MTU          types.Int64  `tfsdk:"mtu"`
+	Protocol     types.String `tfsdk:"protocol"`
 	Organization types.String `tfsdk:"organization"`
 	Bucket       types.String `tfsdk:"bucket"`
 	Token        types.String `tfsdk:"token"`
@@ -285,7 +285,7 @@ func (r *metricsServerResource) Read(ctx context.Context, req resource.ReadReque
 	// Update state with values from API
 	state.Server = types.StringValue(server.Server)
 	state.Port = types.Int64Value(int64(server.Port))
-	
+
 	if server.Enable != nil {
 		state.Enable = types.BoolValue(*server.Enable)
 	}
