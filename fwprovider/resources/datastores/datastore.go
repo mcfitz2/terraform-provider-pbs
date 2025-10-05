@@ -4,8 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// Package resources provides Terraform resources for the PBS provider
-package resources
+// Package datastores provides Terraform resources for PBS datastores
+package datastores
 
 import (
 	"context"
