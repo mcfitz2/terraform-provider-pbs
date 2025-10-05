@@ -91,7 +91,7 @@ jobs:
         PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
       run: |
-        go test -v -timeout 15m ./test -run "TestQuickSmoke|TestDatastore"
+        go test -v -timeout 15m ./test/integration -run "TestQuickSmoke|TestDatastore"
 
     - name: Upload test logs
       if: failure()
@@ -99,7 +99,7 @@ jobs:
       with:
         name: quick-datastore-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-aws-tests:
@@ -177,7 +177,7 @@ jobs:
           exit 0
         fi
         echo "Running AWS S3 tests..."
-        go test -v -timeout 20m ./test -run "AWS"
+        go test -v -timeout 20m ./test/integration -run "AWS"
 
     - name: Upload test logs
       if: failure()
@@ -185,7 +185,7 @@ jobs:
       with:
         name: aws-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-backblaze-tests:
@@ -263,7 +263,7 @@ jobs:
           exit 0
         fi
         echo "Running Backblaze B2 tests..."
-        go test -v -timeout 20m ./test -run "Backblaze|B2"
+        go test -v -timeout 20m ./test/integration -run "Backblaze|B2"
 
     - name: Upload test logs
       if: failure()
@@ -271,7 +271,7 @@ jobs:
       with:
         name: b2-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-scaleway-tests:
@@ -349,7 +349,7 @@ jobs:
           exit 0
         fi
         echo "Running Scaleway tests..."
-        go test -v -timeout 20m ./test -run "Scaleway"
+        go test -v -timeout 20m ./test/integration -run "Scaleway"
 
     - name: Upload test logs
       if: failure()
@@ -357,7 +357,7 @@ jobs:
       with:
         name: scaleway-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-cleanup-tests:
@@ -391,7 +391,7 @@ jobs:
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
         echo "Running S3 cleanup tests..."
-        go test -v -timeout 10m ./test -run "TestCleanup"
+        go test -v -timeout 10m ./test/integration -run "TestCleanup"
 
   test-summary:
     name: Test Summary

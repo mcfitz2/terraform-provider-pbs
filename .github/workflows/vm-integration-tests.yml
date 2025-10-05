@@ -129,7 +129,7 @@ jobs:
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
         echo "Running full integration test suite with VM PBS..."
-        go test -v -timeout 45m ./test -run "TestIntegration|TestDatastoreZFS"
+        go test -v -timeout 45m ./test/integration -run "TestIntegration|TestDatastoreZFS"
 
     - name: Run ZFS-specific tests
       if: always()
@@ -140,7 +140,7 @@ jobs:
         PBS_INSECURE_TLS: "true"
       run: |
         echo "Running ZFS-specific tests..."
-        go test -v -timeout 15m ./test -run "TestDatastoreZFS"
+        go test -v -timeout 15m ./test/integration -run "TestDatastoreZFS"
 
     - name: Collect PBS logs on failure
       if: failure()
@@ -160,7 +160,7 @@ jobs:
       with:
         name: vm-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
           terraform.log
         retention-days: 7
 

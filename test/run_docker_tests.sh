@@ -197,7 +197,7 @@ if [[ "$START_ONLY" == "true" ]]; then
     echo "  export PBS_USERNAME=admin@pbs"
     echo "  export PBS_PASSWORD=pbspbs"
     echo "  export PBS_INSECURE_TLS=true"
-    echo "  go test $VERBOSE ./test -run \"\${TEST_PATTERN:-.*}\""
+    echo "  go test $VERBOSE ./test/integration -run \"\${TEST_PATTERN:-.*}\""
     echo
     echo "To stop the container:"
     echo "  $0 --cleanup"
@@ -229,10 +229,10 @@ cd "$SCRIPT_DIR/.."
 
 if [[ -n "$TEST_PATTERN" ]]; then
     log_info "Running tests matching pattern: $TEST_PATTERN"
-    go test $VERBOSE ./test -run "$TEST_PATTERN"
+    go test $VERBOSE ./test/integration -run "$TEST_PATTERN"
 else
     log_info "Running all integration tests"
-    go test $VERBOSE ./test
+    go test $VERBOSE ./test/integration
 fi
 
 test_exit_code=$?

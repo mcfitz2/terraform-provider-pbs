@@ -256,7 +256,7 @@ if [[ "$START_ONLY" == "true" ]]; then
     echo "  export PBS_PASSWORD=password123"
     echo "  export PBS_INSECURE_TLS=true"
     echo "  cd .."
-    echo "  go test $VERBOSE ./test -run \"\${TEST_PATTERN:-.*}\""
+    echo "  go test $VERBOSE ./test/integration -run \"\${TEST_PATTERN:-.*}\""
     echo
     echo "Useful commands:"
     echo "  $0 --ssh              # SSH into VM"
@@ -277,10 +277,10 @@ cd "$SCRIPT_DIR/.."
 
 if [[ -n "$TEST_PATTERN" ]]; then
     log_info "Running tests matching pattern: $TEST_PATTERN"
-    go test $VERBOSE ./test -timeout 30m -run "$TEST_PATTERN"
+    go test $VERBOSE ./test/integration -timeout 30m -run "$TEST_PATTERN"
 else
     log_info "Running all integration tests (including ZFS)"
-    go test $VERBOSE ./test -timeout 45m
+    go test $VERBOSE ./test/integration -timeout 45m
 fi
 
 test_exit_code=$?
