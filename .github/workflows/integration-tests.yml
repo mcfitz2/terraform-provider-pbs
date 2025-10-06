@@ -91,7 +91,8 @@ jobs:
         PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
       run: |
-        go test -v -timeout 15m ./test/integration -run "TestQuickSmoke|TestDatastore"
+        # Run all datastore tests except ZFS (ZFS requires VM with kernel modules)
+        go test -v -timeout 15m ./test/integration -run "TestQuickSmoke|TestDatastore" -skip "TestDatastoreZFS"
 
     - name: Upload test logs
       if: failure()
