@@ -109,6 +109,7 @@ func TestDatastoreZFSIntegration(t *testing.T) {
 resource "pbs_datastore" "test_zfs" {
   name        = "%s"
   type        = "zfs"
+  path        = "/mnt/datastore/%s"
   zfs_pool    = "testpool"
   zfs_dataset = "backup/%s"
   content     = ["backup"]
@@ -117,7 +118,7 @@ resource "pbs_datastore" "test_zfs" {
   block_size  = "8K"
   max_backups = 15
 }
-`, datastoreName, datastoreName)
+`, datastoreName, datastoreName, datastoreName)
 
 	// Write terraform configuration
 	tc.WriteMainTF(t, testConfig)

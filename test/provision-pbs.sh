@@ -39,15 +39,25 @@ sed -i 's/main$/main contrib/g' /etc/apt/sources.list
 apt-get update -qq
 apt-get upgrade -y -qq
 
-# Install required packages
+# Install required packages (ZFS headers must match kernel)
 log_info "Installing required packages (ZFS, curl, gnupg)..."
+
+# Get current running kernel version
+RUNNING_KERNEL=$(uname -r)
+log_info "Running kernel: $RUNNING_KERNEL"
+
+# Install base packages first
 apt-get install -y -qq \
     curl \
     gnupg \
     lsb-release \
     ca-certificates \
-    zfsutils-linux \
     software-properties-common
+
+# Install ZFS packages that match the current kernel
+apt-get install -y -qq \
+    linux-headers-${RUNNING_KERNEL} \
+    zfsutils-linux
 
 log_success "Base packages installed"
 
@@ -68,6 +78,17 @@ log_info "Installing Proxmox Backup Server (this may take several minutes)..."
 apt-get install -y -qq proxmox-backup-server
 
 log_success "Proxmox Backup Server installed"
+
+# Ensure ZFS modules are available for current running kernel
+log_info "Ensuring ZFS modules match running kernel..."
+RUNNING_KERNEL=$(uname -r)
+
+# If modules aren't available, rebuild them
+if ! modinfo zfs >/dev/null 2>&1; then
+    log_warning "ZFS modules not found for kernel $RUNNING_KERNEL, attempting to build..."
+    apt-get install -y -qq linux-headers-${RUNNING_KERNEL} dkms
+    dpkg-reconfigure zfs-dkms || log_warning "Failed to rebuild ZFS modules"
+fi
 
 # Configure PBS admin user
 log_info "Configuring PBS admin user..."
