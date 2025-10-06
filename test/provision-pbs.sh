@@ -59,47 +59,70 @@ log_info "Running kernel: $RUNNING_KERNEL"
 log_info "Installing DKMS and kernel headers..."
 apt-get install -y -qq dkms
 
-# Try to install headers for running kernel, fallback to generic if not available
-if ! apt-get install -y -qq linux-headers-${RUNNING_KERNEL} 2>/dev/null; then
-    log_warning "Headers for kernel ${RUNNING_KERNEL} not available"
-    log_info "Installing latest kernel headers..."
-    apt-get install -y -qq linux-headers-amd64
-    
-    # Update RUNNING_KERNEL to the newly installed headers
-    NEW_KERNEL=$(ls -1 /lib/modules/ | grep -v "$(uname -r)" | sort -V | tail -1)
-    if [ -n "$NEW_KERNEL" ]; then
-        log_info "New kernel headers installed for: $NEW_KERNEL"
-        log_info "Note: Will build ZFS for both $RUNNING_KERNEL and $NEW_KERNEL"
-    fi
+# Install headers for running kernel
+log_info "Installing headers for running kernel $RUNNING_KERNEL..."
+if apt-get install -y -qq linux-headers-${RUNNING_KERNEL} 2>/dev/null; then
+    log_success "Headers for $RUNNING_KERNEL installed"
+else
+    log_warning "Headers for kernel ${RUNNING_KERNEL} not available in repos"
 fi
 
 # Install ZFS which will use DKMS to build modules
 log_info "Installing ZFS packages (this may take a few minutes)..."
 apt-get install -y -qq zfs-dkms zfsutils-linux
 
-# Force DKMS to build ZFS modules for running kernel
-log_info "Building ZFS modules with DKMS..."
+# Get ZFS version
 ZFS_VERSION=$(dkms status zfs | head -1 | cut -d',' -f1 | cut -d'/' -f2 || echo "")
-if [ -n "$ZFS_VERSION" ]; then
-    log_info "ZFS version: $ZFS_VERSION"
-    dkms build -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1 || log_warning "DKMS build reported warnings"
-    dkms install -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1 || log_warning "DKMS install reported warnings"
-else
-    log_warning "Could not determine ZFS version from DKMS"
+if [ -z "$ZFS_VERSION" ]; then
+    log_error "Could not determine ZFS version from DKMS"
+    exit 1
+fi
+log_info "ZFS version: $ZFS_VERSION"
+
+# DKMS may have already built for available kernels. Check what we have.
+log_info "Checking DKMS status:"
+dkms status zfs
+
+# If modules aren't available for running kernel, try to build them
+if ! find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null | grep -q .; then
+    log_info "Building ZFS modules for running kernel $RUNNING_KERNEL..."
+    if dkms build -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1; then
+        log_success "ZFS built for $RUNNING_KERNEL"
+        dkms install -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1 || log_warning "DKMS install had warnings"
+    else
+        log_warning "Could not build ZFS for $RUNNING_KERNEL (headers may not be available)"
+    fi
 fi
 
-# Verify ZFS modules can be loaded
-log_info "Loading ZFS modules..."
-if modprobe zfs 2>/dev/null; then
-    log_success "ZFS modules loaded successfully"
-    modinfo zfs | grep -E "^(filename|version):" | head -2
+# Check if modules are available for the running kernel after build attempt
+log_info "Checking for ZFS modules in running kernel..."
+if find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null | grep -q .; then
+    # Modules exist, try to load them
+    log_info "Loading ZFS modules..."
+    if modprobe zfs 2>/dev/null; then
+        log_success "ZFS modules loaded successfully for kernel $RUNNING_KERNEL"
+        modinfo zfs | grep -E "^(filename|version):" | head -2
+    else
+        log_error "ZFS modules exist but failed to load"
+        exit 1
+    fi
 else
-    log_error "Failed to load ZFS modules for kernel $RUNNING_KERNEL"
-    log_info "Available modules:"
-    find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null || log_info "No ZFS modules found"
-    log_info "DKMS status:"
-    dkms status zfs
-    exit 1
+    # No modules for running kernel - check if they were built for newer kernel
+    log_warning "No ZFS modules found for running kernel $RUNNING_KERNEL"
+    log_info "Checking for ZFS modules in other kernels..."
+    
+    # Find any kernel with ZFS modules
+    ZFS_KERNEL=$(find /lib/modules -name "zfs.ko*" 2>/dev/null | head -1 | cut -d'/' -f4)
+    
+    if [ -n "$ZFS_KERNEL" ]; then
+        log_warning "ZFS modules built for kernel $ZFS_KERNEL but running $RUNNING_KERNEL"
+        log_info "A reboot will be required before ZFS can be used"
+        log_info "Continuing with provisioning - ZFS will be available after reboot"
+    else
+        log_error "No ZFS modules found for any kernel!"
+        dkms status zfs
+        exit 1
+    fi
 fi
 
 log_success "ZFS packages installed and verified"
