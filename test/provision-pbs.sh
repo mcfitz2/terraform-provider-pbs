@@ -56,23 +56,53 @@ RUNNING_KERNEL=$(uname -r)
 log_info "Running kernel: $RUNNING_KERNEL"
 
 # Install DKMS and headers for current kernel first
-apt-get install -y -qq \
-    dkms \
-    linux-headers-${RUNNING_KERNEL} || {
-        log_warning "Headers for kernel ${RUNNING_KERNEL} not available, installing generic headers"
-        apt-get install -y -qq linux-headers-amd64
-    }
+log_info "Installing DKMS and kernel headers..."
+apt-get install -y -qq dkms
 
-# Install ZFS which will use DKMS to build modules for current kernel
+# Try to install headers for running kernel, fallback to generic if not available
+if ! apt-get install -y -qq linux-headers-${RUNNING_KERNEL} 2>/dev/null; then
+    log_warning "Headers for kernel ${RUNNING_KERNEL} not available"
+    log_info "Installing latest kernel headers..."
+    apt-get install -y -qq linux-headers-amd64
+    
+    # Update RUNNING_KERNEL to the newly installed headers
+    NEW_KERNEL=$(ls -1 /lib/modules/ | grep -v "$(uname -r)" | sort -V | tail -1)
+    if [ -n "$NEW_KERNEL" ]; then
+        log_info "New kernel headers installed for: $NEW_KERNEL"
+        log_info "Note: Will build ZFS for both $RUNNING_KERNEL and $NEW_KERNEL"
+    fi
+fi
+
+# Install ZFS which will use DKMS to build modules
+log_info "Installing ZFS packages (this may take a few minutes)..."
 apt-get install -y -qq zfs-dkms zfsutils-linux
 
-# Verify ZFS modules loaded successfully
-log_info "Loading ZFS modules..."
-modprobe zfs || {
-    log_warning "ZFS modules failed to load, will retry after system upgrade"
-}
+# Force DKMS to build ZFS modules for running kernel
+log_info "Building ZFS modules with DKMS..."
+ZFS_VERSION=$(dkms status zfs | head -1 | cut -d',' -f1 | cut -d'/' -f2 || echo "")
+if [ -n "$ZFS_VERSION" ]; then
+    log_info "ZFS version: $ZFS_VERSION"
+    dkms build -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1 || log_warning "DKMS build reported warnings"
+    dkms install -m zfs -v "$ZFS_VERSION" -k "$RUNNING_KERNEL" 2>&1 || log_warning "DKMS install reported warnings"
+else
+    log_warning "Could not determine ZFS version from DKMS"
+fi
 
-log_success "ZFS packages installed"
+# Verify ZFS modules can be loaded
+log_info "Loading ZFS modules..."
+if modprobe zfs 2>/dev/null; then
+    log_success "ZFS modules loaded successfully"
+    modinfo zfs | grep -E "^(filename|version):" | head -2
+else
+    log_error "Failed to load ZFS modules for kernel $RUNNING_KERNEL"
+    log_info "Available modules:"
+    find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null || log_info "No ZFS modules found"
+    log_info "DKMS status:"
+    dkms status zfs
+    exit 1
+fi
+
+log_success "ZFS packages installed and verified"
 
 # Now upgrade the rest of the system
 log_info "Upgrading remaining system packages..."
