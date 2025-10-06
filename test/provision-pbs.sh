@@ -73,8 +73,9 @@ if [ ! -f "$PROVISION_MARKER" ]; then
     if [ "$RUNNING_KERNEL" != "$LATEST_KERNEL" ]; then
         log_warning "Kernel upgraded from $RUNNING_KERNEL to $LATEST_KERNEL"
         log_info "Rebooting to use new kernel before installing ZFS..."
-        log_info "Provisioning will continue after reboot..."
-        reboot
+        log_info "Provisioning will continue automatically after reboot..."
+        # Use nohup to avoid SSH connection issues
+        nohup sh -c 'sleep 2 && shutdown -r now' > /dev/null 2>&1 &
         exit 0
     else
         log_info "Already running latest kernel: $RUNNING_KERNEL"
