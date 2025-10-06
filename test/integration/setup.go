@@ -146,9 +146,9 @@ provider "pbs" {
 
 // getProjectRoot returns the absolute path to the project root containing the built provider
 func (tc *TestContext) getProjectRoot() string {
-	// Get absolute path to the project root (parent directory of test/)
+	// Get absolute path to the project root (two levels up from test/integration/)
 	wd, _ := os.Getwd()
-	return filepath.Dir(wd)
+	return filepath.Dir(filepath.Dir(wd))
 }
 
 // setupLocalProvider configures the local provider binary for terraform

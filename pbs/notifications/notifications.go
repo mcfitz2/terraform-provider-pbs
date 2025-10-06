@@ -41,7 +41,6 @@ type SMTPTarget struct {
 	Name       string `json:"name"`
 	From       string `json:"from-address"`
 	To         string `json:"mailto"`
-	Mailto     string `json:"mailto-user,omitempty"`
 	Server     string `json:"server"`
 	Port       *int   `json:"port,omitempty"`
 	Mode       string `json:"mode,omitempty"` // insecure, starttls, tls
