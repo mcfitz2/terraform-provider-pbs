@@ -31,62 +31,31 @@ log_info "Starting PBS provisioning on Debian VM..."
 # Export for non-interactive mode
 export DEBIAN_FRONTEND=noninteractive
 
-# Check if this is the first run or after reboot
-PROVISION_MARKER="/var/lib/pbs-provision-stage"
-
-if [ ! -f "$PROVISION_MARKER" ]; then
-    log_info "=== STAGE 1: Update system and prepare for ZFS ==="
-    
-    # Enable contrib repository for ZFS support
-    log_info "Enabling contrib repository for ZFS..."
-    sed -i 's/main$/main contrib/g' /etc/apt/sources.list
-    
-    # Update package lists
-    log_info "Updating package lists..."
-    apt-get update -qq
-    
-    # Install base packages first
-    log_info "Installing base packages..."
-    apt-get install -y -qq \
-        curl \
-        gnupg \
-        lsb-release \
-        ca-certificates \
-        software-properties-common \
-        dkms
-    
-    # Upgrade system packages including kernel
-    log_info "Upgrading system packages (including kernel)..."
-    apt-get upgrade -y -qq
-    
-    # Install kernel headers for the LATEST kernel (after upgrade)
-    log_info "Installing latest kernel headers..."
-    apt-get install -y -qq linux-headers-amd64
-    
-    # Mark stage 1 complete
-    echo "stage1" > "$PROVISION_MARKER"
-    
-    # Check if kernel was upgraded
-    RUNNING_KERNEL=$(uname -r)
-    LATEST_KERNEL=$(ls -1 /lib/modules/ | sort -V | tail -1)
-    
-    if [ "$RUNNING_KERNEL" != "$LATEST_KERNEL" ]; then
-        log_warning "Kernel upgraded from $RUNNING_KERNEL to $LATEST_KERNEL"
-        log_info "Rebooting to use new kernel before installing ZFS..."
-        log_info "Provisioning will continue automatically after reboot..."
-        # Use nohup to avoid SSH connection issues
-        nohup sh -c 'sleep 2 && shutdown -r now' > /dev/null 2>&1 &
-        exit 0
-    else
-        log_info "Already running latest kernel: $RUNNING_KERNEL"
-    fi
-fi
-
-# Stage 2: Install ZFS and PBS (runs after reboot or if no reboot needed)
-log_info "=== STAGE 2: Install ZFS and PBS ==="
-
+# Get current running kernel
 RUNNING_KERNEL=$(uname -r)
 log_info "Running kernel: $RUNNING_KERNEL"
+
+# Enable contrib repository for ZFS support
+log_info "Enabling contrib repository for ZFS..."
+sed -i 's/main$/main contrib/g' /etc/apt/sources.list
+
+# Update package lists
+log_info "Updating package lists..."
+apt-get update -qq
+
+# Install base packages (but DON'T upgrade the kernel)
+log_info "Installing base packages..."
+apt-get install -y -qq \
+    curl \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    software-properties-common \
+    dkms
+
+# Install kernel headers for the RUNNING kernel (don't upgrade kernel)
+log_info "Installing kernel headers for running kernel $RUNNING_KERNEL..."
+apt-get install -y -qq linux-headers-${RUNNING_KERNEL}
 
 # Ensure we have headers for the running kernel
 log_info "Verifying kernel headers for $RUNNING_KERNEL..."
