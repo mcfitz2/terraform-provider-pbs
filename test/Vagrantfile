@@ -2,8 +2,14 @@
 # vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  # Use Debian 12 (Bookworm) which is the base for PBS
-  config.vm.box = "debian/bookworm64"
+  # Use pre-built PBS box from mcfitz2/proxmox-backup-server
+  # The box name will be set by CI workflow (e.g., "pbs-3.4" or "pbs-4.0")
+  # For local testing, you can manually add a box:
+  #   vagrant box add pbs-3.4 /path/to/pbs-3.4.box
+  # Or download from GitHub releases:
+  #   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/pbs-3.4.box
+  #   vagrant box add pbs-3.4 pbs-3.4.box
+  config.vm.box = "pbs-3.4"  # Default for local testing, overridden by CI
   
   # Disable default synced folder (not needed for PBS VM, avoids NFS issues in CI)
   config.vm.synced_folder ".", "/vagrant", disabled: true
@@ -22,8 +28,7 @@ Vagrant.configure("2") do |config|
       vb.cpus = 2
       vb.name = "pbs-test-vm"
       
-      # Create a virtual disk for ZFS pool (4GB)
-      # This will be used to create a ZFS pool for testing
+      # Create a virtual disk for ZFS pool (4GB) - for testing datastore creation
       unless File.exist?("./zfs-disk.vdi")
         vb.customize ['createhd', '--filename', './zfs-disk.vdi', '--size', 4096]
       end
@@ -37,12 +42,48 @@ Vagrant.configure("2") do |config|
       lv.machine_type = "q35"
       lv.cpu_mode = "host-passthrough"
       
-      # Create a virtual disk for ZFS pool (4GB)
+      # Create a virtual disk for ZFS pool (4GB) - for testing datastore creation
       lv.storage :file, :size => '4G', :device => 'vdb', :allow_existing => true
     end
     
-    # Two-stage provision with reboot
-    # Stage 1: Upgrade kernel
-    pbs.vm.provision "shell", path: "provision-pbs.sh", run: "once"
+    # Optional: Create a test ZFS pool if additional disk is available
+    # The pre-built boxes already have PBS installed and configured
+    pbs.vm.provision "shell", inline: <<-SHELL
+      # Check if we have an additional disk for ZFS testing
+      if [ -b /dev/vdb ]; then
+        echo "Found additional disk /dev/vdb, creating test ZFS pool..."
+        
+        # Create ZFS pool if it doesn't exist
+        if ! zpool list testpool >/dev/null 2>&1; then
+          zpool create -f testpool /dev/vdb
+          echo "✅ Created ZFS pool 'testpool'"
+          zpool list testpool
+        else
+          echo "ZFS pool 'testpool' already exists"
+        fi
+      elif [ -b /dev/sdb ]; then
+        echo "Found additional disk /dev/sdb, creating test ZFS pool..."
+        
+        # Create ZFS pool if it doesn't exist
+        if ! zpool list testpool >/dev/null 2>&1; then
+          zpool create -f testpool /dev/sdb
+          echo "✅ Created ZFS pool 'testpool'"
+          zpool list testpool
+        else
+          echo "ZFS pool 'testpool' already exists"
+        fi
+      else
+        echo "⚠️  No additional disk found, skipping test ZFS pool creation"
+        echo "Available block devices:"
+        lsblk
+      fi
+      
+      # Ensure PBS services are running
+      systemctl is-active --quiet proxmox-backup.service || systemctl start proxmox-backup.service
+      systemctl is-active --quiet proxmox-backup-proxy.service || systemctl start proxmox-backup-proxy.service
+      
+      echo "PBS is ready!"
+      proxmox-backup-manager version
+    SHELL
   end
 end

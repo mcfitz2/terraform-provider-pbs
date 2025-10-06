@@ -11,10 +11,54 @@ on:
     - cron: '0 2 * * 0'
 
 jobs:
+  # First job: Discover available PBS versions from external repo releases
+  discover-versions:
+    name: Discover PBS Versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - name: Fetch latest release from PBS Vagrant box repo
+      id: fetch-release
+      run: |
+        RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/mcfitz2/proxmox-backup-server/releases/latest)
+        
+        echo "Release data:"
+        echo "$RELEASE_DATA" | jq '.'
+        
+        # Extract assets
+        ASSETS=$(echo "$RELEASE_DATA" | jq -c '[.assets[] | select(.name | endswith(".box"))]')
+        echo "assets=$ASSETS" >> $GITHUB_OUTPUT
+    
+    - name: Build test matrix
+      id: set-matrix
+      run: |
+        ASSETS='${{ steps.fetch-release.outputs.assets }}'
+        
+        # Build matrix with version, box name, and download URL
+        MATRIX=$(echo "$ASSETS" | jq -c '{
+          include: [
+            .[] | {
+              version: (.name | sub("pbs-"; "") | sub(".box"; "")),
+              box_name: .name,
+              box_url: .browser_download_url
+            }
+          ]
+        }')
+        
+        echo "Matrix:"
+        echo "$MATRIX" | jq '.'
+        echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
   vm-integration-tests:
-    name: VM Integration Tests (with ZFS)
-    runs-on: ubuntu-latest  # Ubuntu runners support KVM/libvirt natively
+    name: VM Tests (PBS ${{ matrix.version }})
+    needs: discover-versions
+    runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-versions.outputs.matrix) }}
     
     steps:
     - name: Checkout code
@@ -74,29 +118,27 @@ jobs:
         virsh version || true
         ls -la /var/run/libvirt/libvirt-sock || true
 
-    - name: Start PBS VM - Stage 1 (Kernel Upgrade)
+    - name: Download and add PBS box (version ${{ matrix.version }})
       working-directory: ./test
       run: |
-        echo "Starting PBS VM provisioning - Stage 1 (kernel upgrade)..."
-        # Use libvirt provider for KVM virtualization
-        vagrant up --provider libvirt || {
-          echo "Stage 1 provisioning may have triggered reboot, continuing..."
-        }
+        echo "Downloading PBS ${{ matrix.version }} box from: ${{ matrix.box_url }}"
+        wget -O pbs-${{ matrix.version }}.box "${{ matrix.box_url }}"
         
-        echo "Checking if reboot is needed..."
-        if vagrant ssh -c "[ -f /var/lib/pbs-provision-stage ]" 2>/dev/null; then
-          echo "Stage 1 complete, reboot needed..."
-          echo "Rebooting VM..."
-          vagrant reload
-          
-          echo "Waiting for VM to come back up..."
-          sleep 20
-          
-          echo "Running Stage 2 (ZFS and PBS installation)..."
-          vagrant provision
-        else
-          echo "Stage 1 not complete or already fully provisioned"
-        fi
+        echo "Adding box to Vagrant as pbs-${{ matrix.version }}..."
+        vagrant box add pbs-${{ matrix.version }} pbs-${{ matrix.version }}.box
+        
+        echo "Verifying box was added..."
+        vagrant box list | grep pbs-${{ matrix.version }}
+        
+        # Update Vagrantfile to use this specific box
+        sed -i 's|config.vm.box = .*|config.vm.box = "pbs-${{ matrix.version }}"|' Vagrantfile
+
+    - name: Start PBS VM
+      working-directory: ./test
+      run: |
+        echo "Starting PBS VM (version ${{ matrix.version }})..."
+        # Use libvirt provider for KVM virtualization
+        vagrant up --provider libvirt
         
         echo "Waiting for PBS to be fully ready..."
         sleep 30
@@ -175,7 +217,7 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: vm-test-logs
+        name: vm-test-logs-pbs-${{ matrix.version }}
         path: |
           test/integration/*.log
           terraform.log

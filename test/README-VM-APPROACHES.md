@@ -75,41 +75,73 @@ vagrant destroy
     vagrant up --provider libvirt
 ```
 
-### 3. Pre-built PBS Vagrant Box (Future)
-**Status:** 🔮 Proposed
+### 3. Pre-built PBS Vagrant Box from External Repo (✅ **CURRENT APPROACH**)
+**Repository:** https://github.com/mcfitz2/proxmox-backup-server  
+**Status:** ✅ In Production
 
-If we build the PBS box and upload it to Vagrant Cloud or GitHub Releases, CI can just download it directly.
+Pre-built Vagrant boxes hosted on GitHub Releases. CI automatically discovers and tests against all available PBS versions in parallel.
 
 **Advantages:**
-- Instant VM startup in CI
-- No Packer build time
-- Can be shared across projects
+- ✅ Instant VM startup in CI (just download)
+- ✅ No build time or Packer dependency
+- ✅ Supports testing multiple PBS versions in parallel (3.4, 4.0, etc.)
+- ✅ Automatic version discovery from releases
+- ✅ ZFS works perfectly (native PBS ISO-based boxes)
+- ✅ Separate repo means boxes can be reused by other projects
 
 **Disadvantages:**
-- Need hosting for ~1.5GB box file
-- Manual updates when PBS releases new versions
-- Trust/security considerations
+- Depends on external repository for box availability
+- Need to update external repo when new PBS versions release
 
 ## Comparison
 
-| Approach | Setup Time | VM Start Time | ZFS Support | Reliability | Maintenance |
-|----------|------------|---------------|-------------|-------------|-------------|
-| Debian + PBS | 0 min | 8-10 min | ❌ Broken | ❌ Poor | 🔧 High |
-| PBS ISO Build | ~20 min (once) | 2-3 min | ✅ Native | ✅ Excellent | ✅ Low |
-| Pre-built Box | 0 min | 2-3 min | ✅ Native | ✅ Excellent | ⚠️ Medium |
+| Approach | Setup Time | VM Start Time | ZFS Support | Reliability | Multi-Version | Maintenance |
+|----------|------------|---------------|-------------|-------------|---------------|-------------|
+| Debian + PBS | 0 min | 8-10 min | ❌ Broken | ❌ Poor | ❌ | 🔧 High |
+| PBS ISO Build | ~20 min (once) | 2-3 min | ✅ Native | ✅ Excellent | ⚠️ Manual | ⚠️ Medium |
+| Pre-built Box | 0 min | 2-3 min | ✅ Native | ✅ Excellent | ✅ Automatic | ✅ Low |
 
-## Recommendation
+## Current Approach: Pre-built Boxes ✅
 
-**For immediate use:** Switch to **PBS ISO Direct Build** approach.
+**We now use pre-built PBS Vagrant boxes from the external repository.**
 
-1. Build the box once locally: `make -f Makefile.pbs-box build-pbs-box`
-2. Add it to vagrant: `make -f Makefile.pbs-box add-pbs-box`
-3. Update CI to use the new Vagrantfile: `cp Vagrantfile.pbs-box Vagrantfile`
+### How it Works
 
-**For production CI:** Set up GitHub Actions caching for the PBS box:
-- First run builds it (~20 min)
-- Subsequent runs use cached box (instant)
-- Cache invalidates when PBS version changes
+1. **Box Repository**: https://github.com/mcfitz2/proxmox-backup-server
+   - Contains Packer templates and build automation
+   - Publishes pre-built boxes to GitHub Releases
+   - Currently provides PBS 3.4 and PBS 4.0 boxes
+
+2. **CI Workflow** (`.github/workflows/vm-integration-tests.yml`):
+   - **Step 1**: Discover available PBS versions from latest release
+   - **Step 2**: Create test matrix with all found versions
+   - **Step 3**: Run tests in parallel for each PBS version
+   - Each matrix job downloads its specific box and runs tests
+
+3. **Local Testing**:
+   ```bash
+   # Download a specific PBS version box
+   cd test
+   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/pbs-3.4.box
+   vagrant box add pbs-3.4 pbs-3.4.box
+   
+   # Update Vagrantfile to use that box
+   sed -i '' 's/config.vm.box = .*/config.vm.box = "pbs-3.4"/' Vagrantfile
+   
+   # Start VM and run tests
+   vagrant up --provider virtualbox  # or libvirt on Linux
+   # Run tests...
+   vagrant destroy
+   ```
+
+### Benefits Achieved
+
+✅ **Parallel Testing**: Automatically test against PBS 3.4 and 4.0 simultaneously  
+✅ **No Build Time**: CI downloads pre-built boxes, starts instantly  
+✅ **ZFS Native Support**: Boxes built from PBS ISO with ZFS working correctly  
+✅ **Automatic Version Discovery**: Adding new PBS versions to external repo auto-updates CI  
+✅ **Simplified Maintenance**: One repo for box building, one for provider testing  
+✅ **Faster CI**: No 20-minute Packer builds, just download and test
 
 ## Files Overview
 
@@ -128,15 +160,15 @@ If we build the PBS box and upload it to Vagrant Cloud or GitHub Releases, CI ca
 - `Vagrantfile` - Current two-stage Debian approach (failing)
 - `provision-pbs.sh` - Current provisioning script (complex)
 
-## Migration Path
+## Migration History
 
 1. ✅ **Backup current approach** (Done)
 2. ✅ **Create PBS ISO build approach** (Done)
-3. ⏳ **Test PBS ISO approach locally**
-4. ⏳ **Update CI workflow**
-5. ⏳ **Replace Vagrantfile**
-6. ⏳ **Verify all tests pass**
-7. ⏳ **Clean up old files**
+3. ✅ **External box repository created** (mcfitz2/proxmox-backup-server)
+4. ✅ **Update CI workflow** (Done - parallel testing with version discovery)
+5. ✅ **Replace Vagrantfile** (Done - simplified for pre-built boxes)
+6. ⏳ **Test in CI and verify all tests pass**
+7. ⏳ **Clean up obsolete files** (Packer templates, old provisioning scripts)
 
 ## References
 
