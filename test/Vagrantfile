@@ -41,8 +41,8 @@ Vagrant.configure("2") do |config|
       lv.storage :file, :size => '4G', :device => 'vdb', :allow_existing => true
     end
     
-    # Provision PBS
-    pbs.vm.provision "shell", path: "provision-pbs.sh"
+    # Provision PBS (handles reboot internally if needed)
+    pbs.vm.provision "shell", path: "provision-pbs.sh", reboot: true
     
     # Optional: Copy test credentials/config
     pbs.vm.provision "shell", inline: <<-SHELL
