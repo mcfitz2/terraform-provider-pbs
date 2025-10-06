@@ -1,0 +1,81 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile for PBS using pre-built box (built with Packer from PBS ISO)
+# Based on https://github.com/rgl/proxmox-backup-server
+
+# To use this:
+# 1. Build the PBS box once using: make build-pbs-box
+# 2. Add it with: vagrant box add -f pbs-test ./pbs-test.box
+# 3. Then vagrant up will work instantly
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "pbs-test"
+  
+  # Disable default synced folder
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  # PBS VM configuration
+  config.vm.define "pbs" do |pbs|
+    pbs.vm.hostname = "pbs-test"
+    
+    # Network configuration - forward PBS web interface
+    pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
+    
+    # Libvirt provider (for Linux/GitHub Actions with KVM support)
+    pbs.vm.provider "libvirt" do |lv|
+      lv.memory = 2048
+      lv.cpus = 2
+      lv.cpu_mode = "host-passthrough"
+      lv.nested = false
+      
+      # Additional disk for ZFS pool/datastore
+      lv.storage :file, :size => '4G', :device => 'vdb', :allow_existing => true
+    end
+    
+    # VirtualBox provider (for local development)
+    pbs.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      vb.name = "pbs-test-vm"
+      
+      # Create additional disk for ZFS pool
+      unless File.exist?("./zfs-disk.vdi")
+        vb.customize ['createhd', '--filename', './zfs-disk.vdi', '--size', 4096]
+      end
+      vb.customize ['storageattach', :id, 
+                    '--storagectl', 'SATA Controller', 
+                    '--port', 1, 
+                    '--device', 0, 
+                    '--type', 'hdd', 
+                    '--medium', './zfs-disk.vdi']
+    end
+    
+    # Post-installation configuration for testing
+    pbs.vm.provision "shell", inline: <<-SHELL
+      # Wait for PBS services to be ready
+      sleep 5
+      
+      # Create admin user for testing (password: password123)
+      proxmox-backup-manager user create admin@pbs --password password123 --email admin@example.com 2>/dev/null || true
+      
+      # Grant admin permissions
+      proxmox-backup-manager acl update / Admin --auth-id admin@pbs 2>/dev/null || true
+      
+      # Create ZFS pool on additional disk for testing
+      if [ -b /dev/vdb ] && ! zpool list testpool 2>/dev/null; then
+        echo "Creating ZFS test pool on /dev/vdb..."
+        zpool create -f testpool /dev/vdb
+        zfs set compression=lz4 testpool
+        zfs set atime=off testpool
+        echo "ZFS test pool created successfully"
+        zpool status testpool
+      fi
+      
+      echo "PBS ready for testing"
+      echo "  URL: https://localhost:8007"
+      echo "  User: admin@pbs"
+      echo "  Pass: password123"
+    SHELL
+  end
+end

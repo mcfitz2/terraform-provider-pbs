@@ -1,0 +1,124 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile for PBS using ISO installer
+# This provides a cleaner approach with PBS pre-installed including ZFS support
+
+Vagrant.configure("2") do |config|
+  # Don't use a base box - we'll boot from ISO
+  config.vm.box = nil
+  
+  # Disable default synced folder
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  # PBS VM configuration
+  config.vm.define "pbs" do |pbs|
+    pbs.vm.hostname = "pbs-test"
+    
+    # Network configuration - forward PBS web interface
+    pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
+    
+    # Libvirt provider (for Linux/GitHub Actions with KVM support)
+    pbs.vm.provider "libvirt" do |lv|
+      lv.memory = 2048
+      lv.cpus = 2
+      lv.machine_type = "q35"
+      lv.cpu_mode = "host-passthrough"
+      
+      # Boot from PBS ISO
+      lv.storage :file, 
+        :path => '/var/lib/libvirt/images/proxmox-backup-server_3.4-1.iso',
+        :device => :cdrom,
+        :bus => 'sata'
+      
+      # Main disk for PBS installation
+      lv.storage :file, 
+        :size => '32G', 
+        :type => 'qcow2',
+        :bus => 'virtio',
+        :device => 'vda'
+      
+      # Additional disk for ZFS pool/datastore
+      lv.storage :file, 
+        :size => '4G',
+        :device => 'vdb',
+        :bus => 'virtio'
+      
+      # Boot order: Try hard disk first (after installation), then CD-ROM
+      lv.boot 'hd'
+      lv.boot 'cdrom'
+    end
+    
+    # VirtualBox provider (for local development on macOS/Windows)
+    pbs.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+      vb.name = "pbs-test-vm"
+      
+      # Attach PBS ISO
+      vb.customize ['storageattach', :id, 
+                    '--storagectl', 'IDE Controller', 
+                    '--port', 0, 
+                    '--device', 0, 
+                    '--type', 'dvddrive', 
+                    '--medium', 'proxmox-backup-server_3.4-1.iso']
+      
+      # Create main disk for PBS
+      unless File.exist?("./pbs-main.vdi")
+        vb.customize ['createhd', '--filename', './pbs-main.vdi', '--size', 32768]
+      end
+      vb.customize ['storageattach', :id, 
+                    '--storagectl', 'SATA Controller', 
+                    '--port', 0, 
+                    '--device', 0, 
+                    '--type', 'hdd', 
+                    '--medium', './pbs-main.vdi']
+      
+      # Create additional disk for ZFS pool
+      unless File.exist?("./zfs-disk.vdi")
+        vb.customize ['createhd', '--filename', './zfs-disk.vdi', '--size', 4096]
+      end
+      vb.customize ['storageattach', :id, 
+                    '--storagectl', 'SATA Controller', 
+                    '--port', 1, 
+                    '--device', 0, 
+                    '--type', 'hdd', 
+                    '--medium', './zfs-disk.vdi']
+      
+      # Boot order
+      vb.customize ['modifyvm', :id, '--boot1', 'disk']
+      vb.customize ['modifyvm', :id, '--boot2', 'dvd']
+    end
+    
+    # Post-installation configuration
+    # This runs after PBS is installed
+    pbs.vm.provision "shell", inline: <<-SHELL
+      echo "Configuring PBS for testing..."
+      
+      # Wait for PBS services to be ready
+      sleep 10
+      
+      # Create admin user for testing
+      proxmox-backup-manager user create admin@pbs --password password123 --email admin@example.com || true
+      
+      # Grant admin permissions
+      proxmox-backup-manager acl update / Admin --auth-id admin@pbs || true
+      
+      # Create ZFS pool on additional disk for testing
+      if [ -b /dev/vdb ]; then
+        if ! zpool list testpool 2>/dev/null; then
+          echo "Creating ZFS test pool..."
+          zpool create -f testpool /dev/vdb
+          zfs set compression=lz4 testpool
+          zfs set atime=off testpool
+          echo "ZFS test pool created"
+        fi
+      fi
+      
+      echo "PBS configuration complete"
+      echo "Access at: https://localhost:8007"
+      echo "Username: admin@pbs"
+      echo "Password: password123"
+    SHELL
+  end
+end
