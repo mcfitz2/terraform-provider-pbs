@@ -26,102 +26,131 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-log_info "Starting PBS provisioning on Debian VM..."
-
 # Export for non-interactive mode
 export DEBIAN_FRONTEND=noninteractive
 
-# Get current running kernel
-RUNNING_KERNEL=$(uname -r)
-log_info "Running kernel: $RUNNING_KERNEL"
+# Check which stage we're in
+STAGE_FILE="/var/lib/pbs-provision-stage"
 
-# Enable contrib repository for ZFS support
-log_info "Enabling contrib repository for ZFS..."
-sed -i 's/main$/main contrib/g' /etc/apt/sources.list
-
-# Update package lists
-log_info "Updating package lists..."
-apt-get update -qq
-
-# Install base packages (but DON'T upgrade the kernel)
-log_info "Installing base packages..."
-apt-get install -y -qq \
-    curl \
-    gnupg \
-    lsb-release \
-    ca-certificates \
-    software-properties-common \
-    dkms
-
-# Install kernel headers for the RUNNING kernel (don't upgrade kernel)
-log_info "Installing kernel headers for running kernel $RUNNING_KERNEL..."
-apt-get install -y -qq linux-headers-${RUNNING_KERNEL}
-
-# Ensure we have headers for the running kernel
-log_info "Verifying kernel headers for $RUNNING_KERNEL..."
-if [ ! -d "/lib/modules/$RUNNING_KERNEL/build" ]; then
-    log_error "Kernel headers not found for running kernel $RUNNING_KERNEL"
-    log_error "Available kernel headers:"
-    ls -1 /lib/modules/
-    exit 1
+if [ ! -f "$STAGE_FILE" ]; then
+    #
+    # STAGE 1: Upgrade kernel and prepare for reboot
+    #
+    log_info "=== STAGE 1: Upgrading kernel ==="
+    
+    RUNNING_KERNEL=$(uname -r)
+    log_info "Current kernel: $RUNNING_KERNEL"
+    
+    # Enable contrib repository for ZFS support
+    log_info "Enabling contrib repository..."
+    sed -i 's/main$/main contrib/g' /etc/apt/sources.list
+    
+    # Update package lists
+    log_info "Updating package lists..."
+    apt-get update -qq
+    
+    # Upgrade kernel to latest available
+    log_info "Upgrading kernel and headers..."
+    apt-get install -y -qq linux-image-amd64 linux-headers-amd64
+    
+    # Mark that stage 1 is complete
+    echo "1" > "$STAGE_FILE"
+    
+    log_success "Stage 1 complete - kernel upgraded"
+    log_info "System will reboot, then continue with Stage 2..."
+    
+else
+    #
+    # STAGE 2: Install ZFS and PBS on upgraded kernel
+    #
+    log_info "=== STAGE 2: Installing ZFS and PBS ==="
+    
+    RUNNING_KERNEL=$(uname -r)
+    log_info "Running kernel: $RUNNING_KERNEL"
+    
+    # Update package lists again
+    log_info "Updating package lists..."
+    apt-get update -qq
+    
+    # Install base packages
+    log_info "Installing base packages..."
+    apt-get install -y -qq \
+        curl \
+        gnupg \
+        lsb-release \
+        ca-certificates \
+        software-properties-common \
+        dkms
+    
+    # Verify we have headers for the running kernel
+    log_info "Verifying kernel headers for $RUNNING_KERNEL..."
+    if [ ! -d "/lib/modules/$RUNNING_KERNEL/build" ]; then
+        log_error "Kernel headers not found for running kernel $RUNNING_KERNEL"
+        log_error "Available kernel modules:"
+        ls -1 /lib/modules/
+        exit 1
+    fi
+    log_success "Kernel headers present for $RUNNING_KERNEL"
+    
+    # Install ZFS which will use DKMS to build modules for running kernel
+    log_info "Installing ZFS packages (this may take a few minutes)..."
+    apt-get install -y -qq zfs-dkms zfsutils-linux
+    
+    # Get ZFS version
+    ZFS_VERSION=$(dkms status zfs | head -1 | cut -d',' -f1 | cut -d'/' -f2 || echo "")
+    if [ -z "$ZFS_VERSION" ]; then
+        log_error "Could not determine ZFS version from DKMS"
+        exit 1
+    fi
+    log_info "ZFS version: $ZFS_VERSION"
+    
+    # Check DKMS status
+    log_info "Checking DKMS build status:"
+    dkms status zfs
+    
+    # Verify ZFS modules were built for running kernel
+    log_info "Verifying ZFS modules for running kernel $RUNNING_KERNEL..."
+    if ! find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null | grep -q .; then
+        log_error "ZFS modules were not built for running kernel $RUNNING_KERNEL"
+        log_error "DKMS status:"
+        dkms status
+        log_error "Available kernel modules:"
+        find /lib/modules -name "zfs.ko*" 2>/dev/null || echo "No ZFS modules found"
+        exit 1
+    fi
+    log_success "ZFS modules found for kernel $RUNNING_KERNEL"
+    
+    # Load ZFS modules
+    log_info "Loading ZFS kernel modules..."
+    if ! modprobe zfs 2>/dev/null; then
+        log_error "Failed to load ZFS kernel modules"
+        log_error "Module info:"
+        modinfo zfs 2>&1 || echo "modinfo failed"
+        log_error "Kernel messages:"
+        dmesg | tail -20
+        exit 1
+    fi
+    log_success "ZFS kernel modules loaded successfully"
+    
+    # Verify ZFS is functional
+    log_info "Verifying ZFS is functional..."
+    zpool version >/dev/null 2>&1 || {
+        log_error "ZFS tools not working correctly"
+        exit 1
+    }
+    log_success "ZFS is fully functional"
+    
+    log_success "ZFS packages installed and verified"
+    
+    # Upgrade the rest of the system
+    log_info "Upgrading remaining system packages..."
+    apt-get upgrade -y -qq
+    
+    log_success "Base packages installed"
 fi
-log_success "Kernel headers present for $RUNNING_KERNEL"
 
-# Install ZFS which will use DKMS to build modules for running kernel
-log_info "Installing ZFS packages (this may take a few minutes)..."
-apt-get install -y -qq zfs-dkms zfsutils-linux
-
-# Get ZFS version
-ZFS_VERSION=$(dkms status zfs | head -1 | cut -d',' -f1 | cut -d'/' -f2 || echo "")
-if [ -z "$ZFS_VERSION" ]; then
-    log_error "Could not determine ZFS version from DKMS"
-    exit 1
-fi
-log_info "ZFS version: $ZFS_VERSION"
-
-# Check DKMS status
-log_info "Checking DKMS build status:"
-dkms status zfs
-
-# Verify ZFS modules were built for running kernel
-log_info "Verifying ZFS modules for running kernel $RUNNING_KERNEL..."
-if ! find /lib/modules/$RUNNING_KERNEL -name "zfs.ko*" 2>/dev/null | grep -q .; then
-    log_error "ZFS modules were not built for running kernel $RUNNING_KERNEL"
-    log_error "DKMS status:"
-    dkms status
-    log_error "Available kernel modules:"
-    find /lib/modules -name "zfs.ko*" 2>/dev/null || echo "No ZFS modules found"
-    exit 1
-fi
-log_success "ZFS modules found for kernel $RUNNING_KERNEL"
-
-# Load ZFS modules
-log_info "Loading ZFS kernel modules..."
-if ! modprobe zfs 2>/dev/null; then
-    log_error "Failed to load ZFS kernel modules"
-    log_error "Module info:"
-    modinfo zfs 2>&1 || echo "modinfo failed"
-    log_error "Kernel messages:"
-    dmesg | tail -20
-    exit 1
-fi
-log_success "ZFS kernel modules loaded successfully"
-
-# Verify ZFS is functional
-log_info "Verifying ZFS is functional..."
-zpool version >/dev/null 2>&1 || {
-    log_error "ZFS tools not working correctly"
-    exit 1
-}
-log_success "ZFS is fully functional"
-
-log_success "ZFS packages installed and verified"
-
-# Now upgrade the rest of the system
-log_info "Upgrading remaining system packages..."
-apt-get upgrade -y -qq
-
-log_success "Base packages installed"
+# Only continue with PBS installation in stage 2
+if [ -f "$STAGE_FILE" ]; then
 
 # Add Proxmox repository
 log_info "Adding Proxmox repository..."
