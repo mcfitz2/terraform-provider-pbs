@@ -29,6 +29,10 @@ Vagrant.configure("2") do |config|
     # Network configuration - forward PBS web interface
     pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
     
+    # For libvirt, use a private network to ensure proper IP assignment
+    # This creates a network with DHCP that the VM can connect to
+    pbs.vm.network "private_network", type: "dhcp"
+    
     # VM resources - PBS needs reasonable resources
     # VirtualBox provider (for local development on macOS/Windows)
     pbs.vm.provider "virtualbox" do |vb|
