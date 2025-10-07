@@ -23,8 +23,6 @@ Vagrant.configure("2") do |config|
     # The vagrant user has sudo privileges without password
     # PBS API credentials will be root@pam with password "vagrant"
     
-    # Enable verbose SSH logging for debugging
-    pbs.ssh.verbose = true
     # Increase boot timeout to see more debug output
     pbs.vm.boot_timeout = 600
     
