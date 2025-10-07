@@ -18,14 +18,8 @@ Vagrant.configure("2") do |config|
     
     # SSH configuration for PBS boxes
     # The boxes have the Vagrant insecure public key installed for root user
+    # Let Vagrant automatically use its default insecure key
     pbs.ssh.username = "root"
-    # Use the standard Vagrant insecure key
-    pbs.ssh.private_key_path = [
-      "~/.vagrant.d/insecure_private_key",
-      "~/.vagrant.d/insecure_private_keys/vagrant.key.rsa"
-    ]
-    pbs.ssh.insert_key = false
-    pbs.ssh.keys_only = true
     
     # Network configuration - forward PBS web interface
     pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
