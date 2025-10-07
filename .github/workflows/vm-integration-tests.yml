@@ -37,10 +37,11 @@ jobs:
         ASSETS='${{ steps.fetch-release.outputs.assets }}'
         
         # Build matrix with version, box name, and download URL
+        # Box name pattern: proxmox-backup-server-{VERSION}-amd64-libvirt.box
         MATRIX=$(echo "$ASSETS" | jq -c '{
           include: [
             .[] | {
-              version: (.name | sub("pbs-"; "") | sub(".box"; "")),
+              version: (.name | capture("proxmox-backup-server-(?<ver>[0-9.]+)-").ver),
               box_name: .name,
               box_url: .browser_download_url
             }

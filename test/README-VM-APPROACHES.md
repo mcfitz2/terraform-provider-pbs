@@ -120,10 +120,10 @@ Pre-built Vagrant boxes hosted on GitHub Releases. CI automatically discovers an
 
 3. **Local Testing**:
    ```bash
-   # Download a specific PBS version box
+   # Download a specific PBS version box (libvirt provider for Linux)
    cd test
-   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/pbs-3.4.box
-   vagrant box add pbs-3.4 pbs-3.4.box
+   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/proxmox-backup-server-3.4-amd64-libvirt.box
+   vagrant box add pbs-3.4 proxmox-backup-server-3.4-amd64-libvirt.box
    
    # Update Vagrantfile to use that box
    sed -i '' 's/config.vm.box = .*/config.vm.box = "pbs-3.4"/' Vagrantfile

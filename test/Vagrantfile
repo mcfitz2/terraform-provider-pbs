@@ -4,11 +4,9 @@
 Vagrant.configure("2") do |config|
   # Use pre-built PBS box from mcfitz2/proxmox-backup-server
   # The box name will be set by CI workflow (e.g., "pbs-3.4" or "pbs-4.0")
-  # For local testing, you can manually add a box:
-  #   vagrant box add pbs-3.4 /path/to/pbs-3.4.box
-  # Or download from GitHub releases:
-  #   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/pbs-3.4.box
-  #   vagrant box add pbs-3.4 pbs-3.4.box
+  # For local testing (libvirt provider only), you can manually add a box:
+  #   wget https://github.com/mcfitz2/proxmox-backup-server/releases/latest/download/proxmox-backup-server-3.4-amd64-libvirt.box
+  #   vagrant box add pbs-3.4 proxmox-backup-server-3.4-amd64-libvirt.box
   config.vm.box = "pbs-3.4"  # Default for local testing, overridden by CI
   
   # Disable default synced folder (not needed for PBS VM, avoids NFS issues in CI)
