@@ -136,8 +136,12 @@ jobs:
 
     - name: Start PBS VM
       working-directory: ./test
+      env:
+        VAGRANT_LOG: debug
+        VAGRANT_LOG_TIMESTAMP: 1
       run: |
         echo "Starting PBS VM (version ${{ matrix.version }})..."
+        echo "Vagrant debug logging enabled (VAGRANT_LOG=debug)"
         # Use libvirt provider for KVM virtualization
         vagrant up --provider libvirt
         
