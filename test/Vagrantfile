@@ -16,6 +16,11 @@ Vagrant.configure("2") do |config|
   config.vm.define "pbs" do |pbs|
     pbs.vm.hostname = "pbs-test"
     
+    # SSH configuration for PBS boxes (use root/vagrant)
+    pbs.ssh.username = "root"
+    pbs.ssh.password = "vagrant"
+    pbs.ssh.insert_key = false
+    
     # Network configuration - forward PBS web interface
     pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
     
