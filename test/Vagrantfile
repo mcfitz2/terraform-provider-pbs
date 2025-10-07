@@ -17,13 +17,11 @@ Vagrant.configure("2") do |config|
     pbs.vm.hostname = "pbs-test"
     
     # SSH configuration for PBS boxes
-    # The boxes have the Vagrant insecure public key installed for root user
-    # Let Vagrant automatically use its default insecure key
-    pbs.ssh.username = "root"
-    # Allow both password and key authentication as fallback
-    pbs.ssh.password = "vagrant"
-    pbs.ssh.keys_only = false
-    pbs.ssh.paranoid = false
+    # Connect as vagrant user first (which has working insecure key),
+    # then sudo to root for commands
+    pbs.ssh.username = "vagrant"
+    # The vagrant user has sudo privileges without password
+    # PBS API credentials will be root@pam with password "vagrant"
     
     # Network configuration - forward PBS web interface
     pbs.vm.network "forwarded_port", guest: 8007, host: 8007, host_ip: "127.0.0.1"
