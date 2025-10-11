@@ -11,13 +11,19 @@ import (
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 	"github.com/micah/terraform-provider-pbs/pbs/datastores"
 	"github.com/micah/terraform-provider-pbs/pbs/endpoints"
+	"github.com/micah/terraform-provider-pbs/pbs/jobs"
+	"github.com/micah/terraform-provider-pbs/pbs/metrics"
+	"github.com/micah/terraform-provider-pbs/pbs/notifications"
 )
 
 // Client represents the main PBS client interface
 type Client struct {
-	api        *api.Client
-	Endpoints  *endpoints.Client
-	Datastores *datastores.Client
+	api           *api.Client
+	Endpoints     *endpoints.Client
+	Datastores    *datastores.Client
+	Metrics       *metrics.Client
+	Notifications *notifications.Client
+	Jobs          *jobs.Client
 }
 
 // NewClient creates a new PBS client
@@ -28,8 +34,11 @@ func NewClient(creds api.Credentials, opts api.ClientOptions) (*Client, error) {
 	}
 
 	return &Client{
-		api:        apiClient,
-		Endpoints:  endpoints.NewClient(apiClient),
-		Datastores: datastores.NewClient(apiClient),
+		api:           apiClient,
+		Endpoints:     endpoints.NewClient(apiClient),
+		Datastores:    datastores.NewClient(apiClient),
+		Metrics:       metrics.NewClient(apiClient),
+		Notifications: notifications.NewClient(apiClient),
+		Jobs:          jobs.NewClient(apiClient),
 	}, nil
 }

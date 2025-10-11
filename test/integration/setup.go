@@ -1,4 +1,4 @@
-package test
+package integration
 
 import (
 	"context"
@@ -146,9 +146,9 @@ provider "pbs" {
 
 // getProjectRoot returns the absolute path to the project root containing the built provider
 func (tc *TestContext) getProjectRoot() string {
-	// Get absolute path to the project root (parent directory of test/)
+	// Get absolute path to the project root (two levels up from test/integration/)
 	wd, _ := os.Getwd()
-	return filepath.Dir(wd)
+	return filepath.Dir(filepath.Dir(wd))
 }
 
 // setupLocalProvider configures the local provider binary for terraform
@@ -283,7 +283,7 @@ func (tc *TestContext) DestroyTerraform(t *testing.T) {
 			t.Logf("Terraform destroy: resource already deleted (desired state achieved)")
 			return
 		}
-		
+
 		// Log any other errors as warnings, but don't fail the test
 		// This allows cleanup to continue even if there are issues
 		t.Logf("Warning: Terraform destroy encountered error: %v", err)

@@ -25,7 +25,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/micah/terraform-provider-pbs/fwprovider/config"
-	"github.com/micah/terraform-provider-pbs/fwprovider/resources"
+	"github.com/micah/terraform-provider-pbs/fwprovider/resources/datastores"
+	"github.com/micah/terraform-provider-pbs/fwprovider/resources/endpoints"
+	"github.com/micah/terraform-provider-pbs/fwprovider/resources/jobs"
+	"github.com/micah/terraform-provider-pbs/fwprovider/resources/metrics"
+	"github.com/micah/terraform-provider-pbs/fwprovider/resources/notifications"
 	"github.com/micah/terraform-provider-pbs/pbs"
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
@@ -236,7 +240,24 @@ func (p *pbsProvider) DataSources(_ context.Context) []func() datasource.DataSou
 // Resources defines the resources implemented in the provider.
 func (p *pbsProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		resources.NewS3EndpointResource,
-		resources.NewDatastoreResource,
+		// Endpoints
+		endpoints.NewS3EndpointResource,
+		// Datastores
+		datastores.NewDatastoreResource,
+		// Metrics
+		metrics.NewMetricsServerResource,
+		// Notifications - Targets
+		notifications.NewSMTPNotificationResource,
+		notifications.NewGotifyNotificationResource,
+		notifications.NewSendmailNotificationResource,
+		notifications.NewWebhookNotificationResource,
+		// Notifications - Routing
+		notifications.NewNotificationEndpointResource,
+		notifications.NewNotificationMatcherResource,
+		// Jobs
+		jobs.NewPruneJobResource,
+		jobs.NewSyncJobResource,
+		jobs.NewVerifyJobResource,
+		jobs.NewGCJobResource,
 	}
 }
