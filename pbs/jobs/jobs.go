@@ -411,7 +411,7 @@ type VerifyJob struct {
 
 // ListVerifyJobs lists all verify job configurations
 func (c *Client) ListVerifyJobs(ctx context.Context) ([]VerifyJob, error) {
-	resp, err := c.api.Get(ctx, "/config/verification")
+	resp, err := c.api.Get(ctx, "/config/verify")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list verify jobs: %w", err)
 	}
@@ -426,7 +426,7 @@ func (c *Client) ListVerifyJobs(ctx context.Context) ([]VerifyJob, error) {
 
 // GetVerifyJob gets a specific verify job by ID
 func (c *Client) GetVerifyJob(ctx context.Context, id string) (*VerifyJob, error) {
-	path := fmt.Sprintf("/config/verification/%s", url.PathEscape(id))
+	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verify job %s: %w", id, err)
@@ -477,7 +477,7 @@ func (c *Client) CreateVerifyJob(ctx context.Context, job *VerifyJob) error {
 		body["disable"] = *job.Disable
 	}
 
-	_, err := c.api.Post(ctx, "/config/verification", body)
+	_, err := c.api.Post(ctx, "/config/verify", body)
 	if err != nil {
 		return fmt.Errorf("failed to create verify job %s: %w", job.ID, err)
 	}
@@ -518,7 +518,7 @@ func (c *Client) UpdateVerifyJob(ctx context.Context, id string, job *VerifyJob)
 		body["disable"] = *job.Disable
 	}
 
-	path := fmt.Sprintf("/config/verification/%s", url.PathEscape(id))
+	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update verify job %s: %w", id, err)
@@ -533,7 +533,7 @@ func (c *Client) DeleteVerifyJob(ctx context.Context, id string) error {
 		return fmt.Errorf("job ID is required")
 	}
 
-	path := fmt.Sprintf("/config/verification/%s", url.PathEscape(id))
+	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete verify job %s: %w", id, err)

@@ -88,7 +88,7 @@ type WebhookTarget struct {
 
 // ListSMTPTargets lists all SMTP notification target configurations
 func (c *Client) ListSMTPTargets(ctx context.Context) ([]SMTPTarget, error) {
-	resp, err := c.api.Get(ctx, "/config/notifications/targets/smtp")
+	resp, err := c.api.Get(ctx, "/config/notifications/endpoints/smtp")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list SMTP targets: %w", err)
 	}
@@ -103,7 +103,7 @@ func (c *Client) ListSMTPTargets(ctx context.Context) ([]SMTPTarget, error) {
 
 // GetSMTPTarget gets a specific SMTP notification target by name
 func (c *Client) GetSMTPTarget(ctx context.Context, name string) (*SMTPTarget, error) {
-	path := fmt.Sprintf("/config/notifications/targets/smtp/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/smtp/%s", url.PathEscape(name))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get SMTP target %s: %w", name, err)
@@ -163,7 +163,7 @@ func (c *Client) CreateSMTPTarget(ctx context.Context, target *SMTPTarget) error
 		body["disable"] = *target.Disable
 	}
 
-	_, err := c.api.Post(ctx, "/config/notifications/targets/smtp", body)
+	_, err := c.api.Post(ctx, "/config/notifications/endpoints/smtp", body)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP target %s: %w", target.Name, err)
 	}
@@ -213,7 +213,7 @@ func (c *Client) UpdateSMTPTarget(ctx context.Context, name string, target *SMTP
 		body["disable"] = *target.Disable
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/smtp/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/smtp/%s", url.PathEscape(name))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update SMTP target %s: %w", name, err)
@@ -228,7 +228,7 @@ func (c *Client) DeleteSMTPTarget(ctx context.Context, name string) error {
 		return fmt.Errorf("target name is required")
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/smtp/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/smtp/%s", url.PathEscape(name))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete SMTP target %s: %w", name, err)
@@ -241,7 +241,7 @@ func (c *Client) DeleteSMTPTarget(ctx context.Context, name string) error {
 
 // ListGotifyTargets lists all Gotify notification target configurations
 func (c *Client) ListGotifyTargets(ctx context.Context) ([]GotifyTarget, error) {
-	resp, err := c.api.Get(ctx, "/config/notifications/targets/gotify")
+	resp, err := c.api.Get(ctx, "/config/notifications/endpoints/gotify")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Gotify targets: %w", err)
 	}
@@ -256,7 +256,7 @@ func (c *Client) ListGotifyTargets(ctx context.Context) ([]GotifyTarget, error) 
 
 // GetGotifyTarget gets a specific Gotify notification target by name
 func (c *Client) GetGotifyTarget(ctx context.Context, name string) (*GotifyTarget, error) {
-	path := fmt.Sprintf("/config/notifications/targets/gotify/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/gotify/%s", url.PathEscape(name))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Gotify target %s: %w", name, err)
@@ -295,7 +295,7 @@ func (c *Client) CreateGotifyTarget(ctx context.Context, target *GotifyTarget) e
 		body["disable"] = *target.Disable
 	}
 
-	_, err := c.api.Post(ctx, "/config/notifications/targets/gotify", body)
+	_, err := c.api.Post(ctx, "/config/notifications/endpoints/gotify", body)
 	if err != nil {
 		return fmt.Errorf("failed to create Gotify target %s: %w", target.Name, err)
 	}
@@ -324,7 +324,7 @@ func (c *Client) UpdateGotifyTarget(ctx context.Context, name string, target *Go
 		body["disable"] = *target.Disable
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/gotify/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/gotify/%s", url.PathEscape(name))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update Gotify target %s: %w", name, err)
@@ -339,7 +339,7 @@ func (c *Client) DeleteGotifyTarget(ctx context.Context, name string) error {
 		return fmt.Errorf("target name is required")
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/gotify/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/gotify/%s", url.PathEscape(name))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete Gotify target %s: %w", name, err)
@@ -352,7 +352,7 @@ func (c *Client) DeleteGotifyTarget(ctx context.Context, name string) error {
 
 // ListSendmailTargets lists all Sendmail notification target configurations
 func (c *Client) ListSendmailTargets(ctx context.Context) ([]SendmailTarget, error) {
-	resp, err := c.api.Get(ctx, "/config/notifications/targets/sendmail")
+	resp, err := c.api.Get(ctx, "/config/notifications/endpoints/sendmail")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Sendmail targets: %w", err)
 	}
@@ -367,7 +367,7 @@ func (c *Client) ListSendmailTargets(ctx context.Context) ([]SendmailTarget, err
 
 // GetSendmailTarget gets a specific Sendmail notification target by name
 func (c *Client) GetSendmailTarget(ctx context.Context, name string) (*SendmailTarget, error) {
-	path := fmt.Sprintf("/config/notifications/targets/sendmail/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/sendmail/%s", url.PathEscape(name))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Sendmail target %s: %w", name, err)
@@ -411,7 +411,7 @@ func (c *Client) CreateSendmailTarget(ctx context.Context, target *SendmailTarge
 		body["disable"] = *target.Disable
 	}
 
-	_, err := c.api.Post(ctx, "/config/notifications/targets/sendmail", body)
+	_, err := c.api.Post(ctx, "/config/notifications/endpoints/sendmail", body)
 	if err != nil {
 		return fmt.Errorf("failed to create Sendmail target %s: %w", target.Name, err)
 	}
@@ -446,7 +446,7 @@ func (c *Client) UpdateSendmailTarget(ctx context.Context, name string, target *
 		body["disable"] = *target.Disable
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/sendmail/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/sendmail/%s", url.PathEscape(name))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update Sendmail target %s: %w", name, err)
@@ -461,7 +461,7 @@ func (c *Client) DeleteSendmailTarget(ctx context.Context, name string) error {
 		return fmt.Errorf("target name is required")
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/sendmail/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/sendmail/%s", url.PathEscape(name))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete Sendmail target %s: %w", name, err)
@@ -474,7 +474,7 @@ func (c *Client) DeleteSendmailTarget(ctx context.Context, name string) error {
 
 // ListWebhookTargets lists all Webhook notification target configurations
 func (c *Client) ListWebhookTargets(ctx context.Context) ([]WebhookTarget, error) {
-	resp, err := c.api.Get(ctx, "/config/notifications/targets/webhook")
+	resp, err := c.api.Get(ctx, "/config/notifications/endpoints/webhook")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Webhook targets: %w", err)
 	}
@@ -489,7 +489,7 @@ func (c *Client) ListWebhookTargets(ctx context.Context) ([]WebhookTarget, error
 
 // GetWebhookTarget gets a specific Webhook notification target by name
 func (c *Client) GetWebhookTarget(ctx context.Context, name string) (*WebhookTarget, error) {
-	path := fmt.Sprintf("/config/notifications/targets/webhook/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/webhook/%s", url.PathEscape(name))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Webhook target %s: %w", name, err)
@@ -536,7 +536,7 @@ func (c *Client) CreateWebhookTarget(ctx context.Context, target *WebhookTarget)
 		body["disable"] = *target.Disable
 	}
 
-	_, err := c.api.Post(ctx, "/config/notifications/targets/webhook", body)
+	_, err := c.api.Post(ctx, "/config/notifications/endpoints/webhook", body)
 	if err != nil {
 		return fmt.Errorf("failed to create Webhook target %s: %w", target.Name, err)
 	}
@@ -574,7 +574,7 @@ func (c *Client) UpdateWebhookTarget(ctx context.Context, name string, target *W
 		body["disable"] = *target.Disable
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/webhook/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/webhook/%s", url.PathEscape(name))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update Webhook target %s: %w", name, err)
@@ -589,7 +589,7 @@ func (c *Client) DeleteWebhookTarget(ctx context.Context, name string) error {
 		return fmt.Errorf("target name is required")
 	}
 
-	path := fmt.Sprintf("/config/notifications/targets/webhook/%s", url.PathEscape(name))
+	path := fmt.Sprintf("/config/notifications/endpoints/webhook/%s", url.PathEscape(name))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete Webhook target %s: %w", name, err)

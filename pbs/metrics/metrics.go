@@ -54,7 +54,7 @@ type MetricsServer struct {
 
 // ListMetricsServers lists all metrics server configurations
 func (c *Client) ListMetricsServers(ctx context.Context) ([]MetricsServer, error) {
-	resp, err := c.api.Get(ctx, "/config/metrics/server")
+	resp, err := c.api.Get(ctx, "/config/metrics")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list metrics servers: %w", err)
 	}
@@ -69,7 +69,7 @@ func (c *Client) ListMetricsServers(ctx context.Context) ([]MetricsServer, error
 
 // GetMetricsServer gets a specific metrics server configuration by name
 func (c *Client) GetMetricsServer(ctx context.Context, serverType MetricsServerType, name string) (*MetricsServer, error) {
-	path := fmt.Sprintf("/config/metrics/server/%s/%s", serverType, url.PathEscape(name))
+	path := fmt.Sprintf("/config/metrics/%s/%s", serverType, url.PathEscape(name))
 	resp, err := c.api.Get(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics server %s: %w", name, err)
@@ -139,7 +139,7 @@ func (c *Client) CreateMetricsServer(ctx context.Context, server *MetricsServer)
 		}
 	}
 
-	path := fmt.Sprintf("/config/metrics/server/%s", server.Type)
+	path := fmt.Sprintf("/config/metrics/%s", server.Type)
 	_, err := c.api.Post(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to create metrics server %s: %w", server.Name, err)
@@ -200,7 +200,7 @@ func (c *Client) UpdateMetricsServer(ctx context.Context, serverType MetricsServ
 		}
 	}
 
-	path := fmt.Sprintf("/config/metrics/server/%s/%s", serverType, url.PathEscape(name))
+	path := fmt.Sprintf("/config/metrics/%s/%s", serverType, url.PathEscape(name))
 	_, err := c.api.Put(ctx, path, body)
 	if err != nil {
 		return fmt.Errorf("failed to update metrics server %s: %w", name, err)
@@ -215,7 +215,7 @@ func (c *Client) DeleteMetricsServer(ctx context.Context, serverType MetricsServ
 		return fmt.Errorf("server name is required")
 	}
 
-	path := fmt.Sprintf("/config/metrics/server/%s/%s", serverType, url.PathEscape(name))
+	path := fmt.Sprintf("/config/metrics/%s/%s", serverType, url.PathEscape(name))
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete metrics server %s: %w", name, err)
