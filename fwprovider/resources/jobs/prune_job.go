@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/micah/terraform-provider-pbs/fwprovider/config"
 	"github.com/micah/terraform-provider-pbs/pbs"
 	"github.com/micah/terraform-provider-pbs/pbs/jobs"
 )
@@ -169,16 +170,16 @@ func (r *pruneJobResource) Configure(_ context.Context, req resource.ConfigureRe
 		return
 	}
 
-	client, ok := req.ProviderData.(*pbs.Client)
+	cfg, ok := req.ProviderData.(*config.Resource)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *pbs.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *config.Resource, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.client = cfg.Client
 }
 
 // Create creates the resource and sets the initial Terraform state.

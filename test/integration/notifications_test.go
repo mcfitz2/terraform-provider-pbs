@@ -393,7 +393,7 @@ resource "pbs_notification_matcher" "test_calendar" {
   name            = "%s"
   targets         = [pbs_notification_endpoint.endpoint.name]
   match_severity  = ["error"]
-  match_calendar  = "Mon..Fri 08:00-17:00"
+  match_calendar  = ["Mon..Fri 08:00-17:00"]
   mode            = "all"
   comment         = "Matcher with calendar - business hours only"
 }
@@ -403,7 +403,7 @@ resource "pbs_notification_matcher" "test_calendar" {
 	tc.ApplyTerraform(t)
 
 	resource := tc.GetResourceFromState(t, "pbs_notification_matcher.test_calendar")
-	assert.Equal(t, "Mon..Fri 08:00-17:00", resource.AttributeValues["match_calendar"])
+	assert.Equal(t, []interface{}{"Mon..Fri 08:00-17:00"}, resource.AttributeValues["match_calendar"])
 
 	notifClient := notifications.NewClient(tc.APIClient)
 	matcher, err := notifClient.GetNotificationMatcher(context.Background(), matcherName)
