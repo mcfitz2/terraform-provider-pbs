@@ -1,4 +1,4 @@
-name: VM Integration Tests (Vagrant)
+name: VM Integration Tests
 
 on:
   push:
@@ -11,55 +11,10 @@ on:
     - cron: '0 2 * * 0'
 
 jobs:
-  # First job: Discover available PBS versions from external repo releases
-  discover-versions:
-    name: Discover PBS Versions
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-    - name: Fetch latest release from PBS Vagrant box repo
-      id: fetch-release
-      run: |
-        RELEASE_DATA=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/mcfitz2/proxmox-backup-server/releases/latest)
-        
-        echo "Release data:"
-        echo "$RELEASE_DATA" | jq '.'
-        
-        # Extract assets
-        ASSETS=$(echo "$RELEASE_DATA" | jq -c '[.assets[] | select(.name | endswith(".box"))]')
-        echo "assets=$ASSETS" >> $GITHUB_OUTPUT
-    
-    - name: Build test matrix
-      id: set-matrix
-      run: |
-        ASSETS='${{ steps.fetch-release.outputs.assets }}'
-        
-        # Build matrix with version, box name, and download URL
-        # Box name pattern: proxmox-backup-server-{VERSION}-amd64-libvirt.box
-        MATRIX=$(echo "$ASSETS" | jq -c '{
-          include: [
-            .[] | {
-              version: (.name | capture("proxmox-backup-server-(?<ver>[0-9.]+)-").ver),
-              box_name: .name,
-              box_url: .browser_download_url
-            }
-          ]
-        }')
-        
-        echo "Matrix:"
-        echo "$MATRIX" | jq '.'
-        echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-
   vm-integration-tests:
-    name: VM Tests (PBS ${{ matrix.version }})
-    needs: discover-versions
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.discover-versions.outputs.matrix) }}
+    name: VM Integration Tests (PBS 4.0)
+    runs-on: self-hosted
+    timeout-minutes: 45
     
     steps:
     - name: Checkout code
@@ -88,99 +43,13 @@ jobs:
     - name: Build provider binary
       run: go build .
 
-    - name: Install Vagrant and libvirt
-      run: |
-        # Install Vagrant
-        wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-        sudo apt-get update
-        sudo apt-get install -y vagrant
-        
-        # Install libvirt and dependencies (including dev package for vagrant-libvirt)
-        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients libvirt-dev bridge-utils virtinst virt-manager
-        
-        # Install vagrant-libvirt plugin
-        vagrant plugin install vagrant-libvirt
-        
-        # Add user to libvirt and kvm groups
-        sudo usermod -aG libvirt $USER
-        sudo usermod -aG kvm $USER
-        
-        # Start libvirt
-        sudo systemctl enable --now libvirtd
-        sudo systemctl status libvirtd
-        
-        # Set socket permissions to allow access
-        sudo chmod 666 /var/run/libvirt/libvirt-sock
-
-    - name: Verify Vagrant installation
-      run: |
-        vagrant --version
-        virsh version || true
-        ls -la /var/run/libvirt/libvirt-sock || true
-
-    - name: Download and add PBS box (version ${{ matrix.version }})
-      working-directory: ./test
-      run: |
-        echo "Downloading PBS ${{ matrix.version }} box from: ${{ matrix.box_url }}"
-        wget -O pbs-${{ matrix.version }}.box "${{ matrix.box_url }}"
-        
-        echo "Adding box to Vagrant as pbs-${{ matrix.version }}..."
-        vagrant box add pbs-${{ matrix.version }} pbs-${{ matrix.version }}.box
-        
-        echo "Verifying box was added..."
-        vagrant box list | grep pbs-${{ matrix.version }}
-        
-        # Update Vagrantfile to use this specific box
-        sed -i 's|config.vm.box = .*|config.vm.box = "pbs-${{ matrix.version }}"|' Vagrantfile
-
-    - name: Start PBS VM
-      working-directory: ./test
+    - name: Run integration tests
       env:
-        VAGRANT_LOG: debug
-        VAGRANT_LOG_TIMESTAMP: 1
-      run: |
-        echo "Starting PBS VM (version ${{ matrix.version }})..."
-        echo "Vagrant debug logging enabled (VAGRANT_LOG=debug)"
-        # Use libvirt provider for KVM virtualization
-        vagrant up --provider libvirt
-        
-        echo "Waiting for PBS to be fully ready..."
-        sleep 30
-        
-        echo "Checking PBS VM status..."
-        vagrant status
-        
-        echo "Testing PBS API connectivity..."
-        for i in {1..10}; do
-          if curl -k -f -s https://localhost:8007 >/dev/null 2>&1; then
-            echo "✅ PBS API is accessible!"
-            break
-          fi
-          if [ $i -eq 10 ]; then
-            echo "❌ PBS API not accessible after 10 attempts"
-            vagrant ssh -c "sudo systemctl status proxmox-backup.service" || true
-            exit 1
-          fi
-          echo "Attempt $i/10: Waiting for PBS API..."
-          sleep 5
-        done
-
-    - name: Display PBS VM information
-      working-directory: ./test
-      run: |
-        echo "=== PBS VM Information ==="
-        vagrant ssh -c "sudo proxmox-backup-manager version"
-        vagrant ssh -c "sudo zpool list" || echo "No ZFS pools"
-        vagrant ssh -c "sudo systemctl status proxmox-backup.service --no-pager"
-        echo "========================="
-
-    - name: Run integration tests with VM PBS
-      env:
-        PBS_ADDRESS: "https://localhost:8007"
+        PBS_ADDRESS: "https://192.168.1.108:8007"
         PBS_USERNAME: "root@pam"
-        PBS_PASSWORD: "vagrant"
+        PBS_PASSWORD: "pbspbs123"
         PBS_INSECURE_TLS: "true"
+        PBS_TESTPOOL: "testpool"
         # S3 provider credentials from secrets (optional for S3 tests)
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -192,46 +61,15 @@ jobs:
         SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
-        echo "Running full integration test suite with VM PBS..."
-        go test -v -timeout 45m ./test/integration -run "TestIntegration|TestDatastoreZFS"
-
-    - name: Run ZFS-specific tests
-      if: always()
-      env:
-        PBS_ADDRESS: "https://localhost:8007"
-        PBS_USERNAME: "root@pam"
-        PBS_PASSWORD: "vagrant"
-        PBS_INSECURE_TLS: "true"
-      run: |
-        echo "Running ZFS-specific tests..."
-        go test -v -timeout 15m ./test/integration -run "TestDatastoreZFS"
-
-    - name: Collect PBS logs on failure
-      if: failure()
-      working-directory: ./test
-      run: |
-        echo "=== PBS Service Logs ==="
-        vagrant ssh -c "sudo journalctl -u proxmox-backup.service -n 100 --no-pager" || true
-        echo "=== PBS Proxy Logs ==="
-        vagrant ssh -c "sudo journalctl -u proxmox-backup-proxy.service -n 100 --no-pager" || true
-        echo "=== ZFS Status ==="
-        vagrant ssh -c "sudo zpool status" || true
-        vagrant ssh -c "sudo zfs list" || true
+        echo "Running integration test suite against PBS 4.0 at 192.168.1.108..."
+        go test -v -timeout 40m ./test/integration
 
     - name: Upload test logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: vm-test-logs-pbs-${{ matrix.version }}
+        name: vm-test-logs-pbs-4.0
         path: |
           test/integration/*.log
           terraform.log
         retention-days: 7
-
-    - name: Cleanup PBS VM
-      if: always()
-      working-directory: ./test
-      run: |
-        echo "Destroying PBS VM..."
-        vagrant destroy -f || true
-        rm -f zfs-disk.vdi || true

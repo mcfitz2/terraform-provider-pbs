@@ -1,280 +1,557 @@
-# Integration Tests for Proxmox Backup Server Terraform Provider
+# Integration Tests for Proxmox Backup Server Terraform Provider# Integration Tests for Proxmox Backup Server Terraform Provider
 
-This directory contains integration tests that validate the Terraform provider against a real Proxmox Backup Server (PBS) instance.
 
-## Prerequisites
 
-1. **Go 1.21+** - Required for running the tests
-2. **Terraform** - Must be installed and available in PATH
-3. **Provider Binary** - Build the provider first: `go build .` (run from project root)
-4. **PBS Instance** - A running Proxmox Backup Server instance for testing
+This directory contains integration tests that validate the Terraform provider against a real Proxmox Backup Server (PBS) instance.This directory contains integration tests that validate the Terraform provider against a real Proxmox Backup Server (PBS) instance.
 
-## Setup Options
 
-### Option 1: Docker Container (Recommended for Development)
 
-The easiest way to run tests is using the included Docker setup:
+## Prerequisites## Prerequisites
 
-```bash
-# First, build the provider binary (from project root)
-go build .
 
-# Run all tests with Docker PBS container
-./test/run_docker_tests.sh
 
-# Run specific tests with verbose output
-./test/run_docker_tests.sh -v TestQuickSmoke
+1. **Go 1.22+** - Required for running the tests1. **Go 1.21+** - Required for running the tests
 
-# Start container only (for manual testing)
-./test/run_docker_tests.sh --start-only
+2. **Terraform 1.5.7+** - Must be installed and available in PATH2. **Terraform** - Must be installed and available in PATH
 
-# Clean up containers
-./test/run_docker_tests.sh --cleanup
+3. **Provider Binary** - Build the provider first: `go build .` (run from project root)3. **Provider Binary** - Build the provider first: `go build .` (run from project root)
+
+4. **PBS Instance** - A running Proxmox Backup Server 4.0 instance for testing4. **PBS Instance** - A running Proxmox Backup Server instance for testing
+
+
+
+## Test Environment## Setup Options
+
+
+
+### Local Development Testing### Option 1: Docker Container (Recommended for Development)
+
+
+
+For local development, use the Docker container setup:The easiest way to run tests is using the included Docker setup:
+
+
+
+```bash```bash
+
+# Start PBS container# First, build the provider binary (from project root)
+
+docker-compose up -dgo build .
+
+
+
+# Run tests against Docker PBS# Run all tests with Docker PBS container
+
+export PBS_ADDRESS="https://localhost:8007"./test/run_docker_tests.sh
+
+export PBS_USERNAME="admin@pbs"
+
+export PBS_PASSWORD="pbspbs"# Run specific tests with verbose output
+
+export PBS_INSECURE_TLS="true"./test/run_docker_tests.sh -v TestQuickSmoke
+
+
+
+# Run all integration tests# Start container only (for manual testing)
+
+make test-integration./test/run_docker_tests.sh --start-only
+
 ```
 
-**Docker Prerequisites:**
-- Docker and Docker Compose installed
+# Clean up containers
+
+**Docker Prerequisites:**./test/run_docker_tests.sh --cleanup
+
+- Docker and Docker Compose installed```
+
 - No additional PBS instance required
 
-**Default Docker Credentials:**
-- URL: `https://localhost:8007`
+**Docker Prerequisites:**
+
+**Default Docker Credentials:**- Docker and Docker Compose installed
+
+- URL: `https://localhost:8007`- No additional PBS instance required
+
 - Username: `admin@pbs`
+
+- Password: `pbspbs`**Default Docker Credentials:**
+
+- URL: `https://localhost:8007`
+
+### CI/CD Testing (GitHub Actions)- Username: `admin@pbs`
+
 - Password: `pbspbs` (pre-configured in Docker image)
+
+The GitHub Actions workflow runs on a **self-hosted runner** with access to a dedicated PBS 4.0 test instance:
 
 ### Option 2: External PBS Instance
 
-#### Environment Variables
+- **PBS Address**: `192.168.1.108:8007`
 
-For testing against an external PBS instance:
+- **Username**: `root@pam`#### Environment Variables
 
-```bash
-export PBS_ADDRESS="https://your-pbs-server:8007"     # PBS server address
-export PBS_USERNAME="your-username@pam"              # PBS username (e.g., admin@pam)
-export PBS_PASSWORD="your-password"                  # PBS password
-export PBS_INSECURE_TLS="true"                       # For self-signed certificates
+- **Password**: `pbspbs123`
+
+- **ZFS Pool**: `testpool` (pre-configured for datastore tests)For testing against an external PBS instance:
+
+
+
+The workflow automatically:```bash
+
+1. Builds the provider binaryexport PBS_ADDRESS="https://your-pbs-server:8007"     # PBS server address
+
+2. Runs the full integration test suiteexport PBS_USERNAME="your-username@pam"              # PBS username (e.g., admin@pam)
+
+3. Tests against PBS 4.0export PBS_PASSWORD="your-password"                  # PBS password
+
+4. Cleans up test resources automaticallyexport PBS_INSECURE_TLS="true"                       # For self-signed certificates
+
 ```
+
+## Environment Variables
 
 ### Multi-Provider S3 Testing Environment Variables
 
+### Required Variables
+
 For multi-provider S3 endpoint testing (optional - enables real S3 bucket testing):
 
-#### AWS S3
 ```bash
-export AWS_ACCESS_KEY_ID="your-aws-access-key"       # AWS access key
-export AWS_SECRET_ACCESS_KEY="your-aws-secret-key"   # AWS secret key
-export AWS_REGION="us-east-1"                        # AWS region (optional, default: us-east-1)
+
+export PBS_ADDRESS="https://your-pbs-server:8007"     # PBS server address#### AWS S3
+
+export PBS_USERNAME="your-username@pam"               # PBS username (e.g., root@pam)```bash
+
+export PBS_PASSWORD="your-password"                   # PBS passwordexport AWS_ACCESS_KEY_ID="your-aws-access-key"       # AWS access key
+
+export PBS_INSECURE_TLS="true"                        # For self-signed certificatesexport AWS_SECRET_ACCESS_KEY="your-aws-secret-key"   # AWS secret key
+
+```export AWS_REGION="us-east-1"                        # AWS region (optional, default: us-east-1)
+
 ```
+
+### Optional Variables
 
 #### Backblaze B2
-```bash
-export B2_ACCESS_KEY_ID="your-b2-key-id"            # Backblaze B2 key ID
-export B2_SECRET_ACCESS_KEY="your-b2-application-key" # Backblaze B2 application key
+
+```bash```bash
+
+export PBS_TESTPOOL="testpool"                        # ZFS pool name for datastore tests (default: testpool)export B2_ACCESS_KEY_ID="your-b2-key-id"            # Backblaze B2 key ID
+
+```export B2_SECRET_ACCESS_KEY="your-b2-application-key" # Backblaze B2 application key
+
 export B2_REGION="us-west-004"                       # B2 region (optional, default: us-west-004)
-```
 
-#### Scaleway Object Storage
-```bash
-export SCALEWAY_ACCESS_KEY="your-scaleway-access-key"    # Scaleway access key
-export SCALEWAY_SECRET_KEY="your-scaleway-secret-key"    # Scaleway secret key
-export SCALEWAY_REGION="fr-par"                          # Scaleway region (optional, default: fr-par)
-```
+### Multi-Provider S3 Testing (Optional)```
 
-### Optional Environment Variables
+
+
+For comprehensive S3 endpoint testing with real cloud providers:#### Scaleway Object Storage
 
 ```bash
-export PBS_INSECURE_TLS="true"                      # Skip TLS certificate verification (default: false)
-```
 
-### Multi-Provider S3 Setup
+#### AWS S3export SCALEWAY_ACCESS_KEY="your-scaleway-access-key"    # Scaleway access key
+
+```bashexport SCALEWAY_SECRET_KEY="your-scaleway-secret-key"    # Scaleway secret key
+
+export AWS_ACCESS_KEY_ID="your-aws-access-key"export SCALEWAY_REGION="fr-par"                          # Scaleway region (optional, default: fr-par)
+
+export AWS_SECRET_ACCESS_KEY="your-aws-secret-key"```
+
+export AWS_REGION="us-east-1"
+
+```### Optional Environment Variables
+
+
+
+#### Backblaze B2```bash
+
+```bashexport PBS_INSECURE_TLS="true"                      # Skip TLS certificate verification (default: false)
+
+export B2_ACCESS_KEY_ID="your-b2-key-id"```
+
+export B2_SECRET_ACCESS_KEY="your-b2-application-key"
+
+export B2_REGION="us-west-004"### Multi-Provider S3 Setup
+
+```
 
 The multi-provider S3 tests are optional but provide comprehensive validation of S3 endpoint functionality with real cloud providers. Set up credentials for the providers you want to test:
 
-#### AWS S3 Setup
-1. Create an AWS account and obtain access keys
-2. Ensure your AWS user has S3 permissions: `s3:CreateBucket`, `s3:DeleteBucket`, `s3:ListBucket`, `s3:PutObject`, `s3:GetObject`
-3. Set the AWS environment variables as shown above
+#### Scaleway Object Storage
+
+```bash#### AWS S3 Setup
+
+export SCALEWAY_ACCESS_KEY="your-scaleway-access-key"1. Create an AWS account and obtain access keys
+
+export SCALEWAY_SECRET_KEY="your-scaleway-secret-key"2. Ensure your AWS user has S3 permissions: `s3:CreateBucket`, `s3:DeleteBucket`, `s3:ListBucket`, `s3:PutObject`, `s3:GetObject`
+
+export SCALEWAY_REGION="fr-par"3. Set the AWS environment variables as shown above
+
+```
 
 #### Backblaze B2 Setup
-1. Create a Backblaze account and generate application keys
+
+## Running Tests1. Create a Backblaze account and generate application keys
+
 2. Create an application key with read/write permissions
-3. Note: B2 uses path-style addressing by default
+
+### Quick Start3. Note: B2 uses path-style addressing by default
+
 4. Set the B2 environment variables as shown above
 
-#### Scaleway Object Storage Setup
-1. Create a Scaleway account and generate API keys
-2. Enable Object Storage in your Scaleway project
-3. Generate access keys with Object Storage permissions
-4. Set the Scaleway environment variables as shown above
+```bash
 
-**Note:** Multi-provider tests will automatically skip providers that don't have credentials configured, so you can run tests with any subset of providers configured.
+# Build the provider#### Scaleway Object Storage Setup
+
+go build .1. Create a Scaleway account and generate API keys
+
+2. Enable Object Storage in your Scaleway project
+
+# Run all tests3. Generate access keys with Object Storage permissions
+
+make test4. Set the Scaleway environment variables as shown above
+
+
+
+# Run only integration tests**Note:** Multi-provider tests will automatically skip providers that don't have credentials configured, so you can run tests with any subset of providers configured.
+
+make test-integration
 
 ## Running Tests
 
-### Quick Start with Docker (Recommended)
+# Run only unit tests
+
+make test-unit### Quick Start with Docker (Recommended)
+
+```
 
 ```bash
-# Run all tests with Docker PBS (zero configuration)
+
+### Running Specific Tests# Run all tests with Docker PBS (zero configuration)
+
 ./test/run_docker_tests.sh
 
-# Run specific tests with verbose output
-./test/run_docker_tests.sh -v TestQuickSmoke
+```bash
 
-# Keep container running for debugging
-./test/run_docker_tests.sh -k TestDatastoreDirectoryIntegration
+# Run a specific test# Run specific tests with verbose output
+
+go test -v ./test/integration -run TestDatastoreDirectoryIntegration./test/run_docker_tests.sh -v TestQuickSmoke
+
+
+
+# Run all datastore tests# Keep container running for debugging
+
+go test -v ./test/integration -run TestDatastore./test/run_docker_tests.sh -k TestDatastoreDirectoryIntegration
+
 ```
 
-### Quick Start with External PBS
+# Run with timeout
+
+go test -v -timeout 30m ./test/integration### Quick Start with External PBS
+
+```
 
 ```bash
-# Set environment variables
+
+### Docker Testing# Set environment variables
+
 export PBS_ADDRESS="https://pbs.local:8007"
-export PBS_USERNAME="admin@pam"
-export PBS_PASSWORD="secret"
+
+```bashexport PBS_USERNAME="admin@pam"
+
+# Start PBS container and run testsexport PBS_PASSWORD="secret"
+
+./test/run_docker_tests.sh
 
 # Run integration tests
-make test-integration
-```
 
-### Individual Test Commands
+# Run specific test with Dockermake test-integration
 
-```bash
+./test/run_docker_tests.sh -v TestQuickSmoke```
+
+
+
+# Keep container running after tests### Individual Test Commands
+
+./test/run_docker_tests.sh --start-only
+
+``````bash
+
 # Run all tests (unit + integration)
-make test
 
-# Run only unit tests (no PBS instance required)
+## Test Structuremake test
+
+
+
+### Test Files# Run only unit tests (no PBS instance required)
+
 make test-unit
 
-# Run only integration tests
-make test-integration
+- `setup.go` - Test utilities and PBS client setup
 
-# Run specific integration test
+- `integration_test.go` - Main test suite entry point# Run only integration tests
+
+- `datastore_test.go` - Datastore lifecycle tests (directory, ZFS, S3)make test-integration
+
+- `s3_providers.go` - Multi-provider S3 configuration
+
+- `s3_providers_test.go` - Real S3 provider integration tests# Run specific integration test
+
 go test -v ./test/ -run TestS3EndpointIntegration
-
-# Run multi-provider S3 tests (requires S3 credentials)
-go test -v ./test/ -run TestS3EndpointMultiProvider
-
-# Run single provider test
-go test -v ./test/ -run TestS3EndpointMultiProvider/AWS
-
-# Run tests with verbose output and timeout
-go test -v -timeout 30m ./test/...
-```
-
-## Test Structure
-
-### Test Files
-
-- `setup.go` - Common test setup and utility functions
-- `integration_test.go` - Main test entry point with organized test suites
-- `datastore_test.go` - Complete datastore lifecycle tests (directory, S3)
-- `s3_providers.go` - Multi-provider S3 configuration and utilities  
-- `s3_providers_test.go` - Multi-provider S3 integration tests (AWS, Backblaze B2, Scaleway)
-- `Makefile` - Build and test automation
-- `run_integration_tests.sh` - Shell script for running integration tests
 
 ### Test Categories
 
-1. **Integration Suite** (`TestIntegration`) - Complete provider functionality
-   - **Datastore Tests** - Directory and S3 datastore lifecycle
-   - **S3 Endpoint Tests** - Multi-provider S3 endpoint management
-2. **Smoke Tests** (`TestQuickSmoke`) - Fast basic connectivity tests
-3. **Multi-Provider Tests** - Real cloud provider integration (AWS, Backblaze B2, Scaleway)
-4. **Provider Quirks** - Backblaze B2 compatibility with `skip-if-none-match-header`
+# Run multi-provider S3 tests (requires S3 credentials)
+
+1. **Integration Suite** - Complete provider functionalitygo test -v ./test/ -run TestS3EndpointMultiProvider
+
+   - Datastore Tests (directory, ZFS, S3)
+
+   - S3 Endpoint Management# Run single provider test
+
+   - User Managementgo test -v ./test/ -run TestS3EndpointMultiProvider/AWS
+
+   - Remote Management
+
+   # Run tests with verbose output and timeout
+
+2. **Smoke Tests** - Fast connectivity validationgo test -v -timeout 30m ./test/...
+
+```
+
+3. **Multi-Provider Tests** - Real cloud provider integration (optional)
+
+## Test Structure
 
 ## Test Scenarios
 
-### Basic S3 Endpoint Tests
+### Test Files
 
-#### TestS3EndpointIntegration
-- Creates an S3 endpoint via Terraform
-- Verifies creation through both Terraform state and direct API calls
-- Updates the endpoint configuration
-- Verifies updates through API
-- Cleans up resources
+### Datastore Tests
 
-#### TestS3EndpointValidation
-- Tests invalid configurations
-- Validates proper error handling
-- Ensures required fields are enforced
+- `setup.go` - Common test setup and utility functions
 
-#### TestS3EndpointConcurrency
-- Creates multiple S3 endpoints simultaneously
-- Verifies concurrent operations work correctly
-- Tests resource isolation
+- **Directory Datastores**: Create, update, and delete directory-backed datastores- `integration_test.go` - Main test entry point with organized test suites
 
-### Multi-Provider S3 Endpoint Tests
+- **ZFS Datastores**: Manage datastores on ZFS pools (requires `testpool`)- `datastore_test.go` - Complete datastore lifecycle tests (directory, S3)
 
-#### TestS3EndpointMultiProvider
-- Tests S3 endpoint creation with real cloud providers
-- Creates actual S3 buckets for each configured provider
-- Validates PBS S3 endpoint connectivity to real S3 services
-- Tests with AWS S3, Backblaze B2, and Scaleway Object Storage
-- Automatically cleans up S3 buckets after testing
-- Runs in parallel for faster execution
+- **S3 Datastores**: Test S3-backed datastore functionality- `s3_providers.go` - Multi-provider S3 configuration and utilities  
 
-#### TestS3EndpointProviderSpecificFeatures
-- Tests provider-specific S3 configurations
-- Validates path-style vs virtual-hosted-style addressing
-- Tests region-specific endpoint configurations
-- Verifies compatibility across different S3 implementations
+- `s3_providers_test.go` - Multi-provider S3 integration tests (AWS, Backblaze B2, Scaleway)
 
-#### TestS3EndpointConcurrentProviders
-- Creates multiple S3 endpoints across different providers simultaneously
-- Tests concurrent access to different S3 services
-- Validates provider isolation and independence
+### S3 Endpoint Tests- `Makefile` - Build and test automation
 
-## Adding New Tests
+- `run_integration_tests.sh` - Shell script for running integration tests
 
-### Test File Template
+- Create and manage S3 endpoints
 
-```go
-package test
+- Validate configuration options### Test Categories
 
-import (
-    "testing"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-)
+- Test with real AWS S3, Backblaze B2, and Scaleway
 
-func TestNewResource(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test in short mode")
-    }
+- Concurrent endpoint operations1. **Integration Suite** (`TestIntegration`) - Complete provider functionality
 
-    tc := SetupTest(t)
-    defer tc.DestroyTerraform(t)
+   - **Datastore Tests** - Directory and S3 datastore lifecycle
 
-    // Your test logic here
-}
-```
+### User Management Tests   - **S3 Endpoint Tests** - Multi-provider S3 endpoint management
 
-### Best Practices
+2. **Smoke Tests** (`TestQuickSmoke`) - Fast basic connectivity tests
 
-1. **Use unique names** - Always use `GenerateTestName()` for resource names
-2. **Clean up resources** - Use `defer tc.DestroyTerraform(t)` in each test
-3. **Verify via API** - Always verify Terraform changes through direct API calls
-4. **Handle errors gracefully** - Use `require.NoError()` for critical operations
-5. **Test edge cases** - Include validation and error scenarios
+- User creation and deletion3. **Multi-Provider Tests** - Real cloud provider integration (AWS, Backblaze B2, Scaleway)
+
+- Permission management4. **Provider Quirks** - Backblaze B2 compatibility with `skip-if-none-match-header`
+
+- Authentication validation
+
+## Test Scenarios
 
 ## Troubleshooting
 
+### Basic S3 Endpoint Tests
+
 ### Common Issues
 
-#### PBS Connection Issues
-```
-Error: Failed to create PBS API client: connection refused
-```
-- Verify PBS_ADDRESS is correct and accessible
-- Check if PBS instance is running
-- Verify firewall allows connections on port 8007
+#### TestS3EndpointIntegration
 
-#### Authentication Issues
+#### Connection Refused- Creates an S3 endpoint via Terraform
+
+```- Verifies creation through both Terraform state and direct API calls
+
+Error: dial tcp: connection refused- Updates the endpoint configuration
+
+```- Verifies updates through API
+
+**Solution**: Verify PBS_ADDRESS is correct and PBS is running- Cleans up resources
+
+
+
+#### Authentication Failed#### TestS3EndpointValidation
+
+```- Tests invalid configurations
+
+Error: authentication failed- Validates proper error handling
+
+```- Ensures required fields are enforced
+
+**Solution**: Check PBS_USERNAME and PBS_PASSWORD are correct
+
+#### TestS3EndpointConcurrency
+
+#### TLS Certificate Errors- Creates multiple S3 endpoints simultaneously
+
+```- Verifies concurrent operations work correctly
+
+Error: x509: certificate signed by unknown authority- Tests resource isolation
+
 ```
-Error: authentication failed
+
+**Solution**: Set `PBS_INSECURE_TLS=true`### Multi-Provider S3 Endpoint Tests
+
+
+
+#### ZFS Pool Not Found#### TestS3EndpointMultiProvider
+
+```- Tests S3 endpoint creation with real cloud providers
+
+Error: ZFS pool 'testpool' does not exist- Creates actual S3 buckets for each configured provider
+
+```- Validates PBS S3 endpoint connectivity to real S3 services
+
+**Solution**: Create the testpool ZFS pool or adjust PBS_TESTPOOL variable- Tests with AWS S3, Backblaze B2, and Scaleway Object Storage
+
+- Automatically cleans up S3 buckets after testing
+
+### Debug Mode- Runs in parallel for faster execution
+
+
+
+```bash#### TestS3EndpointProviderSpecificFeatures
+
+# Verbose test output- Tests provider-specific S3 configurations
+
+go test -v ./test/integration- Validates path-style vs virtual-hosted-style addressing
+
+- Tests region-specific endpoint configurations
+
+# Run with race detection- Verifies compatibility across different S3 implementations
+
+go test -race ./test/integration
+
+#### TestS3EndpointConcurrentProviders
+
+# Generate coverage report- Creates multiple S3 endpoints across different providers simultaneously
+
+go test -cover ./test/integration- Tests concurrent access to different S3 services
+
+```- Validates provider isolation and independence
+
+
+
+## CI/CD Integration## Adding New Tests
+
+
+
+### GitHub Actions### Test File Template
+
+
+
+The repository includes a workflow (`.github/workflows/vm-integration-tests.yml`) that:```go
+
+package test
+
+1. Runs on self-hosted runner with PBS 4.0 access
+
+2. Automatically builds the providerimport (
+
+3. Runs the full test suite    "testing"
+
+4. Reports results and uploads logs on failure    "github.com/stretchr/testify/assert"
+
+    "github.com/stretchr/testify/require"
+
+To set up:)
+
+1. Configure a self-hosted runner with network access to PBS instance
+
+2. Tag the runner appropriately in the workflowfunc TestNewResource(t *testing.T) {
+
+3. Tests will automatically run on push/PR    if testing.Short() {
+
+        t.Skip("Skipping integration test in short mode")
+
+## Safety Considerations    }
+
+
+
+- **Use dedicated test instances** - Never run against production PBS    tc := SetupTest(t)
+
+- **Automatic cleanup** - Tests clean up resources automatically    defer tc.DestroyTerraform(t)
+
+- **Resource naming** - Test resources use `*-test-*` naming patterns
+
+- **Failed test cleanup** - May require manual cleanup if tests fail unexpectedly    // Your test logic here
+
+}
+
+## Contributing```
+
+
+
+When adding new tests:### Best Practices
+
+
+
+1. Follow existing test patterns from `setup.go`1. **Use unique names** - Always use `GenerateTestName()` for resource names
+
+2. Use `GenerateTestName()` for unique resource names2. **Clean up resources** - Use `defer tc.DestroyTerraform(t)` in each test
+
+3. Always include cleanup with `defer tc.DestroyTerraform(t)`3. **Verify via API** - Always verify Terraform changes through direct API calls
+
+4. Verify resources via API calls, not just Terraform state4. **Handle errors gracefully** - Use `require.NoError()` for critical operations
+
+5. Add both positive and negative test cases5. **Test edge cases** - Include validation and error scenarios
+
+6. Update this README with new test descriptions
+
+## Troubleshooting
+
+## Project Structure
+
+### Common Issues
+
 ```
-- Verify PBS_USERNAME and PBS_PASSWORD are correct
-- Check if user has necessary permissions
-- Verify user account is not disabled
+
+test/#### PBS Connection Issues
+
+├── README.md                      # This file```
+
+├── TESTS.md                       # Detailed test documentationError: Failed to create PBS API client: connection refused
+
+├── docker-compose.yml             # Docker PBS setup for local testing```
+
+├── run_docker_tests.sh            # Docker test runner script- Verify PBS_ADDRESS is correct and accessible
+
+├── run_integration_tests.sh       # Integration test runner- Check if PBS instance is running
+
+├── Makefile                       # Build and test automation- Verify firewall allows connections on port 8007
+
+├── integration/                   # Integration test suite
+
+│   ├── setup.go                   # Test utilities#### Authentication Issues
+
+│   ├── integration_test.go        # Main test suite```
+
+│   ├── datastore_test.go          # Datastore testsError: authentication failed
+
+│   ├── s3_providers.go            # S3 provider configs```
+
+│   └── s3_providers_test.go       # Multi-provider S3 tests- Verify PBS_USERNAME and PBS_PASSWORD are correct
+
+└── unit/                          # Unit tests (no PBS required)- Check if user has necessary permissions
+
+```- Verify user account is not disabled
+
 
 #### TLS Issues
 ```

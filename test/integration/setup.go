@@ -283,7 +283,7 @@ func (tc *TestContext) DestroyTerraform(t *testing.T) {
 			t.Logf("Terraform destroy: resource already deleted (desired state achieved)")
 			return
 		}
-		
+
 		// Log any other errors as warnings, but don't fail the test
 		// This allows cleanup to continue even if there are issues
 		t.Logf("Warning: Terraform destroy encountered error: %v", err)
