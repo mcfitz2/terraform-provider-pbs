@@ -24,16 +24,16 @@ func TestSMTPNotificationIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "test_smtp" {
-  name       = "%s"
-  server     = "smtp.example.com"
-  port       = 587
-  username   = "test@example.com"
-  password   = "secret123"
-  mailto     = ["admin@example.com", "backup@example.com"]
-  from       = "pbs@example.com"
-  author     = "PBS Admin"
-  comment    = "Test SMTP notification"
-  disable    = false
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret123"
+  mailto       = "admin@example.com,backup@example.com"
+  from_address = "pbs@example.com"
+  author       = "PBS Admin"
+  comment      = "Test SMTP notification"
+  disable      = false
 }
 `, targetName)
 
@@ -57,16 +57,16 @@ resource "pbs_smtp_notification" "test_smtp" {
 	// Test update
 	updatedConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "test_smtp" {
-  name       = "%s"
-  server     = "smtp.newserver.com"
-  port       = 465
-  username   = "updated@example.com"
-  password   = "newsecret456"
-  mailto     = ["newadmin@example.com"]
-  from       = "pbs-updated@example.com"
-  author     = "Updated PBS Admin"
-  comment    = "Updated SMTP notification"
-  disable    = false
+  name         = "%s"
+  server       = "smtp.newserver.com"
+  port         = 465
+  username     = "updated@example.com"
+  password     = "newsecret456"
+  mailto       = "newadmin@example.com"
+  from_address = "pbs-updated@example.com"
+  author       = "Updated PBS Admin"
+  comment      = "Updated SMTP notification"
+  disable      = false
 }
 `, targetName)
 
@@ -129,12 +129,12 @@ func TestSendmailNotificationIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_sendmail_notification" "test_sendmail" {
-  name       = "%s"
-  mailto     = ["admin@example.com"]
-  from       = "pbs@example.com"
-  author     = "PBS System"
-  comment    = "Test Sendmail notification"
-  disable    = false
+  name         = "%s"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
+  author       = "PBS System"
+  comment      = "Test Sendmail notification"
+  disable      = false
 }
 `, targetName)
 
@@ -143,7 +143,7 @@ resource "pbs_sendmail_notification" "test_sendmail" {
 
 	resource := tc.GetResourceFromState(t, "pbs_sendmail_notification.test_sendmail")
 	assert.Equal(t, targetName, resource.AttributeValues["name"])
-	assert.Equal(t, "pbs@example.com", resource.AttributeValues["from"])
+	assert.Equal(t, "pbs@example.com", resource.AttributeValues["from_address"])
 
 	// Verify via API
 	notifClient := notifications.NewClient(tc.APIClient)
@@ -207,13 +207,13 @@ func TestNotificationEndpointIntegration(t *testing.T) {
 	// Create notification targets first
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target1" {
-  name     = "%s"
-  server   = "smtp.example.com"
-  port     = 587
-  username = "test@example.com"
-  password = "secret"
-  mailto   = ["admin@example.com"]
-  from     = "pbs@example.com"
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
 }
 
 resource "pbs_gotify_notification" "target2" {
@@ -262,13 +262,13 @@ func TestNotificationMatcherIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target" {
-  name     = "%s"
-  server   = "smtp.example.com"
-  port     = 587
-  username = "test@example.com"
-  password = "secret"
-  mailto   = ["admin@example.com"]
-  from     = "pbs@example.com"
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
 }
 
 resource "pbs_notification_endpoint" "endpoint" {
@@ -325,13 +325,13 @@ func TestNotificationMatcherModes(t *testing.T) {
 	// Test "any" mode
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target" {
-  name     = "%s"
-  server   = "smtp.example.com"
-  port     = 587
-  username = "test@example.com"
-  password = "secret"
-  mailto   = ["admin@example.com"]
-  from     = "pbs@example.com"
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
 }
 
 resource "pbs_notification_endpoint" "endpoint" {
@@ -375,13 +375,13 @@ func TestNotificationMatcherWithCalendar(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target" {
-  name     = "%s"
-  server   = "smtp.example.com"
-  port     = 587
-  username = "test@example.com"
-  password = "secret"
-  mailto   = ["admin@example.com"]
-  from     = "pbs@example.com"
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
 }
 
 resource "pbs_notification_endpoint" "endpoint" {
@@ -426,13 +426,13 @@ func TestNotificationMatcherInvertMatch(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target" {
-  name     = "%s"
-  server   = "smtp.example.com"
-  port     = 587
-  username = "test@example.com"
-  password = "secret"
-  mailto   = ["admin@example.com"]
-  from     = "pbs@example.com"
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = "admin@example.com"
+  from_address = "pbs@example.com"
 }
 
 resource "pbs_notification_endpoint" "endpoint" {

@@ -78,10 +78,6 @@ func NewClient(creds Credentials, opts ClientOptions) (*Client, error) {
 		},
 	}
 
-	if opts.Insecure {
-		fmt.Println("[WARNING] TLS certificate verification is disabled (Insecure=true). This should only be used for development or testing environments.")
-	}
-
 	client := &Client{
 		httpClient: &http.Client{
 			Transport: transport,

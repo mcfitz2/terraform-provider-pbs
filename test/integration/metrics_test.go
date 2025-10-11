@@ -26,7 +26,8 @@ func TestMetricsServerInfluxDBHTTPIntegration(t *testing.T) {
 resource "pbs_metrics_server" "test_influxdb_http" {
   name         = "%s"
   type         = "influxdb-http"
-  url          = "https://influx.example.com"
+  server       = "influx.example.com"
+  port         = 443
   organization = "myorg"
   bucket       = "pbs-metrics"
   token        = "mytoken123456"
@@ -41,7 +42,8 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_influxdb_http")
 	assert.Equal(t, serverName, resource.AttributeValues["name"])
 	assert.Equal(t, "influxdb-http", resource.AttributeValues["type"])
-	assert.Equal(t, "https://influx.example.com", resource.AttributeValues["url"])
+	assert.Equal(t, "influx.example.com", resource.AttributeValues["server"])
+	assert.Equal(t, float64(443), resource.AttributeValues["port"])
 	assert.Equal(t, "myorg", resource.AttributeValues["organization"])
 	assert.Equal(t, "pbs-metrics", resource.AttributeValues["bucket"])
 
@@ -51,7 +53,8 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 	require.NoError(t, err)
 	assert.Equal(t, serverName, server.Name)
 	assert.Equal(t, metrics.MetricsServerTypeInfluxDBHTTP, server.Type)
-	assert.Equal(t, "https://influx.example.com", server.Server)
+	assert.Equal(t, "influx.example.com", server.Server)
+	assert.Equal(t, 443, server.Port)
 	assert.Equal(t, "myorg", server.Organization)
 	assert.Equal(t, "pbs-metrics", server.Bucket)
 
@@ -60,7 +63,8 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 resource "pbs_metrics_server" "test_influxdb_http" {
   name         = "%s"
   type         = "influxdb-http"
-  url          = "https://influx-new.example.com"
+  server       = "influx-new.example.com"
+  port         = 443
   organization = "neworg"
   bucket       = "new-pbs-metrics"
   token        = "newtoken789"
@@ -74,7 +78,8 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 
 	server, err = metricsClient.GetMetricsServer(context.Background(), metrics.MetricsServerTypeInfluxDBHTTP, serverName)
 	require.NoError(t, err)
-	assert.Equal(t, "https://influx-new.example.com", server.Server)
+	assert.Equal(t, "influx-new.example.com", server.Server)
+	assert.Equal(t, 443, server.Port)
 	assert.Equal(t, "neworg", server.Organization)
 	assert.Equal(t, "Updated InfluxDB HTTP metrics server", server.Comment)
 }
@@ -94,7 +99,7 @@ func TestMetricsServerInfluxDBUDPIntegration(t *testing.T) {
 resource "pbs_metrics_server" "test_influxdb_udp" {
   name     = "%s"
   type     = "influxdb-udp"
-  host     = "influx-udp.example.com"
+  server   = "influx-udp.example.com"
   port     = 8089
   protocol = "udp"
   enable   = true
@@ -108,7 +113,7 @@ resource "pbs_metrics_server" "test_influxdb_udp" {
 	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_influxdb_udp")
 	assert.Equal(t, serverName, resource.AttributeValues["name"])
 	assert.Equal(t, "influxdb-udp", resource.AttributeValues["type"])
-	assert.Equal(t, "influx-udp.example.com", resource.AttributeValues["host"])
+	assert.Equal(t, "influx-udp.example.com", resource.AttributeValues["server"])
 	assert.Equal(t, float64(8089), resource.AttributeValues["port"])
 	assert.Equal(t, "udp", resource.AttributeValues["protocol"])
 
@@ -137,7 +142,7 @@ func TestMetricsServerMTU(t *testing.T) {
 resource "pbs_metrics_server" "test_mtu" {
   name     = "%s"
   type     = "influxdb-udp"
-  host     = "influx.example.com"
+  server   = "influx.example.com"
   port     = 8089
   protocol = "udp"
   mtu      = 1400
@@ -172,15 +177,16 @@ func TestMetricsServerVerifyCertificate(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_metrics_server" "test_tls" {
-  name               = "%s"
-  type               = "influxdb-http"
-  url                = "https://influx-secure.example.com"
-  organization       = "myorg"
-  bucket             = "pbs-metrics"
-  token              = "securetoken"
-  verify_certificate = true
-  enable             = true
-  comment            = "Metrics server with TLS verification"
+  name         = "%s"
+  type         = "influxdb-http"
+  server       = "influx-secure.example.com"
+  port         = 443
+  organization = "myorg"
+  bucket       = "pbs-metrics"
+  token        = "securetoken"
+  verify_tls   = true
+  enable       = true
+  comment      = "Metrics server with TLS verification"
 }
 `, serverName)
 
@@ -188,7 +194,7 @@ resource "pbs_metrics_server" "test_tls" {
 	tc.ApplyTerraform(t)
 
 	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_tls")
-	assert.Equal(t, true, resource.AttributeValues["verify_certificate"])
+	assert.Equal(t, true, resource.AttributeValues["verify_tls"])
 
 	metricsClient := metrics.NewClient(tc.APIClient)
 	server, err := metricsClient.GetMetricsServer(context.Background(), metrics.MetricsServerTypeInfluxDBHTTP, serverName)
@@ -212,7 +218,8 @@ func TestMetricsServerDisabled(t *testing.T) {
 resource "pbs_metrics_server" "test_disabled" {
   name         = "%s"
   type         = "influxdb-http"
-  url          = "https://influx.example.com"
+  server       = "influx.example.com"
+  port         = 443
   organization = "myorg"
   bucket       = "pbs-metrics"
   token        = "token123"
@@ -249,7 +256,8 @@ func TestMetricsServerMaxBodySize(t *testing.T) {
 resource "pbs_metrics_server" "test_bodysize" {
   name          = "%s"
   type          = "influxdb-http"
-  url           = "https://influx.example.com"
+  server        = "influx.example.com"
+  port          = 443
   organization  = "myorg"
   bucket        = "pbs-metrics"
   token         = "token123"
@@ -287,7 +295,8 @@ func TestMetricsServerTimeout(t *testing.T) {
 resource "pbs_metrics_server" "test_timeout" {
   name         = "%s"
   type         = "influxdb-http"
-  url          = "https://influx.example.com"
+  server       = "influx.example.com"
+  port         = 443
   organization = "myorg"
   bucket       = "pbs-metrics"
   token        = "token123"
@@ -326,7 +335,8 @@ func TestMetricsServerTypeChange(t *testing.T) {
 resource "pbs_metrics_server" "test_typechange" {
   name         = "%s"
   type         = "influxdb-http"
-  url          = "https://influx.example.com"
+  server       = "influx.example.com"
+  port         = 443
   organization = "myorg"
   bucket       = "pbs-metrics"
   token        = "token123"
