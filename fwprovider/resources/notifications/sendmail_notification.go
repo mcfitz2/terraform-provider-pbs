@@ -9,6 +9,7 @@ package notifications
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -142,7 +143,15 @@ func (r *sendmailNotificationResource) Create(ctx context.Context, req resource.
 	}
 
 	if !plan.Mailto.IsNull() {
-		target.Mailto = plan.Mailto.ValueString()
+		// PBS 4.0: mailto is an array, split comma-separated string
+		mailtoStr := plan.Mailto.ValueString()
+		if mailtoStr != "" {
+			target.Mailto = strings.Split(mailtoStr, ",")
+			// Trim spaces from each email address
+			for i := range target.Mailto {
+				target.Mailto[i] = strings.TrimSpace(target.Mailto[i])
+			}
+		}
 	}
 	if !plan.MailtoUser.IsNull() {
 		target.MailtoUser = plan.MailtoUser.ValueString()
@@ -189,8 +198,9 @@ func (r *sendmailNotificationResource) Read(ctx context.Context, req resource.Re
 	}
 
 	state.From = types.StringValue(target.From)
-	if target.Mailto != "" {
-		state.Mailto = types.StringValue(target.Mailto)
+	if len(target.Mailto) > 0 {
+		// PBS 4.0: mailto is an array, join into comma-separated string
+		state.Mailto = types.StringValue(strings.Join(target.Mailto, ","))
 	}
 	if target.MailtoUser != "" {
 		state.MailtoUser = types.StringValue(target.MailtoUser)
@@ -223,7 +233,15 @@ func (r *sendmailNotificationResource) Update(ctx context.Context, req resource.
 	}
 
 	if !plan.Mailto.IsNull() {
-		target.Mailto = plan.Mailto.ValueString()
+		// PBS 4.0: mailto is an array, split comma-separated string
+		mailtoStr := plan.Mailto.ValueString()
+		if mailtoStr != "" {
+			target.Mailto = strings.Split(mailtoStr, ",")
+			// Trim spaces from each email address
+			for i := range target.Mailto {
+				target.Mailto[i] = strings.TrimSpace(target.Mailto[i])
+			}
+		}
 	}
 	if !plan.MailtoUser.IsNull() {
 		target.MailtoUser = plan.MailtoUser.ValueString()

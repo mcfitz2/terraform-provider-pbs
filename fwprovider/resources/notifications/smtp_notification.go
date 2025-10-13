@@ -9,6 +9,7 @@ package notifications
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -192,7 +193,15 @@ func (r *smtpNotificationResource) Create(ctx context.Context, req resource.Crea
 		target.Mode = plan.Mode.ValueString()
 	}
 	if !plan.Mailto.IsNull() {
-		target.To = plan.Mailto.ValueString()
+		// PBS 4.0: mailto is an array, split comma-separated string
+		mailtoStr := plan.Mailto.ValueString()
+		if mailtoStr != "" {
+			target.To = strings.Split(mailtoStr, ",")
+			// Trim spaces from each email address
+			for i := range target.To {
+				target.To[i] = strings.TrimSpace(target.To[i])
+			}
+		}
 	}
 	if !plan.MailtoUser.IsNull() {
 		target.MailtoUser = plan.MailtoUser.ValueString()
@@ -256,8 +265,9 @@ func (r *smtpNotificationResource) Read(ctx context.Context, req resource.ReadRe
 	if target.Mode != "" {
 		state.Mode = types.StringValue(target.Mode)
 	}
-	if target.To != "" {
-		state.Mailto = types.StringValue(target.To)
+	if len(target.To) > 0 {
+		// PBS 4.0: mailto is an array, join into comma-separated string
+		state.Mailto = types.StringValue(strings.Join(target.To, ","))
 	}
 	if target.MailtoUser != "" {
 		state.MailtoUser = types.StringValue(target.MailtoUser)
@@ -305,7 +315,15 @@ func (r *smtpNotificationResource) Update(ctx context.Context, req resource.Upda
 		target.Mode = plan.Mode.ValueString()
 	}
 	if !plan.Mailto.IsNull() {
-		target.To = plan.Mailto.ValueString()
+		// PBS 4.0: mailto is an array, split comma-separated string
+		mailtoStr := plan.Mailto.ValueString()
+		if mailtoStr != "" {
+			target.To = strings.Split(mailtoStr, ",")
+			// Trim spaces from each email address
+			for i := range target.To {
+				target.To[i] = strings.TrimSpace(target.To[i])
+			}
+		}
 	}
 	if !plan.MailtoUser.IsNull() {
 		target.MailtoUser = plan.MailtoUser.ValueString()
