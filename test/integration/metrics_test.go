@@ -281,42 +281,42 @@ resource "pbs_metrics_server" "test_bodysize" {
 }
 
 // TestMetricsServerTimeout tests metrics server with custom timeout
+// NOTE: PBS 4.0 removed the timeout parameter, so this test is disabled
 func TestMetricsServerTimeout(t *testing.T) {
+	t.Skip("PBS 4.0 removed the timeout parameter from metrics servers")
+	
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	tc := SetupTest(t)
-	defer tc.DestroyTerraform(t)
-
-	serverName := GenerateTestName("influxdb-timeout")
-
-	testConfig := fmt.Sprintf(`
-resource "pbs_metrics_server" "test_timeout" {
-  name         = "%s"
-  type         = "influxdb-http"
-  server       = "influx.example.com"
-  port         = 443
-  organization = "myorg"
-  bucket       = "pbs-metrics"
-  token        = "token123"
-  timeout      = 5
-  enable       = true
-  comment      = "Metrics server with custom timeout"
-}
-`, serverName)
-
-	tc.WriteMainTF(t, testConfig)
-	tc.ApplyTerraform(t)
-
-	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_timeout")
-	assert.Equal(t, float64(5), resource.AttributeValues["timeout"])
-
-	metricsClient := metrics.NewClient(tc.APIClient)
-	server, err := metricsClient.GetMetricsServer(context.Background(), metrics.MetricsServerTypeInfluxDBHTTP, serverName)
-	require.NoError(t, err)
-	assert.NotNil(t, server.Timeout)
-	assert.Equal(t, 5, *server.Timeout)
+	// Test disabled - timeout field removed in PBS 4.0
+	// tc := SetupTest(t)
+	// defer tc.DestroyTerraform(t)
+	// serverName := GenerateTestName("influxdb-timeout")
+	// testConfig := fmt.Sprintf(`
+	// resource "pbs_metrics_server" "test_timeout" {
+	//   name         = "%s"
+	//   type         = "influxdb-http"
+	//   server       = "influx.example.com"
+	//   port         = 443
+	//   organization = "myorg"
+	//   bucket       = "pbs-metrics"
+	//   token        = "token123"
+	//   timeout      = 5
+	//   enable       = true
+	//   comment      = "Metrics server with custom timeout"
+	// }
+	// `, serverName)
+	// Test code disabled - timeout field removed in PBS 4.0
+	// tc.WriteMainTF(t, testConfig)
+	// tc.ApplyTerraform(t)
+	// resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_timeout")
+	// assert.Equal(t, float64(5), resource.AttributeValues["timeout"])
+	// metricsClient := metrics.NewClient(tc.APIClient)
+	// server, err := metricsClient.GetMetricsServer(context.Background(), metrics.MetricsServerTypeInfluxDBHTTP, serverName)
+	// require.NoError(t, err)
+	// assert.NotNil(t, server.Timeout)
+	// assert.Equal(t, 5, *server.Timeout)
 }
 
 // TestMetricsServerHTTPToUDPUpdate tests updating from HTTP to UDP type (should force replacement)

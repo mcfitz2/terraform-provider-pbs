@@ -16,6 +16,71 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 45
     
+    # Service containers for testing
+    services:
+      influxdb:
+        image: influxdb:2.7-alpine
+        ports:
+          - 8086:8086
+        env:
+          DOCKER_INFLUXDB_INIT_MODE: setup
+          DOCKER_INFLUXDB_INIT_USERNAME: admin
+          DOCKER_INFLUXDB_INIT_PASSWORD: testpass123
+          DOCKER_INFLUXDB_INIT_ORG: testorg
+          DOCKER_INFLUXDB_INIT_BUCKET: pbs-metrics
+          DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: test-token-for-pbs-provider
+        options: >-
+          --health-cmd "influx ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      gotify:
+        image: gotify/server:latest
+        ports:
+          - 8080:80
+        env:
+          GOTIFY_DEFAULTUSER_NAME: admin
+          GOTIFY_DEFAULTUSER_PASS: admin
+        options: >-
+          --health-cmd "wget --spider -q http://localhost:80/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      webhook-receiver:
+        image: tarampampam/webhook-tester:latest
+        ports:
+          - 8081:8080
+        env:
+          LISTEN_ADDR: 0.0.0.0
+          LISTEN_PORT: 8080
+      
+      nfs-server:
+        image: erichough/nfs-server:latest
+        ports:
+          - 2049:2049
+        env:
+          NFS_EXPORT_0: '/export *(rw,sync,no_subtree_check,no_root_squash,fsid=0)'
+        options: >-
+          --privileged
+          --cap-add SYS_ADMIN
+        volumes:
+          - nfs-export:/export
+      
+      samba-server:
+        image: dperson/samba:latest
+        ports:
+          - 445:445
+        env:
+          SHARE: 'backup;/backup;yes;no;no;testuser'
+          USER: 'testuser;testpass'
+          PERMISSIONS: 'yes'
+        options: >-
+          --cap-add SYS_ADMIN
+        volumes:
+          - samba-share:/backup
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -45,11 +110,30 @@ jobs:
 
     - name: Run integration tests
       env:
+        # PBS Server configuration
         PBS_ADDRESS: "https://192.168.1.108:8007"
         PBS_USERNAME: "root@pam"
         PBS_PASSWORD: "pbspbs123"
         PBS_INSECURE_TLS: "true"
         PBS_TESTPOOL: "testpool"
+        # Test service endpoints
+        TEST_INFLUXDB_HOST: "localhost"
+        TEST_INFLUXDB_PORT: "8086"
+        TEST_INFLUXDB_ORG: "testorg"
+        TEST_INFLUXDB_BUCKET: "pbs-metrics"
+        TEST_INFLUXDB_TOKEN: "test-token-for-pbs-provider"
+        TEST_GOTIFY_HOST: "localhost"
+        TEST_GOTIFY_PORT: "8080"
+        TEST_GOTIFY_TOKEN: "AqQR.Oq8ZqYJ4"
+        TEST_WEBHOOK_HOST: "localhost"
+        TEST_WEBHOOK_PORT: "8081"
+        # Network storage test endpoints
+        TEST_NFS_HOST: "localhost"
+        TEST_NFS_EXPORT: "/export"
+        TEST_CIFS_HOST: "localhost"
+        TEST_CIFS_SHARE: "backup"
+        TEST_CIFS_USERNAME: "testuser"
+        TEST_CIFS_PASSWORD: "testpass"
         # S3 provider credentials from secrets (optional for S3 tests)
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -62,6 +146,12 @@ jobs:
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
         echo "Running integration test suite against PBS 4.0 at 192.168.1.108..."
+        echo "Test services available:"
+        echo "  - InfluxDB: localhost:8086"
+        echo "  - Gotify: localhost:8080"
+        echo "  - Webhook: localhost:8081"
+        echo "  - NFS Server: localhost:2049"
+        echo "  - CIFS/Samba: localhost:445"
         go test -v -timeout 40m ./test/integration
 
     - name: Upload test logs

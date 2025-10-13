@@ -3,6 +3,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,6 +100,12 @@ func TestDatastoreZFSIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// Check if ZFS pool is configured for testing
+	zfsPool := os.Getenv("PBS_TESTPOOL")
+	if zfsPool == "" {
+		zfsPool = "testpool" // default
+	}
+
 	tc := SetupTest(t)
 	defer tc.DestroyTerraform(t)
 
@@ -110,7 +118,7 @@ resource "pbs_datastore" "test_zfs" {
   name        = "%s"
   type        = "zfs"
   path        = "/mnt/datastore/%s"
-  zfs_pool    = "testpool"
+  zfs_pool    = "%s"
   zfs_dataset = "backup/%s"
   content     = ["backup"]
   comment     = "Test ZFS datastore"
@@ -118,17 +126,19 @@ resource "pbs_datastore" "test_zfs" {
   block_size  = "8K"
   max_backups = 15
 }
-`, datastoreName, datastoreName, datastoreName)
+`, datastoreName, datastoreName, zfsPool, datastoreName)
 
 	// Write terraform configuration
 	tc.WriteMainTF(t, testConfig)
 
-	// Apply terraform (this will likely fail if ZFS testpool doesn't exist)
-	// We'll handle the error gracefully for CI environments
+	// Apply terraform (this will fail if ZFS pool doesn't exist)
 	err := tc.ApplyTerraformWithError(t)
 	if err != nil {
-		t.Logf("ZFS test skipped - ZFS pool 'testpool' may not be available: %v", err)
-		return
+		// Check if it's a ZFS pool error
+		if strings.Contains(err.Error(), "pool") || strings.Contains(err.Error(), "zfs") {
+			t.Skipf("ZFS test skipped - ZFS pool '%s' is not available: %v", zfsPool, err)
+		}
+		t.Fatalf("Unexpected error creating ZFS datastore: %v", err)
 	}
 
 	// Verify resource was created via Terraform state
@@ -213,38 +223,57 @@ func TestDatastoreNetworkStorage(t *testing.T) {
 	cifsDatastore := GenerateTestName("cifs-datastore")
 	nfsDatastore := GenerateTestName("nfs-datastore")
 
+	// Get CIFS server configuration from environment
+	cifsHost := os.Getenv("TEST_CIFS_HOST")
+	cifsShare := os.Getenv("TEST_CIFS_SHARE")
+	cifsUser := os.Getenv("TEST_CIFS_USERNAME")
+	cifsPass := os.Getenv("TEST_CIFS_PASSWORD")
+	
+	if cifsHost == "" || cifsShare == "" {
+		t.Skip("CIFS test skipped - TEST_CIFS_HOST and TEST_CIFS_SHARE environment variables not set")
+	}
+	
+	// Default credentials if not provided
+	if cifsUser == "" {
+		cifsUser = "testuser"
+	}
+	if cifsPass == "" {
+		cifsPass = "testpass"
+	}
+
 	// Test configuration for CIFS datastore
 	cifsConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_cifs" {
   name     = "%s"
   type     = "cifs"
   path     = "/mnt/datastore/%s"
-  server   = "192.168.1.100"
-  share    = "backup"
-  username = "backup-user"
-  password = "backup-password"
-  domain   = "example.com"
+  server   = "%s"
+  share    = "%s"
+  username = "%s"
+  password = "%s"
   sub_dir  = "pbs"
   content  = ["backup"]
   comment  = "Test CIFS datastore"
   options  = "vers=3.0"
 }
-`, cifsDatastore, cifsDatastore)
+`, cifsDatastore, cifsDatastore, cifsHost, cifsShare, cifsUser, cifsPass)
 
 	tc.WriteMainTF(t, cifsConfig)
+	tc.ApplyTerraform(t)
 
-	// Apply terraform (this will likely fail without actual CIFS server)
-	err := tc.ApplyTerraformWithError(t)
-	if err != nil {
-		t.Logf("CIFS test expected to fail without real server: %v", err)
-		// This is expected in most test environments
-	} else {
-		// If it succeeds (perhaps with a mock server), verify the configuration
-		resource := tc.GetResourceFromState(t, "pbs_datastore.test_cifs")
-		assert.Equal(t, cifsDatastore, resource.AttributeValues["name"])
-		assert.Equal(t, "cifs", resource.AttributeValues["type"])
-		assert.Equal(t, "192.168.1.100", resource.AttributeValues["server"])
-		assert.Equal(t, "backup", resource.AttributeValues["share"])
+	// Verify the configuration
+	resource := tc.GetResourceFromState(t, "pbs_datastore.test_cifs")
+	assert.Equal(t, cifsDatastore, resource.AttributeValues["name"])
+	assert.Equal(t, "cifs", resource.AttributeValues["type"])
+	assert.Equal(t, cifsHost, resource.AttributeValues["server"])
+	assert.Equal(t, cifsShare, resource.AttributeValues["share"])
+
+	// Get NFS server configuration from environment
+	nfsHost := os.Getenv("TEST_NFS_HOST")
+	nfsExport := os.Getenv("TEST_NFS_EXPORT")
+
+	if nfsHost == "" || nfsExport == "" {
+		t.Skip("NFS test skipped - TEST_NFS_HOST and TEST_NFS_EXPORT environment variables not set")
 	}
 
 	// Test configuration for NFS datastore
@@ -253,30 +282,26 @@ resource "pbs_datastore" "test_nfs" {
   name    = "%s"
   type    = "nfs"
   path    = "/mnt/datastore/%s"
-  server  = "192.168.1.101"
-  export  = "/export/backup"
+  server  = "%s"
+  export  = "%s"
   sub_dir = "pbs"
   content = ["backup"]
   comment = "Test NFS datastore"
   options = "vers=4,soft"
 }
-`, nfsDatastore, nfsDatastore)
+`, nfsDatastore, nfsDatastore, nfsHost, nfsExport)
 
 	tc.WriteMainTF(t, nfsConfig)
 
-	// Apply terraform (this will likely fail without actual NFS server)
-	err = tc.ApplyTerraformWithError(t)
-	if err != nil {
-		t.Logf("NFS test expected to fail without real server: %v", err)
-		// This is expected in most test environments
-	} else {
-		// If it succeeds, verify the configuration
-		resource := tc.GetResourceFromState(t, "pbs_datastore.test_nfs")
-		assert.Equal(t, nfsDatastore, resource.AttributeValues["name"])
-		assert.Equal(t, "nfs", resource.AttributeValues["type"])
-		assert.Equal(t, "192.168.1.101", resource.AttributeValues["server"])
-		assert.Equal(t, "/export/backup", resource.AttributeValues["export"])
-	}
+	// Apply terraform - should succeed with Docker NFS server
+	tc.ApplyTerraform(t)
+
+	// Verify the configuration
+	resource = tc.GetResourceFromState(t, "pbs_datastore.test_nfs")
+	assert.Equal(t, nfsDatastore, resource.AttributeValues["name"])
+	assert.Equal(t, "nfs", resource.AttributeValues["type"])
+	assert.Equal(t, nfsHost, resource.AttributeValues["server"])
+	assert.Equal(t, nfsExport, resource.AttributeValues["export"])
 }
 
 // TestDatastoreImport tests importing existing datastores

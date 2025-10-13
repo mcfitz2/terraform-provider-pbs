@@ -223,9 +223,7 @@ func (r *metricsServerResource) Create(ctx context.Context, req resource.CreateR
 	// Type-specific fields
 	switch server.Type {
 	case metrics.MetricsServerTypeInfluxDBUDP:
-		if !plan.Protocol.IsNull() {
-			server.Protocol = plan.Protocol.ValueString()
-		}
+		// PBS 4.0: Protocol field removed (was always "udp" anyway)
 	case metrics.MetricsServerTypeInfluxDBHTTP:
 		if !plan.Organization.IsNull() {
 			server.Organization = plan.Organization.ValueString()
@@ -244,10 +242,7 @@ func (r *metricsServerResource) Create(ctx context.Context, req resource.CreateR
 			verifyTLS := plan.VerifyTLS.ValueBool()
 			server.VerifyTLS = &verifyTLS
 		}
-		if !plan.Timeout.IsNull() {
-			timeout := int(plan.Timeout.ValueInt64())
-			server.Timeout = &timeout
-		}
+		// PBS 4.0: Timeout field removed
 	}
 
 	err := r.client.Metrics.CreateMetricsServer(ctx, server)
@@ -300,9 +295,7 @@ func (r *metricsServerResource) Read(ctx context.Context, req resource.ReadReque
 	// Type-specific fields
 	switch serverType {
 	case metrics.MetricsServerTypeInfluxDBUDP:
-		if server.Protocol != "" {
-			state.Protocol = types.StringValue(server.Protocol)
-		}
+		// PBS 4.0: Protocol field removed
 	case metrics.MetricsServerTypeInfluxDBHTTP:
 		if server.Organization != "" {
 			state.Organization = types.StringValue(server.Organization)
@@ -317,9 +310,7 @@ func (r *metricsServerResource) Read(ctx context.Context, req resource.ReadReque
 		if server.VerifyTLS != nil {
 			state.VerifyTLS = types.BoolValue(*server.VerifyTLS)
 		}
-		if server.Timeout != nil {
-			state.Timeout = types.Int64Value(int64(*server.Timeout))
-		}
+		// PBS 4.0: Timeout field removed
 	}
 
 	// Set refreshed state
@@ -359,9 +350,7 @@ func (r *metricsServerResource) Update(ctx context.Context, req resource.UpdateR
 	serverType := metrics.MetricsServerType(plan.Type.ValueString())
 	switch serverType {
 	case metrics.MetricsServerTypeInfluxDBUDP:
-		if !plan.Protocol.IsNull() {
-			server.Protocol = plan.Protocol.ValueString()
-		}
+		// PBS 4.0: Protocol field removed
 	case metrics.MetricsServerTypeInfluxDBHTTP:
 		if !plan.Organization.IsNull() {
 			server.Organization = plan.Organization.ValueString()
@@ -380,10 +369,7 @@ func (r *metricsServerResource) Update(ctx context.Context, req resource.UpdateR
 			verifyTLS := plan.VerifyTLS.ValueBool()
 			server.VerifyTLS = &verifyTLS
 		}
-		if !plan.Timeout.IsNull() {
-			timeout := int(plan.Timeout.ValueInt64())
-			server.Timeout = &timeout
-		}
+		// PBS 4.0: Timeout field removed
 	}
 
 	err := r.client.Metrics.UpdateMetricsServer(ctx, serverType, plan.Name.ValueString(), server)
