@@ -38,18 +38,18 @@ const (
 
 // SMTPTarget represents an SMTP notification target configuration
 type SMTPTarget struct {
-	Name       string `json:"name"`
-	From       string `json:"from-address"`
-	To         string `json:"mailto"`
-	Server     string `json:"server"`
-	Port       *int   `json:"port,omitempty"`
-	Mode       string `json:"mode,omitempty"` // insecure, starttls, tls
-	Username   string `json:"username,omitempty"`
-	Password   string `json:"password,omitempty"`
-	Author     string `json:"author,omitempty"`
-	Comment    string `json:"comment,omitempty"`
-	Disable    *bool  `json:"disable,omitempty"`
-	MailtoUser string `json:"mailto-user,omitempty"`
+	Name       string   `json:"name"`
+	From       string   `json:"from-address"`
+	To         []string `json:"mailto"` // PBS 4.0: array of email addresses
+	Server     string   `json:"server"`
+	Port       *int     `json:"port,omitempty"`
+	Mode       string   `json:"mode,omitempty"` // insecure, starttls, tls
+	Username   string   `json:"username,omitempty"`
+	Password   string   `json:"password,omitempty"`
+	Author     string   `json:"author,omitempty"`
+	Comment    string   `json:"comment,omitempty"`
+	Disable    *bool    `json:"disable,omitempty"`
+	MailtoUser string   `json:"mailto-user,omitempty"`
 }
 
 // GotifyTarget represents a Gotify notification target configuration
@@ -63,13 +63,13 @@ type GotifyTarget struct {
 
 // SendmailTarget represents a Sendmail notification target configuration
 type SendmailTarget struct {
-	Name       string `json:"name"`
-	From       string `json:"from-address"`
-	Mailto     string `json:"mailto,omitempty"`
-	MailtoUser string `json:"mailto-user,omitempty"`
-	Author     string `json:"author,omitempty"`
-	Comment    string `json:"comment,omitempty"`
-	Disable    *bool  `json:"disable,omitempty"`
+	Name       string   `json:"name"`
+	From       string   `json:"from-address"`
+	Mailto     []string `json:"mailto,omitempty"` // PBS 4.0: array of email addresses
+	MailtoUser string   `json:"mailto-user,omitempty"`
+	Author     string   `json:"author,omitempty"`
+	Comment    string   `json:"comment,omitempty"`
+	Disable    *bool    `json:"disable,omitempty"`
 }
 
 // WebhookTarget represents a Webhook notification target configuration
@@ -135,7 +135,7 @@ func (c *Client) CreateSMTPTarget(ctx context.Context, target *SMTPTarget) error
 		"from-address": target.From,
 	}
 
-	if target.To != "" {
+	if len(target.To) > 0 {
 		body["mailto"] = target.To
 	}
 	if target.MailtoUser != "" {
@@ -185,7 +185,7 @@ func (c *Client) UpdateSMTPTarget(ctx context.Context, name string, target *SMTP
 	if target.From != "" {
 		body["from-address"] = target.From
 	}
-	if target.To != "" {
+	if len(target.To) > 0 {
 		body["mailto"] = target.To
 	}
 	if target.MailtoUser != "" {
@@ -395,7 +395,7 @@ func (c *Client) CreateSendmailTarget(ctx context.Context, target *SendmailTarge
 		"from-address": target.From,
 	}
 
-	if target.Mailto != "" {
+	if len(target.Mailto) > 0 {
 		body["mailto"] = target.Mailto
 	}
 	if target.MailtoUser != "" {
@@ -430,7 +430,7 @@ func (c *Client) UpdateSendmailTarget(ctx context.Context, name string, target *
 	if target.From != "" {
 		body["from-address"] = target.From
 	}
-	if target.Mailto != "" {
+	if len(target.Mailto) > 0 {
 		body["mailto"] = target.Mailto
 	}
 	if target.MailtoUser != "" {
