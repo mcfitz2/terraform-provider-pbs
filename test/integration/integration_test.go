@@ -149,5 +149,5 @@ resource "pbs_datastore" "smoke" {
 		t.Errorf("Expected datastore name %s, got %v", datastoreName, resource.AttributeValues["name"])
 	}
 
-	t.Logf("✅ Smoke test passed: PBS provider basic functionality works")
+	t.Logf("Smoke test passed: PBS provider basic functionality works")
 }

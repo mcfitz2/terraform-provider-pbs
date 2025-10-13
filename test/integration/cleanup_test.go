@@ -35,7 +35,7 @@ func TestCleanupB2Buckets(t *testing.T) {
 		b2Region = "us-east-005" // Updated default Backblaze region to match tests
 	}
 
-	t.Logf("🧹 Starting B2 bucket cleanup...")
+	t.Logf("Starting B2 bucket cleanup...")
 	t.Logf("   Region: %s", b2Region)
 
 	// Setup S3 client for B2 using same config as working tests
@@ -67,7 +67,7 @@ func TestCleanupB2Buckets(t *testing.T) {
 	}
 
 	if len(bucketsToDelete) == 0 {
-		t.Log("✅ No leftover pbs-test-* buckets found - all clean!")
+		t.Log("[OK] No leftover pbs-test-* buckets found - all clean!")
 		return
 	}
 
@@ -83,14 +83,14 @@ func TestCleanupB2Buckets(t *testing.T) {
 
 	for _, bucket := range bucketsToDelete {
 		bucketName := *bucket.Name
-		t.Logf("\n🧹 Cleaning bucket: %s", bucketName)
+		t.Logf("\nCleaning bucket: %s", bucketName)
 
 		if deleteB2Bucket(t, s3Client, bucketName) {
 			deletedCount++
-			t.Logf("   ✅ Successfully deleted: %s", bucketName)
+			t.Logf("   [OK] Successfully deleted: %s", bucketName)
 		} else {
 			failedCount++
-			t.Logf("   ❌ Failed to delete: %s", bucketName)
+			t.Logf("   [FAIL] Failed to delete: %s", bucketName)
 		}
 	}
 
@@ -105,9 +105,9 @@ func TestCleanupB2Buckets(t *testing.T) {
 	t.Logf("%s", separator)
 
 	if failedCount > 0 {
-		t.Logf("⚠️  Some buckets could not be deleted. They may need manual cleanup.")
+		t.Logf("[WARN]  Some buckets could not be deleted. They may need manual cleanup.")
 	} else {
-		t.Log("✅ All leftover buckets successfully cleaned up!")
+		t.Log("[OK] All leftover buckets successfully cleaned up!")
 	}
 }
 
@@ -160,12 +160,12 @@ func deleteB2Bucket(t *testing.T, s3Client *s3.S3, bucketName string) bool {
 			t.Logf("   ℹ️  Bucket already deleted: %s", bucketName)
 			return true
 		}
-		t.Logf("   ❌ Failed to list object versions: %v", err)
+		t.Logf("   [FAIL] Failed to list object versions: %v", err)
 		return false
 	}
 
 	if len(deleteErrors) > 0 {
-		t.Logf("   ⚠️  Encountered %d errors while deleting objects (showing first 3):", len(deleteErrors))
+		t.Logf("   [WARN]  Encountered %d errors while deleting objects (showing first 3):", len(deleteErrors))
 		for i, err := range deleteErrors {
 			if i >= 3 {
 				break
@@ -175,11 +175,11 @@ func deleteB2Bucket(t *testing.T, s3Client *s3.S3, bucketName string) bool {
 	}
 
 	if totalVersions > 0 {
-		t.Logf("   ✓ Deleted %d object versions/markers", totalVersions)
+		t.Logf("   [OK] Deleted %d object versions/markers", totalVersions)
 		// Wait for B2 eventual consistency
 		time.Sleep(3 * time.Second)
 	} else {
-		t.Logf("   ✓ No objects to delete (empty bucket)")
+		t.Logf("   [OK] No objects to delete (empty bucket)")
 	}
 
 	// Step 2: Verify bucket is empty
@@ -189,10 +189,10 @@ func deleteB2Bucket(t *testing.T, s3Client *s3.S3, bucketName string) bool {
 	})
 
 	if err != nil {
-		t.Logf("   ⚠️  Warning: Could not verify bucket is empty: %v", err)
+		t.Logf("   [WARN]  Warning: Could not verify bucket is empty: %v", err)
 	} else if len(listOutput.Versions) > 0 || len(listOutput.DeleteMarkers) > 0 {
 		remaining := len(listOutput.Versions) + len(listOutput.DeleteMarkers)
-		t.Logf("   ⚠️  Warning: Bucket still has %d+ objects/markers remaining", remaining)
+		t.Logf("   [WARN]  Warning: Bucket still has %d+ objects/markers remaining", remaining)
 	}
 
 	// Step 3: Delete the bucket with retries
@@ -219,10 +219,10 @@ func deleteB2Bucket(t *testing.T, s3Client *s3.S3, bucketName string) bool {
 					time.Sleep(time.Duration(attempt*2) * time.Second)
 					continue
 				}
-				t.Logf("   ❌ Bucket still not empty after %d attempts", maxRetries)
+				t.Logf("   [FAIL] Bucket still not empty after %d attempts", maxRetries)
 				return false
 			default:
-				t.Logf("   ❌ Delete failed: %s - %s", awsErr.Code(), awsErr.Message())
+				t.Logf("   [FAIL] Delete failed: %s - %s", awsErr.Code(), awsErr.Message())
 				return false
 			}
 		}
@@ -233,7 +233,7 @@ func deleteB2Bucket(t *testing.T, s3Client *s3.S3, bucketName string) bool {
 		}
 	}
 
-	t.Logf("   ❌ Failed to delete bucket after %d attempts: %v", maxRetries, err)
+	t.Logf("   [FAIL] Failed to delete bucket after %d attempts: %v", maxRetries, err)
 	return false
 }
 
@@ -248,7 +248,7 @@ func TestCleanupAllProviderBuckets(t *testing.T) {
 		t.Skip("No S3 providers configured for cleanup")
 	}
 
-	t.Logf("🧹 Starting cleanup for %d S3 provider(s)...\n", len(providers))
+	t.Logf("Starting cleanup for %d S3 provider(s)...\n", len(providers))
 
 	for _, provider := range providers {
 		t.Run(provider.Name, func(t *testing.T) {
@@ -256,12 +256,12 @@ func TestCleanupAllProviderBuckets(t *testing.T) {
 		})
 	}
 
-	t.Log("\n✅ Cleanup complete for all providers!")
+	t.Log("\n[OK] Cleanup complete for all providers!")
 }
 
 // cleanupProviderBuckets removes all pbs-test-* buckets for a specific provider
 func cleanupProviderBuckets(t *testing.T, provider *S3ProviderConfig) {
-	t.Logf("🧹 Cleaning up %s buckets...", provider.Name)
+	t.Logf("Cleaning up %s buckets...", provider.Name)
 
 	// Setup S3 client
 	provider.SetupS3Client(t)
@@ -269,7 +269,7 @@ func cleanupProviderBuckets(t *testing.T, provider *S3ProviderConfig) {
 	// List all buckets
 	listBucketsOutput, err := provider.S3Client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
-		t.Logf("   ❌ Failed to list buckets: %v", err)
+		t.Logf("   [FAIL] Failed to list buckets: %v", err)
 		return
 	}
 
@@ -294,7 +294,7 @@ func cleanupProviderBuckets(t *testing.T, provider *S3ProviderConfig) {
 	}
 
 	if len(bucketsToDelete) == 0 {
-		t.Logf("   ✅ No leftover buckets found for %s", provider.Name)
+		t.Logf("   [OK] No leftover buckets found for %s", provider.Name)
 		return
 	}
 
@@ -310,5 +310,5 @@ func cleanupProviderBuckets(t *testing.T, provider *S3ProviderConfig) {
 		deletedCount++
 	}
 
-	t.Logf("   ✅ Deleted %d bucket(s) from %s", deletedCount, provider.Name)
+	t.Logf("   [OK] Deleted %d bucket(s) from %s", deletedCount, provider.Name)
 }

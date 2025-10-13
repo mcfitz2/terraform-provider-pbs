@@ -78,9 +78,9 @@ func GetS3ProviderConfigs(t *testing.T) []*S3ProviderConfig {
 			// - Endpoint format: s3.{region}.backblazeb2.com
 			//
 			// With this configuration, B2 works reliably with PBS for:
-			// ✓ S3 endpoint creation and management
-			// ✓ Datastore creation and verification
-			// ✓ Chunk upload operations
+			// - S3 endpoint creation and management
+			// - Datastore creation and verification
+			// - Chunk upload operations
 			//
 			// Reference: docs/BACKBLAZE_B2_REMEDIATION.md
 			providers = append(providers, &S3ProviderConfig{

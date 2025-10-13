@@ -153,10 +153,10 @@ export TEST_WEBHOOK_PORT="${WEBHOOK_PORT}"
 
 # Check for AWS credentials (for S3 tests)
 if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
-    echo -e "${GREEN}✓ AWS credentials detected - S3 tests will run${NC}"
+    echo -e "${GREEN}AWS credentials detected - S3 tests will run${NC}"
     export AWS_S3_AVAILABLE=true
 else
-    echo -e "${YELLOW}! AWS credentials not found - S3 tests will be skipped${NC}"
+    echo -e "${YELLOW}AWS credentials not found - S3 tests will be skipped${NC}"
     export AWS_S3_AVAILABLE=false
 fi
 
@@ -186,9 +186,9 @@ fi
 exit_code=$?
 
 if [ $exit_code -eq 0 ]; then
-    echo -e "${GREEN}✓ All tests passed!${NC}"
+    echo -e "${GREEN}All tests passed!${NC}"
 else
-    echo -e "${RED}✗ Tests failed with exit code ${exit_code}${NC}"
+    echo -e "${RED}Tests failed with exit code ${exit_code}${NC}"
 fi
 
 exit $exit_code
