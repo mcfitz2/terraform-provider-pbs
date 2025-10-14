@@ -43,6 +43,24 @@ services:
       retries: 5
       start_period: 10s
 
+  influxdb-udp:
+    image: influxdb:1.8
+    container_name: influxdb-udp-test
+    ports:
+      - "8089:8089/udp"
+    environment:
+      - INFLUXDB_UDP_ENABLED=true
+      - INFLUXDB_UDP_BIND_ADDRESS=:8089
+      - INFLUXDB_UDP_DATABASE=udp
+    mem_limit: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "influx -execute 'SHOW DATABASES' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 networks:
   default:
     name: pbs-test-network

@@ -116,9 +116,7 @@ func TestIntegration(t *testing.T) {
 			TestMetricsServerMaxBodySize(t)
 		})
 
-		t.Run("MetricsServerTimeout", func(t *testing.T) {
-			TestMetricsServerTimeout(t)
-		})
+		// TestMetricsServerTimeout - skipped, PBS 4.0 removed timeout parameter
 	})
 }
 

@@ -33,6 +33,25 @@ func getInfluxDBPort() int {
 	return 8086
 }
 
+// getInfluxDBUDPHost returns the InfluxDB UDP host from environment or default
+func getInfluxDBUDPHost() string {
+	if host := os.Getenv("TEST_INFLUXDB_UDP_HOST"); host != "" {
+		return host
+	}
+	return "localhost"
+}
+
+// getInfluxDBUDPPort returns the InfluxDB UDP port from environment or default
+func getInfluxDBUDPPort() int {
+	if port := os.Getenv("TEST_INFLUXDB_UDP_PORT"); port != "" {
+		var portNum int
+		if _, err := fmt.Sscanf(port, "%d", &portNum); err == nil {
+			return portNum
+		}
+	}
+	return 8089
+}
+
 // TestMetricsServerInfluxDBHTTPIntegration tests InfluxDB HTTP metrics server lifecycle
 func TestMetricsServerInfluxDBHTTPIntegration(t *testing.T) {
 	if testing.Short() {
@@ -106,8 +125,6 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 
 // TestMetricsServerInfluxDBUDPIntegration tests InfluxDB UDP metrics server lifecycle
 func TestMetricsServerInfluxDBUDPIntegration(t *testing.T) {
-	t.Skip("InfluxDB 2.x does not support UDP protocol - test disabled")
-	
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -116,19 +133,20 @@ func TestMetricsServerInfluxDBUDPIntegration(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	serverName := GenerateTestName("influxdb-udp")
-	influxHost := getInfluxDBHost()
+	influxUDPHost := getInfluxDBUDPHost()
+	influxUDPPort := getInfluxDBUDPPort()
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_metrics_server" "test_influxdb_udp" {
   name     = "%s"
   type     = "influxdb-udp"
   server   = "%s"
-  port     = 8089
+  port     = %d
   protocol = "udp"
   enable   = true
   comment  = "Test InfluxDB UDP metrics server"
 }
-`, serverName, influxHost)
+`, serverName, influxUDPHost, influxUDPPort)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
@@ -136,8 +154,8 @@ resource "pbs_metrics_server" "test_influxdb_udp" {
 	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_influxdb_udp")
 	assert.Equal(t, serverName, resource.AttributeValues["name"])
 	assert.Equal(t, "influxdb-udp", resource.AttributeValues["type"])
-	assert.Equal(t, influxHost, resource.AttributeValues["server"])
-	assert.Equal(t, float64(8089), resource.AttributeValues["port"])
+	assert.Equal(t, influxUDPHost, resource.AttributeValues["server"])
+	assert.Equal(t, json.Number(fmt.Sprintf("%d", influxUDPPort)), resource.AttributeValues["port"])
 	assert.Equal(t, "udp", resource.AttributeValues["protocol"])
 
 	// Verify via API
@@ -146,14 +164,12 @@ resource "pbs_metrics_server" "test_influxdb_udp" {
 	require.NoError(t, err)
 	assert.Equal(t, serverName, server.Name)
 	assert.Equal(t, metrics.MetricsServerTypeInfluxDBUDP, server.Type)
-	assert.Equal(t, influxHost, server.Server)
-	assert.Equal(t, 8089, server.Port)
+	assert.Equal(t, influxUDPHost, server.Server)
+	assert.Equal(t, influxUDPPort, server.Port)
 }
 
 // TestMetricsServerMTU tests metrics server with custom MTU
 func TestMetricsServerMTU(t *testing.T) {
-	t.Skip("InfluxDB 2.x does not support UDP protocol - MTU test disabled")
-	
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -162,26 +178,27 @@ func TestMetricsServerMTU(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	serverName := GenerateTestName("influxdb-mtu")
-	influxHost := getInfluxDBHost()
+	influxUDPHost := getInfluxDBUDPHost()
+	influxUDPPort := getInfluxDBUDPPort()
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_metrics_server" "test_mtu" {
   name     = "%s"
   type     = "influxdb-udp"
   server   = "%s"
-  port     = 8089
+  port     = %d
   protocol = "udp"
   mtu      = 1400
   enable   = true
   comment  = "Metrics server with custom MTU"
 }
-`, serverName, influxHost)
+`, serverName, influxUDPHost, influxUDPPort)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
 
 	resource := tc.GetResourceFromState(t, "pbs_metrics_server.test_mtu")
-	assert.Equal(t, float64(1400), resource.AttributeValues["mtu"])
+	assert.Equal(t, json.Number("1400"), resource.AttributeValues["mtu"])
 
 	metricsClient := metrics.NewClient(tc.APIClient)
 	server, err := metricsClient.GetMetricsServer(context.Background(), metrics.MetricsServerTypeInfluxDBUDP, serverName)
