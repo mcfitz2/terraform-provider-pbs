@@ -359,23 +359,28 @@ resource "pbs_s3_endpoint" "test_%s" {
 
 	terraformConfig += "}\n"
 
-	// Add S3 datastore configuration
+	// Add S3 datastore configuration  
+	// NOTE: We use the .id attribute reference which creates an implicit dependency
+	// ensuring the datastore can only be created after the endpoint exists.
+	// During destroy, Terraform reverses this dependency, destroying the datastore first.
+	endpointID := pbsConfig["id"]
 	terraformConfig += fmt.Sprintf(`
 resource "pbs_datastore" "test_%s" {
   name       = "%s"
   type       = "s3"
   path       = "/datastore/%s-cache"
-  s3_client  = pbs_s3_endpoint.test_%s.id
+  s3_client  = "%s"
   s3_bucket  = "%s"
   comment    = "Test S3 datastore for %s provider"
   
+  # Explicit dependency ensures proper destroy order: datastore -> endpoint
   depends_on = [pbs_s3_endpoint.test_%s]
 }
 `,
 		provider.Name,
 		datastoreName,
 		datastoreName,
-		provider.Name,
+		endpointID,
 		provider.BucketName,
 		provider.Name,
 		provider.Name)

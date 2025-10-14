@@ -146,10 +146,8 @@ resource "pbs_datastore" "test_zfs" {
 	datastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
 	require.NoError(t, err)
 
-	// If PBS created a directory datastore instead of ZFS, skip the test
-	if datastore.Type != datastores.DatastoreTypeZFS {
-		t.Skipf("ZFS test skipped - ZFS pool '%s' not available (PBS created '%s' datastore instead)", zfsPool, datastore.Type)
-	}
+	// ZFS datastores are reported as "dir" type by PBS (they're directory datastores on ZFS mounts)
+	assert.Equal(t, datastores.DatastoreTypeDirectory, datastore.Type)
 
 	// Verify resource was created via Terraform state
 	resource := tc.GetResourceFromState(t, "pbs_datastore.test_zfs")
@@ -158,8 +156,7 @@ resource "pbs_datastore" "test_zfs" {
 	assert.Equal(t, zfsPool, resource.AttributeValues["zfs_pool"])
 	assert.Equal(t, fmt.Sprintf("backup/%s", datastoreName), resource.AttributeValues["zfs_dataset"])
 
-	// Verify ZFS-specific fields
-	assert.Equal(t, datastores.DatastoreTypeZFS, datastore.Type)
+	// Verify ZFS-specific fields (ZFS pool and compression settings)
 	assert.Equal(t, zfsPool, datastore.ZFSPool)
 	assert.Equal(t, "lz4", datastore.Compression)
 }
