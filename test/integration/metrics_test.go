@@ -329,8 +329,6 @@ resource "pbs_metrics_server" "test_bodysize" {
 // TestMetricsServerTimeout tests metrics server with custom timeout
 // NOTE: PBS 4.0 removed the timeout parameter, so this test is disabled
 
-
-
 // TestMetricsServerHTTPToUDPUpdate tests updating from HTTP to UDP type (should force replacement)
 func TestMetricsServerTypeChange(t *testing.T) {
 	if testing.Short() {

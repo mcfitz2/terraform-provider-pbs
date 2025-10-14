@@ -28,7 +28,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 45
     
-    # Service containers for testing
+    # Service containers for testing - exposed on host network
     services:
       influxdb:
         image: influxdb:2.7-alpine
@@ -134,6 +134,14 @@ jobs:
     - name: Build provider binary
       run: go build .
 
+    - name: Get runner IP address
+      id: get_ip
+      run: |
+        # Get the IP address of the runner on the local network
+        RUNNER_IP=$(hostname -I | awk '{print $1}')
+        echo "Runner IP: $RUNNER_IP"
+        echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
+
     - name: Run integration tests
       env:
         # PBS Server configuration
@@ -142,23 +150,24 @@ jobs:
         PBS_PASSWORD: "pbspbs123"
         PBS_INSECURE_TLS: "true"
         PBS_TESTPOOL: "testpool"
-        # Test service endpoints
-        TEST_INFLUXDB_HOST: "localhost"
+        TF_ACC: "1"
+        # Test service endpoints - use runner's IP so PBS can reach them
+        TEST_INFLUXDB_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_INFLUXDB_PORT: "8086"
-        TEST_INFLUXDB_UDP_HOST: "localhost"
+        TEST_INFLUXDB_UDP_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_INFLUXDB_UDP_PORT: "8089"
         TEST_INFLUXDB_ORG: "testorg"
         TEST_INFLUXDB_BUCKET: "pbs-metrics"
         TEST_INFLUXDB_TOKEN: "test-token-for-pbs-provider"
-        TEST_GOTIFY_HOST: "localhost"
+        TEST_GOTIFY_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_GOTIFY_PORT: "8080"
         TEST_GOTIFY_TOKEN: "AqQR.Oq8ZqYJ4"
-        TEST_WEBHOOK_HOST: "localhost"
+        TEST_WEBHOOK_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_WEBHOOK_PORT: "8081"
         # Network storage test endpoints
-        TEST_NFS_HOST: "localhost"
+        TEST_NFS_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_NFS_EXPORT: "/export"
-        TEST_CIFS_HOST: "localhost"
+        TEST_CIFS_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_CIFS_SHARE: "backup"
         TEST_CIFS_USERNAME: "testuser"
         TEST_CIFS_PASSWORD: "testpass"
@@ -175,13 +184,15 @@ jobs:
       run: |
         echo "Running FULL integration test suite against PBS 4.0 at 192.168.1.108..."
         echo ""
-        echo "Test services available:"
-        echo "  - InfluxDB 2.7 (HTTP): localhost:8086"
-        echo "  - InfluxDB 1.8 (UDP): localhost:8089"
-        echo "  - Gotify: localhost:8080"
-        echo "  - Webhook: localhost:8081"
-        echo "  - NFS Server: localhost:2049"
-        echo "  - CIFS/Samba: localhost:445"
+        echo "Runner IP: ${{ steps.get_ip.outputs.RUNNER_IP }}"
+        echo ""
+        echo "Test services available (PBS can reach these at runner IP):"
+        echo "  - InfluxDB 2.7 (HTTP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8086"
+        echo "  - InfluxDB 1.8 (UDP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8089"
+        echo "  - Gotify: ${{ steps.get_ip.outputs.RUNNER_IP }}:8080"
+        echo "  - Webhook: ${{ steps.get_ip.outputs.RUNNER_IP }}:8081"
+        echo "  - NFS Server: ${{ steps.get_ip.outputs.RUNNER_IP }}:2049"
+        echo "  - CIFS/Samba: ${{ steps.get_ip.outputs.RUNNER_IP }}:445"
         echo ""
         echo "Test Suites:"
         echo "  ✓ Core Integration Tests (Datastore, Metrics, Jobs, Notifications)"

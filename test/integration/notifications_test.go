@@ -44,7 +44,7 @@ resource "pbs_smtp_notification" "test_smtp" {
 	resource := tc.GetResourceFromState(t, "pbs_smtp_notification.test_smtp")
 	assert.Equal(t, targetName, resource.AttributeValues["name"])
 	assert.Equal(t, "smtp.example.com", resource.AttributeValues["server"])
-	assert.Equal(t, float64(587), resource.AttributeValues["port"])
+	assert.Equal(t, "587", resource.AttributeValues["port"])
 	assert.Equal(t, "test@example.com", resource.AttributeValues["username"])
 
 	// Verify via API
@@ -53,7 +53,7 @@ resource "pbs_smtp_notification" "test_smtp" {
 	require.NoError(t, err)
 	assert.Equal(t, targetName, target.Name)
 	assert.Equal(t, "smtp.example.com", target.Server)
-	assert.Equal(t, 587, target.Port)
+	assert.Equal(t, 587, *target.Port)
 
 	// Test update
 	updatedConfig := fmt.Sprintf(`
@@ -77,7 +77,7 @@ resource "pbs_smtp_notification" "test_smtp" {
 	target, err = notifClient.GetSMTPTarget(context.Background(), targetName)
 	require.NoError(t, err)
 	assert.Equal(t, "smtp.newserver.com", target.Server)
-	assert.Equal(t, 465, target.Port)
+	assert.Equal(t, 465, *target.Port)
 	assert.Equal(t, "Updated SMTP notification", target.Comment)
 }
 

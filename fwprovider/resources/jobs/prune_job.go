@@ -53,8 +53,8 @@ type pruneJobResourceModel struct {
 	MaxDepth    types.Int64  `tfsdk:"max_depth"`
 	Namespace   types.String `tfsdk:"namespace"`
 	// BackupType field removed in PBS 4.0
-	BackupID    types.String `tfsdk:"backup_id"`
-	Comment     types.String `tfsdk:"comment"`
+	BackupID types.String `tfsdk:"backup_id"`
+	Comment  types.String `tfsdk:"comment"`
 	// Disable field removed in PBS 4.0
 }
 
