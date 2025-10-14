@@ -227,7 +227,7 @@ type SyncJob struct {
 	RemoveVanished *bool    `json:"remove-vanished,omitempty"`
 	Comment        string   `json:"comment,omitempty"`
 	// Disable field removed in PBS 4.0
-	Owner      string  `json:"owner,omitempty"`
+	Owner       string `json:"owner,omitempty"`
 	RateLimitIn string `json:"rate-in,omitempty"` // PBS 4.0 expects byte size string format (e.g., "10M", "1G")
 }
 

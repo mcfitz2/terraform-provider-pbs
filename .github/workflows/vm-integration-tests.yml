@@ -69,7 +69,7 @@ jobs:
           GOTIFY_DEFAULTUSER_NAME: admin
           GOTIFY_DEFAULTUSER_PASS: admin
         options: >-
-          --health-cmd "wget --spider -q http://localhost:80/health"
+          --health-cmd "curl -f http://localhost:80/health || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
