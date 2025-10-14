@@ -1,5 +1,12 @@
 name: Docker Integration Tests
 
+# This workflow runs integration tests in Docker containers (no hardware dependencies).
+# 
+# Test Suites:
+#   1. Core Integration Tests - Datastore (non-ZFS), Metrics, Jobs, Notifications
+#   2. S3 Integration Tests - AWS, Backblaze B2, Scaleway (requires credentials)
+#   3. Hardware-Dependent Tests - EXCLUDED (ZFS requires VM with kernel modules)
+#
 # Code coverage is collected during test runs and reported via Codecov.
 # Coverage annotations will appear on pull requests showing which lines are covered.
 # Coverage reports and trends are available at https://codecov.io
@@ -48,8 +55,8 @@ jobs:
     - name: Build provider
       run: make build
 
-  quick-and-datastore-tests:
-    name: Quick & Datastore Tests
+  core-integration-tests:
+    name: Core Integration Tests (Non-S3, Non-Hardware)
     runs-on: ubuntu-latest
     needs: unit-tests
     services:
@@ -64,6 +71,37 @@ jobs:
           --memory=2g
           --tmpfs /run
           --tmpfs /var/log/proxmox-backup
+      
+      influxdb:
+        image: influxdb:2.7
+        ports:
+          - 8086:8086
+        env:
+          DOCKER_INFLUXDB_INIT_MODE: setup
+          DOCKER_INFLUXDB_INIT_USERNAME: admin
+          DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+          DOCKER_INFLUXDB_INIT_ORG: testorg
+          DOCKER_INFLUXDB_INIT_BUCKET: pbs-metrics
+          DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: test-token-123456
+        options: >-
+          --health-cmd "influx ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      influxdb-udp:
+        image: influxdb:1.8
+        ports:
+          - 8089:8089/udp
+        env:
+          INFLUXDB_UDP_ENABLED: true
+          INFLUXDB_UDP_BIND_ADDRESS: :8089
+          INFLUXDB_UDP_DATABASE: udp
+        options: >-
+          --health-cmd "influx -execute 'SHOW DATABASES'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -102,43 +140,50 @@ jobs:
           sleep 5
         done
 
-    - name: Run tests
+    - name: Run core integration tests
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
         PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
+        TEST_INFLUXDB_HOST: "localhost"
+        TEST_INFLUXDB_PORT: "8086"
+        TEST_INFLUXDB_UDP_HOST: "localhost"
+        TEST_INFLUXDB_UDP_PORT: "8089"
       run: |
-        # Run all datastore tests except ZFS (ZFS requires VM with kernel modules)
-        go test -v -timeout 15m -coverprofile=coverage-quick-datastore.out -covermode=atomic ./test/integration -run "TestQuickSmoke|TestDatastore" -skip "TestDatastoreZFS"
+        # Run all tests except S3 and hardware-dependent tests (ZFS)
+        # Includes: Quick smoke, Datastore (non-ZFS), Metrics, Jobs, Notifications
+        go test -v -timeout 20m -coverprofile=coverage-core.out -covermode=atomic ./test/integration \
+          -run "TestQuickSmoke|TestDatastore|TestMetrics|Test.*Job|Test.*Notification" \
+          -skip "TestDatastoreZFS|TestS3|TestCleanup"
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-quick-datastore
-        path: coverage-quick-datastore.out
+        name: coverage-core-integration
+        path: coverage-core.out
         retention-days: 7
 
     - name: Report coverage
       uses: codecov/codecov-action@v4
       with:
-        files: ./coverage-quick-datastore.out
-        flags: integration-quick-datastore
-        name: quick-datastore-coverage
+        files: ./coverage-core.out
+        flags: integration-core
+        name: core-integration-coverage
 
     - name: Upload test logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: quick-datastore-test-logs
+        name: core-integration-test-logs
         path: |
           test/integration/*.log
         retention-days: 7
 
   s3-aws-tests:
-    name: S3 Tests - AWS
+    name: S3 Integration Tests - AWS
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -236,9 +281,9 @@ jobs:
         retention-days: 7
 
   s3-backblaze-tests:
-    name: S3 Tests - Backblaze B2
+    name: S3 Integration Tests - Backblaze B2
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -336,9 +381,9 @@ jobs:
         retention-days: 7
 
   s3-scaleway-tests:
-    name: S3 Tests - Scaleway
+    name: S3 Integration Tests - Scaleway
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -471,13 +516,18 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [quick-and-datastore-tests, s3-aws-tests, s3-backblaze-tests, s3-scaleway-tests, s3-cleanup-tests]
+    needs: [core-integration-tests, s3-aws-tests, s3-backblaze-tests, s3-scaleway-tests, s3-cleanup-tests]
     if: always()
     steps:
     - name: Check test results
       run: |
         echo "All Docker-based integration tests completed"
-        # This job will show as success if all tests passed, or show which failed
+        echo "Test Suites:"
+        echo "  ✓ Core Integration Tests (Non-S3, Non-Hardware)"
+        echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway)"
+        echo "  ✓ S3 Cleanup Tests"
+        echo ""
+        echo "Note: Hardware-dependent tests (ZFS) run only in VM workflow"
 
   security-scan:
     name: Security Scan

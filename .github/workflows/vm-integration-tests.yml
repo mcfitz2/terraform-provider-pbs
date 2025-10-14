@@ -1,5 +1,13 @@
 name: VM Integration Tests
 
+# This workflow runs the FULL integration test suite on a self-hosted VM runner.
+# It includes ALL test suites, including hardware-dependent tests.
+#
+# Test Suites:
+#   1. Core Integration Tests - Datastore (including ZFS), Metrics, Jobs, Notifications
+#   2. S3 Integration Tests - AWS, Backblaze B2, Scaleway (if credentials provided)
+#   3. Hardware-Dependent Tests - ZFS (requires VM with kernel modules)
+#
 # Code coverage is collected during test runs and reported via Codecov.
 # Coverage annotations will appear on pull requests showing which lines are covered.
 # Coverage reports and trends are available at https://codecov.io
@@ -35,6 +43,20 @@ jobs:
           DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: test-token-for-pbs-provider
         options: >-
           --health-cmd "influx ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      influxdb-udp:
+        image: influxdb:1.8
+        ports:
+          - 8089:8089/udp
+        env:
+          INFLUXDB_UDP_ENABLED: true
+          INFLUXDB_UDP_BIND_ADDRESS: :8089
+          INFLUXDB_UDP_DATABASE: udp
+        options: >-
+          --health-cmd "influx -execute 'SHOW DATABASES'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -123,6 +145,8 @@ jobs:
         # Test service endpoints
         TEST_INFLUXDB_HOST: "localhost"
         TEST_INFLUXDB_PORT: "8086"
+        TEST_INFLUXDB_UDP_HOST: "localhost"
+        TEST_INFLUXDB_UDP_PORT: "8089"
         TEST_INFLUXDB_ORG: "testorg"
         TEST_INFLUXDB_BUCKET: "pbs-metrics"
         TEST_INFLUXDB_TOKEN: "test-token-for-pbs-provider"
@@ -149,13 +173,23 @@ jobs:
         SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
-        echo "Running integration test suite against PBS 4.0 at 192.168.1.108..."
+        echo "Running FULL integration test suite against PBS 4.0 at 192.168.1.108..."
+        echo ""
         echo "Test services available:"
-        echo "  - InfluxDB: localhost:8086"
+        echo "  - InfluxDB 2.7 (HTTP): localhost:8086"
+        echo "  - InfluxDB 1.8 (UDP): localhost:8089"
         echo "  - Gotify: localhost:8080"
         echo "  - Webhook: localhost:8081"
         echo "  - NFS Server: localhost:2049"
         echo "  - CIFS/Samba: localhost:445"
+        echo ""
+        echo "Test Suites:"
+        echo "  ✓ Core Integration Tests (Datastore, Metrics, Jobs, Notifications)"
+        echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway - if credentials provided)"
+        echo "  ✓ Hardware-Dependent Tests (ZFS)"
+        echo ""
+        
+        # Run ALL tests including hardware-dependent (ZFS)
         go test -v -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
 
     - name: Upload coverage
