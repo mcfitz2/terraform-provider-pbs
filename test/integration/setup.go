@@ -87,9 +87,9 @@ func SetupTest(t *testing.T) *TestContext {
 	currentPath := os.Getenv("PATH")
 	nodePaths := "/usr/local/bin:/usr/bin"
 	if !strings.Contains(currentPath, nodePaths) {
-		os.Setenv("PATH", nodePaths+":"+currentPath)
+		_ = os.Setenv("PATH", nodePaths+":"+currentPath)
 	}
-	os.Setenv("NODE_PATH", nodePaths)
+	_ = os.Setenv("NODE_PATH", nodePaths)
 
 	// Set up environment for terraform
 	err = tf.SetEnv(map[string]string{
@@ -182,13 +182,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }()
 
 	_, err = io.Copy(destFile, sourceFile)
 	return err
@@ -294,7 +294,7 @@ func (tc *TestContext) DestroyTerraform(t *testing.T) {
 // GetTerraformState returns the current terraform state with fallback for Node.js issues
 func (tc *TestContext) GetTerraformState(t *testing.T) *tfjson.State {
 	// Set NODE_PATH environment variable to help find node binary
-	os.Setenv("NODE_PATH", "/usr/bin:/usr/local/bin")
+	_ = os.Setenv("NODE_PATH", "/usr/bin:/usr/local/bin")
 
 	state, err := tc.TF.Show(context.Background())
 	if err != nil {

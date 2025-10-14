@@ -37,22 +37,22 @@ const (
 
 // MetricsServer represents a metrics server configuration
 type MetricsServer struct {
-	Name         string            `json:"name"`
-	Type         MetricsServerType `json:"type"`
-	Enable       *bool             `json:"enable,omitempty"`
+	Name   string            `json:"name"`
+	Type   MetricsServerType `json:"type"`
+	Enable *bool             `json:"enable,omitempty"`
 	// PBS 4.0 fields
-	URL          string            `json:"url,omitempty"`           // InfluxDB HTTP only (PBS 4.0)
-	Host         string            `json:"host,omitempty"`          // InfluxDB UDP only (PBS 4.0)
+	URL  string `json:"url,omitempty"`  // InfluxDB HTTP only (PBS 4.0)
+	Host string `json:"host,omitempty"` // InfluxDB UDP only (PBS 4.0)
 	// Backwards compatibility fields (will be converted to URL/Host)
-	Server       string            `json:"server,omitempty"`
-	Port         int               `json:"port,omitempty"`
-	MTU          *int              `json:"mtu,omitempty"`
-	Organization string            `json:"organization,omitempty"`  // InfluxDB HTTP only
-	Bucket       string            `json:"bucket,omitempty"`        // InfluxDB HTTP only
-	Token        string            `json:"token,omitempty"`         // InfluxDB HTTP only
-	MaxBodySize  *int              `json:"max-body-size,omitempty"` // InfluxDB HTTP only
-	VerifyTLS    *bool             `json:"verify-tls,omitempty"`    // InfluxDB HTTP only (renamed from verify_certificate)
-	Comment      string            `json:"comment,omitempty"`
+	Server       string `json:"server,omitempty"`
+	Port         int    `json:"port,omitempty"`
+	MTU          *int   `json:"mtu,omitempty"`
+	Organization string `json:"organization,omitempty"`  // InfluxDB HTTP only
+	Bucket       string `json:"bucket,omitempty"`        // InfluxDB HTTP only
+	Token        string `json:"token,omitempty"`         // InfluxDB HTTP only
+	MaxBodySize  *int   `json:"max-body-size,omitempty"` // InfluxDB HTTP only
+	VerifyTLS    *bool  `json:"verify-tls,omitempty"`    // InfluxDB HTTP only (renamed from verify_certificate)
+	Comment      string `json:"comment,omitempty"`
 }
 
 // ListMetricsServers lists all metrics server configurations
@@ -102,7 +102,7 @@ func (s *MetricsServer) parseURLFields() {
 		if u, err := url.Parse(s.URL); err == nil {
 			s.Server = u.Hostname()
 			if u.Port() != "" {
-				fmt.Sscanf(u.Port(), "%d", &s.Port)
+				_, _ = fmt.Sscanf(u.Port(), "%d", &s.Port)
 			} else if u.Scheme == "https" {
 				s.Port = 443
 			} else if u.Scheme == "http" {
@@ -113,7 +113,7 @@ func (s *MetricsServer) parseURLFields() {
 		// Parse hostname:port
 		if host, portStr, err := net.SplitHostPort(s.Host); err == nil {
 			s.Server = host
-			fmt.Sscanf(portStr, "%d", &s.Port)
+			_, _ = fmt.Sscanf(portStr, "%d", &s.Port)
 		} else {
 			// No port specified
 			s.Server = s.Host

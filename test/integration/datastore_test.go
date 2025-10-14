@@ -145,7 +145,7 @@ resource "pbs_datastore" "test_zfs" {
 	datastoreClient := datastores.NewClient(tc.APIClient)
 	datastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
 	require.NoError(t, err)
-	
+
 	// If PBS created a directory datastore instead of ZFS, skip the test
 	if datastore.Type != datastores.DatastoreTypeZFS {
 		t.Skipf("ZFS test skipped - ZFS pool '%s' not available (PBS created '%s' datastore instead)", zfsPool, datastore.Type)
@@ -235,11 +235,11 @@ func TestDatastoreNetworkStorage(t *testing.T) {
 	cifsShare := os.Getenv("TEST_CIFS_SHARE")
 	cifsUser := os.Getenv("TEST_CIFS_USERNAME")
 	cifsPass := os.Getenv("TEST_CIFS_PASSWORD")
-	
+
 	if cifsHost == "" || cifsShare == "" {
 		t.Skip("CIFS test skipped - TEST_CIFS_HOST and TEST_CIFS_SHARE environment variables not set")
 	}
-	
+
 	// Default credentials if not provided
 	if cifsUser == "" {
 		cifsUser = "testuser"
@@ -333,6 +333,11 @@ func TestDatastoreImport(t *testing.T) {
 
 	err := datastoreClient.CreateDatastore(context.Background(), testDatastore)
 	require.NoError(t, err, "Failed to create datastore via API for import test")
+
+	// Verify the datastore was created by reading it back
+	createdDatastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
+	require.NoError(t, err, "Failed to verify datastore creation")
+	require.Equal(t, datastoreName, createdDatastore.Name, "Datastore name mismatch after creation")
 
 	// Terraform destroy will clean up the datastore after import
 	// No need for manual API cleanup

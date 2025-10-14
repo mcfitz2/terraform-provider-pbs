@@ -420,7 +420,7 @@ func (p *S3ProviderConfig) TestS3Connectivity(t *testing.T) {
 		Key:    aws.String(testKey),
 	})
 	require.NoError(t, err, "Failed to download test object from %s bucket %s", p.Name, p.BucketName)
-	result.Body.Close()
+	_ = result.Body.Close()
 
 	// Clean up test object
 	_, err = p.S3Client.DeleteObject(&s3.DeleteObjectInput{
