@@ -1,0 +1,79 @@
+# Codecov Configuration
+# See: https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto          # Maintain current coverage level
+        threshold: 1%         # Allow coverage to drop by 1%
+        if_ci_failed: error   # Fail if CI fails
+    
+    patch:
+      default:
+        target: 70%           # Require 70% coverage on new code
+        threshold: 5%         # Allow some flexibility
+
+  precision: 2                # Show coverage to 2 decimal places
+  round: down                 # Round coverage percentages down
+  range: "60...100"           # Color scale from 60% (red) to 100% (green)
+
+# Pull request comments
+comment:
+  layout: "header, diff, flags, files, footer"
+  behavior: default           # Post new comment on each push
+  require_changes: false      # Always comment, even if coverage unchanged
+  require_base: false         # Don't require base coverage to exist
+  require_head: true          # Require head coverage to exist
+
+# Ignore certain files/paths from coverage
+ignore:
+  - "test/**/*"               # Don't include test files in coverage
+  - "examples/**/*"           # Don't include examples
+  - "docs/**/*"               # Don't include documentation
+  - "**/*_test.go"            # Don't include test files
+  - "**/test_*.go"            # Don't include test helpers
+  - "**/*.pb.go"              # Don't include generated protobuf files
+  - "**/mock_*.go"            # Don't include mock files
+
+# Coverage flags for different test types
+flags:
+  unit-tests:
+    paths:
+      - fwprovider/
+      - pbs/
+    carryforward: true        # Use previous coverage if test doesn't run
+  
+  integration-quick-datastore:
+    paths:
+      - fwprovider/
+      - test/integration/
+    carryforward: true
+  
+  integration-s3-aws:
+    paths:
+      - fwprovider/
+      - test/integration/
+    carryforward: true
+  
+  integration-s3-b2:
+    paths:
+      - fwprovider/
+      - test/integration/
+    carryforward: true
+  
+  integration-s3-scaleway:
+    paths:
+      - fwprovider/
+      - test/integration/
+    carryforward: true
+  
+  vm-integration-tests:
+    paths:
+      - fwprovider/
+      - test/integration/
+    carryforward: true
+
+# Customize the Codecov GitHub checks
+github_checks:
+  annotations: true           # Enable inline annotations on PRs

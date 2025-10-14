@@ -1,5 +1,9 @@
 name: Docker Integration Tests
 
+# Code coverage is collected during test runs and reported via Codecov.
+# Coverage annotations will appear on pull requests showing which lines are covered.
+# Coverage reports and trends are available at https://codecov.io
+
 on:
   push:
     branches: [ main, develop ]
@@ -25,7 +29,21 @@ jobs:
       run: go mod download
 
     - name: Run unit tests
-      run: make test-unit
+      run: go test -coverprofile=coverage-unit.out -covermode=atomic ./...
+
+    - name: Upload unit test coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-unit
+        path: coverage-unit.out
+        retention-days: 7
+
+    - name: Report unit test coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-unit.out
+        flags: unit-tests
+        name: unit-tests-coverage
 
     - name: Build provider
       run: make build
@@ -92,7 +110,21 @@ jobs:
         PBS_INSECURE_TLS: "true"
       run: |
         # Run all datastore tests except ZFS (ZFS requires VM with kernel modules)
-        go test -v -timeout 15m ./test/integration -run "TestQuickSmoke|TestDatastore" -skip "TestDatastoreZFS"
+        go test -v -timeout 15m -coverprofile=coverage-quick-datastore.out -covermode=atomic ./test/integration -run "TestQuickSmoke|TestDatastore" -skip "TestDatastoreZFS"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-quick-datastore
+        path: coverage-quick-datastore.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-quick-datastore.out
+        flags: integration-quick-datastore
+        name: quick-datastore-coverage
 
     - name: Upload test logs
       if: failure()
@@ -178,7 +210,21 @@ jobs:
           exit 0
         fi
         echo "Running AWS S3 tests..."
-        go test -v -timeout 20m ./test/integration -run "AWS"
+        go test -v -timeout 20m -coverprofile=coverage-aws.out -covermode=atomic ./test/integration -run "AWS"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-aws
+        path: coverage-aws.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-aws.out
+        flags: integration-s3-aws
+        name: aws-s3-coverage
 
     - name: Upload test logs
       if: failure()
@@ -264,7 +310,21 @@ jobs:
           exit 0
         fi
         echo "Running Backblaze B2 tests..."
-        go test -v -timeout 20m ./test/integration -run "Backblaze|B2"
+        go test -v -timeout 20m -coverprofile=coverage-b2.out -covermode=atomic ./test/integration -run "Backblaze|B2"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-b2
+        path: coverage-b2.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-b2.out
+        flags: integration-s3-b2
+        name: b2-s3-coverage
 
     - name: Upload test logs
       if: failure()
@@ -350,7 +410,21 @@ jobs:
           exit 0
         fi
         echo "Running Scaleway tests..."
-        go test -v -timeout 20m ./test/integration -run "Scaleway"
+        go test -v -timeout 20m -coverprofile=coverage-scaleway.out -covermode=atomic ./test/integration -run "Scaleway"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-scaleway
+        path: coverage-scaleway.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-scaleway.out
+        flags: integration-s3-scaleway
+        name: scaleway-s3-coverage
 
     - name: Upload test logs
       if: failure()

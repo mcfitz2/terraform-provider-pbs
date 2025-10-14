@@ -1,5 +1,9 @@
 name: VM Integration Tests
 
+# Code coverage is collected during test runs and reported via Codecov.
+# Coverage annotations will appear on pull requests showing which lines are covered.
+# Coverage reports and trends are available at https://codecov.io
+
 on:
   push:
     branches: [ main, develop ]
@@ -152,7 +156,21 @@ jobs:
         echo "  - Webhook: localhost:8081"
         echo "  - NFS Server: localhost:2049"
         echo "  - CIFS/Samba: localhost:445"
-        go test -v -timeout 40m ./test/integration
+        go test -v -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-vm-integration
+        path: coverage-vm-integration.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-vm-integration.out
+        flags: vm-integration-tests
+        name: vm-integration-coverage
 
     - name: Upload test logs
       if: failure()
