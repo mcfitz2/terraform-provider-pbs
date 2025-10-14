@@ -139,6 +139,20 @@ jobs:
           fi
           sleep 5
         done
+    
+    - name: Prepare PBS test directories
+      run: |
+        # Get the PBS container ID
+        PBS_CONTAINER=$(docker ps --filter "ancestor=ayufan/proxmox-backup-server:latest" --format "{{.ID}}")
+        echo "PBS container: $PBS_CONTAINER"
+        
+        # Create base datastore directory with proper permissions
+        # This is needed for API-based datastore creation since the API client
+        # doesn't support the create-base-path parameter
+        docker exec $PBS_CONTAINER mkdir -p /datastore
+        docker exec $PBS_CONTAINER chmod 755 /datastore
+        docker exec $PBS_CONTAINER chown backup:backup /datastore
+        echo "✅ PBS test directories created"
 
     - name: Run core integration tests
       env:
