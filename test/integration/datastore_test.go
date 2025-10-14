@@ -323,10 +323,12 @@ func TestDatastoreImport(t *testing.T) {
 
 	// First, create a datastore manually via API
 	datastoreClient := datastores.NewClient(tc.APIClient)
+	createBasePath := true
 	testDatastore := &datastores.Datastore{
-		Name: datastoreName,
-		Type: datastores.DatastoreTypeDirectory,
-		Path: fmt.Sprintf("/datastore/%s", datastoreName),
+		Name:           datastoreName,
+		Type:           datastores.DatastoreTypeDirectory,
+		Path:           fmt.Sprintf("/datastore/%s", datastoreName),
+		CreateBasePath: &createBasePath, // Ensure directory is created
 	}
 
 	err := datastoreClient.CreateDatastore(context.Background(), testDatastore)
@@ -339,8 +341,10 @@ func TestDatastoreImport(t *testing.T) {
 	for i := 0; i < maxRetries; i++ {
 		createdDatastore, err = datastoreClient.GetDatastore(context.Background(), datastoreName)
 		if err == nil {
+			t.Logf("SUCCESS: Datastore found after %d attempts", i+1)
 			break
 		}
+		t.Logf("Attempt %d/%d: Datastore not yet available: %v", i+1, maxRetries, err)
 		if i < maxRetries-1 {
 			time.Sleep(2 * time.Second)
 		}
