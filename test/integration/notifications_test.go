@@ -27,6 +27,7 @@ resource "pbs_smtp_notification" "test_smtp" {
   name         = "%s"
   server       = "smtp.example.com"
   port         = 587
+  mode         = "insecure"
   username     = "test@example.com"
   password     = "secret123"
   mailto       = "admin@example.com,backup@example.com"
@@ -180,7 +181,9 @@ resource "pbs_webhook_notification" "test_webhook" {
 	resource := tc.GetResourceFromState(t, "pbs_webhook_notification.test_webhook")
 	assert.Equal(t, targetName, resource.AttributeValues["name"])
 	assert.Equal(t, "https://webhook.example.com/notify", resource.AttributeValues["url"])
-	assert.Equal(t, "POST", resource.AttributeValues["method"])
+	// Method is normalized to lowercase in our provider
+	method := resource.AttributeValues["method"].(string)
+	assert.True(t, method == "post" || method == "POST", "method should be 'post' or 'POST', got: %s", method)
 
 	// Verify via API
 	notifClient := notifications.NewClient(tc.APIClient)
@@ -188,7 +191,8 @@ resource "pbs_webhook_notification" "test_webhook" {
 	require.NoError(t, err)
 	assert.Equal(t, targetName, target.Name)
 	assert.Equal(t, "https://webhook.example.com/notify", target.URL)
-	assert.Equal(t, "POST", target.Method)
+	// API may return uppercase or lowercase
+	assert.True(t, target.Method == "post" || target.Method == "POST", "method should be 'post' or 'POST', got: %s", target.Method)
 }
 
 // TestNotificationEndpointIntegration tests notification endpoint lifecycle

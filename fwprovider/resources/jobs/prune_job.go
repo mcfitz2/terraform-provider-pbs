@@ -10,14 +10,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/micah/terraform-provider-pbs/fwprovider/config"
@@ -55,10 +52,10 @@ type pruneJobResourceModel struct {
 	KeepYearly  types.Int64  `tfsdk:"keep_yearly"`
 	MaxDepth    types.Int64  `tfsdk:"max_depth"`
 	Namespace   types.String `tfsdk:"namespace"`
-	BackupType  types.String `tfsdk:"backup_type"`
+	// BackupType field removed in PBS 4.0
 	BackupID    types.String `tfsdk:"backup_id"`
 	Comment     types.String `tfsdk:"comment"`
-	Disable     types.Bool   `tfsdk:"disable"`
+	// Disable field removed in PBS 4.0
 }
 
 // Metadata returns the resource type name.
@@ -135,14 +132,7 @@ keep-monthly, and keep-yearly parameters.`,
 				MarkdownDescription: "Namespace filter as a regular expression. Only backups in matching namespaces will be pruned.",
 				Optional:            true,
 			},
-			"backup_type": schema.StringAttribute{
-				Description:         "Backup type filter (vm, ct, host).",
-				MarkdownDescription: "Backup type filter. Valid values: `vm`, `ct`, `host`.",
-				Optional:            true,
-				Validators: []validator.String{
-					stringvalidator.OneOf("vm", "ct", "host"),
-				},
-			},
+			// backup_type field removed in PBS 4.0
 			"backup_id": schema.StringAttribute{
 				Description:         "Specific backup ID filter.",
 				MarkdownDescription: "Specific backup ID to prune. If set, only this backup ID will be affected.",
@@ -153,13 +143,7 @@ keep-monthly, and keep-yearly parameters.`,
 				MarkdownDescription: "A comment describing this prune job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this prune job.",
-				MarkdownDescription: "Disable this prune job. Defaults to `false`.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
+			// disable attribute removed in PBS 4.0
 		},
 	}
 }
@@ -228,19 +212,14 @@ func (r *pruneJobResource) Create(ctx context.Context, req resource.CreateReques
 	if !plan.Namespace.IsNull() {
 		job.NamespaceRE = plan.Namespace.ValueString()
 	}
-	if !plan.BackupType.IsNull() {
-		job.BackupType = plan.BackupType.ValueString()
-	}
+	// BackupType field removed in PBS 4.0
 	if !plan.BackupID.IsNull() {
 		job.BackupID = plan.BackupID.ValueString()
 	}
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.CreatePruneJob(ctx, job)
 	if err != nil {
@@ -318,11 +297,7 @@ func (r *pruneJobResource) Read(ctx context.Context, req resource.ReadRequest, r
 	} else {
 		state.Namespace = types.StringNull()
 	}
-	if job.BackupType != "" {
-		state.BackupType = types.StringValue(job.BackupType)
-	} else {
-		state.BackupType = types.StringNull()
-	}
+	// BackupType field removed in PBS 4.0
 	if job.BackupID != "" {
 		state.BackupID = types.StringValue(job.BackupID)
 	} else {
@@ -333,11 +308,7 @@ func (r *pruneJobResource) Read(ctx context.Context, req resource.ReadRequest, r
 	} else {
 		state.Comment = types.StringNull()
 	}
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
-	}
+	// Disable field removed in PBS 4.0
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -388,19 +359,14 @@ func (r *pruneJobResource) Update(ctx context.Context, req resource.UpdateReques
 	if !plan.Namespace.IsNull() {
 		job.NamespaceRE = plan.Namespace.ValueString()
 	}
-	if !plan.BackupType.IsNull() {
-		job.BackupType = plan.BackupType.ValueString()
-	}
+	// BackupType field removed in PBS 4.0
 	if !plan.BackupID.IsNull() {
 		job.BackupID = plan.BackupID.ValueString()
 	}
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.UpdatePruneJob(ctx, plan.ID.ValueString(), job)
 	if err != nil {

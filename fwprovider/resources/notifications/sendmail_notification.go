@@ -176,6 +176,34 @@ func (r *sendmailNotificationResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	// Read back from API to get actual values
+	created, err := r.client.Notifications.GetSendmailTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading created Sendmail notification target",
+			fmt.Sprintf("Created Sendmail notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	// Update plan with values from API
+	plan.From = types.StringValue(created.From)
+	if len(created.Mailto) > 0 {
+		plan.Mailto = types.StringValue(strings.Join(created.Mailto, ","))
+	}
+	if created.MailtoUser != "" {
+		plan.MailtoUser = types.StringValue(created.MailtoUser)
+	}
+	if created.Author != "" {
+		plan.Author = types.StringValue(created.Author)
+	}
+	if created.Comment != "" {
+		plan.Comment = types.StringValue(created.Comment)
+	}
+	if created.Disable != nil {
+		plan.Disable = types.BoolValue(*created.Disable)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -37,7 +38,6 @@ resource "pbs_prune_job" "test_prune" {
   keep_yearly    = 3
   max_depth      = 3
   comment        = "Test prune job"
-  disable        = false
 }
 `, jobID, datastoreName)
 
@@ -52,8 +52,8 @@ resource "pbs_prune_job" "test_prune" {
 	assert.Equal(t, jobID, resource.AttributeValues["id"])
 	assert.Equal(t, datastoreName, resource.AttributeValues["store"])
 	assert.Equal(t, "daily", resource.AttributeValues["schedule"])
-	assert.Equal(t, float64(7), resource.AttributeValues["keep_last"])
-	assert.Equal(t, float64(14), resource.AttributeValues["keep_daily"])
+	assert.Equal(t, json.Number("7"), resource.AttributeValues["keep_last"])
+	assert.Equal(t, json.Number("14"), resource.AttributeValues["keep_daily"])
 	assert.Equal(t, "Test prune job", resource.AttributeValues["comment"])
 
 	// Verify job exists via direct API call
@@ -81,7 +81,6 @@ resource "pbs_prune_job" "test_prune" {
   keep_yearly    = 5
   max_depth      = 5
   comment        = "Updated test prune job"
-  disable        = false
 }
 `, jobID, datastoreName)
 
@@ -120,9 +119,8 @@ resource "pbs_sync_job" "test_sync" {
   remote_store   = "backup"
   schedule       = "hourly"
   remove_vanished = true
-  rate_limit_kbps = 10000
+  rate_limit_in  = "10M"
   comment        = "Test sync job"
-  disable        = false
 }
 `, jobID, datastoreName, remoteName)
 
@@ -162,9 +160,8 @@ resource "pbs_sync_job" "test_sync" {
   remote_store   = "backup"
   schedule       = "daily"
   remove_vanished = false
-  rate_limit_kbps = 20000
+  rate_limit_in  = "20M"
   comment        = "Updated test sync job"
-  disable        = false
 }
 `, jobID, datastoreName, remoteName)
 
@@ -203,7 +200,6 @@ resource "pbs_verify_job" "test_verify" {
   outdated_after  = 30
   max_depth       = 3
   comment         = "Test verify job"
-  disable         = false
 }
 `, jobID, datastoreName)
 
@@ -219,7 +215,7 @@ resource "pbs_verify_job" "test_verify" {
 	assert.Equal(t, datastoreName, resource.AttributeValues["store"])
 	assert.Equal(t, "weekly", resource.AttributeValues["schedule"])
 	assert.Equal(t, true, resource.AttributeValues["ignore_verified"])
-	assert.Equal(t, float64(30), resource.AttributeValues["outdated_after"])
+	assert.Equal(t, json.Number("30"), resource.AttributeValues["outdated_after"])
 
 	// Verify job exists via direct API call
 	jobsClient := jobs.NewClient(tc.APIClient)
@@ -243,7 +239,6 @@ resource "pbs_verify_job" "test_verify" {
   outdated_after  = 60
   max_depth       = 5
   comment         = "Updated test verify job"
-  disable         = false
 }
 `, jobID, datastoreName)
 
@@ -279,7 +274,6 @@ resource "pbs_gc_job" "test_gc" {
   store    = "%s"
   schedule = "weekly"
   comment  = "Test GC job"
-  disable  = false
 }
 `, jobID, datastoreName)
 
@@ -312,7 +306,6 @@ resource "pbs_gc_job" "test_gc" {
   store    = "%s"
   schedule = "daily"
   comment  = "Updated test GC job"
-  disable  = false
 }
 `, jobID, datastoreName)
 
@@ -344,8 +337,7 @@ resource "pbs_prune_job" "test_filter" {
   store        = "%s"
   schedule     = "daily"
   keep_last    = 5
-  namespace    = "vm/.*"
-  backup_type  = "vm"
+  namespace    = "vm"
   max_depth    = 2
   comment      = "Prune job with filters"
 }
@@ -355,14 +347,12 @@ resource "pbs_prune_job" "test_filter" {
 	tc.ApplyTerraform(t)
 
 	resource := tc.GetResourceFromState(t, "pbs_prune_job.test_filter")
-	assert.Equal(t, "vm/.*", resource.AttributeValues["namespace"])
-	assert.Equal(t, "vm", resource.AttributeValues["backup_type"])
+	assert.Equal(t, "vm", resource.AttributeValues["namespace"])
 
 	jobsClient := jobs.NewClient(tc.APIClient)
 	job, err := jobsClient.GetPruneJob(context.Background(), jobID)
 	require.NoError(t, err)
-	assert.Equal(t, "vm/.*", job.NamespaceRE)
-	assert.Equal(t, "vm", job.BackupType)
+	assert.Equal(t, "vm", job.NamespaceRE)
 }
 
 // TestSyncJobWithGroupFilter tests sync job with group filters
@@ -385,7 +375,7 @@ resource "pbs_sync_job" "test_filter" {
   remote       = "%s"
   remote_store = "backup"
   schedule     = "daily"
-  group_filter = ["vm/.*", "ct/.*"]
+  group_filter = ["type:vm", "type:ct"]
   namespace    = "production"
   comment      = "Sync job with filters"
 }
@@ -402,7 +392,7 @@ resource "pbs_sync_job" "test_filter" {
 	job, err := jobsClient.GetSyncJob(context.Background(), jobID)
 	require.NoError(t, err)
 	assert.Len(t, job.GroupFilter, 2)
-	assert.Contains(t, job.GroupFilter, "vm/.*")
-	assert.Contains(t, job.GroupFilter, "ct/.*")
+	assert.Contains(t, job.GroupFilter, "type:vm")
+	assert.Contains(t, job.GroupFilter, "type:ct")
 	assert.Equal(t, "production", job.NamespaceRE)
 }

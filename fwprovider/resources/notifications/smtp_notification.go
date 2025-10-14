@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -99,6 +100,7 @@ verification tasks, and system events.`,
 				MarkdownDescription: "Connection mode for SMTP. Valid values: `insecure` (no encryption), `starttls` (upgrade to TLS), `tls` (direct TLS). Defaults to `insecure`.",
 				Optional:            true,
 				Computed:            true,
+				Default:             stringdefault.StaticString("insecure"),
 				Validators: []validator.String{
 					stringvalidator.OneOf("insecure", "starttls", "tls"),
 				},
@@ -189,7 +191,7 @@ func (r *smtpNotificationResource) Create(ctx context.Context, req resource.Crea
 		port := int(plan.Port.ValueInt64())
 		target.Port = &port
 	}
-	if !plan.Mode.IsNull() {
+	if !plan.Mode.IsNull() && !plan.Mode.IsUnknown() {
 		target.Mode = plan.Mode.ValueString()
 	}
 	if !plan.Mailto.IsNull() {
@@ -232,6 +234,47 @@ func (r *smtpNotificationResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
+	// Read back from API to get computed values (like mode default)
+	created, err := r.client.Notifications.GetSMTPTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading created SMTP notification target",
+			fmt.Sprintf("Created SMTP notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	// Update plan with values from API
+	plan.Server = types.StringValue(created.Server)
+	plan.From = types.StringValue(created.From)
+	if created.Port != nil {
+		plan.Port = types.Int64Value(int64(*created.Port))
+	}
+	if created.Mode != "" {
+		plan.Mode = types.StringValue(created.Mode)
+	} else if plan.Mode.IsUnknown() || plan.Mode.IsNull() {
+		// If API doesn't return mode and plan has no value, use default
+		plan.Mode = types.StringValue("insecure")
+	}
+	if len(created.To) > 0 {
+		plan.Mailto = types.StringValue(strings.Join(created.To, ","))
+	}
+	if created.MailtoUser != "" {
+		plan.MailtoUser = types.StringValue(created.MailtoUser)
+	}
+	if created.Username != "" {
+		plan.Username = types.StringValue(created.Username)
+	}
+	if created.Author != "" {
+		plan.Author = types.StringValue(created.Author)
+	}
+	if created.Comment != "" {
+		plan.Comment = types.StringValue(created.Comment)
+	}
+	if created.Disable != nil {
+		plan.Disable = types.BoolValue(*created.Disable)
+	}
+
 	// Set state to fully populated data
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
@@ -264,6 +307,8 @@ func (r *smtpNotificationResource) Read(ctx context.Context, req resource.ReadRe
 	}
 	if target.Mode != "" {
 		state.Mode = types.StringValue(target.Mode)
+	} else {
+		state.Mode = types.StringNull()
 	}
 	if len(target.To) > 0 {
 		// PBS 4.0: mailto is an array, join into comma-separated string

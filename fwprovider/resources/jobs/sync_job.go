@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -52,9 +51,9 @@ type syncJobResourceModel struct {
 	GroupFilter    types.List   `tfsdk:"group_filter"`
 	RemoveVanished types.Bool   `tfsdk:"remove_vanished"`
 	Owner          types.String `tfsdk:"owner"`
-	RateLimitKbps  types.Int64  `tfsdk:"rate_limit_kbps"`
+	RateLimitIn    types.String `tfsdk:"rate_limit_in"` // PBS 4.0 expects byte size string (e.g., "10M", "1G")
 	Comment        types.String `tfsdk:"comment"`
-	Disable        types.Bool   `tfsdk:"disable"`
+	// Disable field removed in PBS 4.0
 }
 
 // Metadata returns the resource type name.
@@ -124,25 +123,17 @@ by removing backups that no longer exist on the remote.`,
 				MarkdownDescription: "Owner user ID for the synced backups. Optional.",
 				Optional:            true,
 			},
-			"rate_limit_kbps": schema.Int64Attribute{
-				Description:         "Transfer rate limit in KiB/s.",
-				MarkdownDescription: "Transfer rate limit in KiB/s. Defaults to unlimited (0).",
+			"rate_limit_in": schema.StringAttribute{
+				Description:         "Transfer rate limit (byte size format).",
+				MarkdownDescription: "Transfer rate limit in byte size format (e.g., `10M` for 10 MiB/s, `1G` for 1 GiB/s). Leave empty for unlimited.",
 				Optional:            true,
-				Computed:            true,
-				Default:             int64default.StaticInt64(0),
 			},
 			"comment": schema.StringAttribute{
 				Description:         "A comment describing this sync job.",
 				MarkdownDescription: "A comment describing this sync job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this sync job.",
-				MarkdownDescription: "Disable this sync job. Defaults to `false`.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
+			// Disable field removed in PBS 4.0
 		},
 	}
 }
@@ -201,17 +192,13 @@ func (r *syncJobResource) Create(ctx context.Context, req resource.CreateRequest
 	if !plan.Owner.IsNull() {
 		job.Owner = plan.Owner.ValueString()
 	}
-	if !plan.RateLimitKbps.IsNull() {
-		rateLimit := int(plan.RateLimitKbps.ValueInt64())
-		job.RateLimitKBPS = &rateLimit
+	if !plan.RateLimitIn.IsNull() {
+		job.RateLimitIn = plan.RateLimitIn.ValueString()
 	}
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.CreateSyncJob(ctx, job)
 	if err != nil {
@@ -275,21 +262,17 @@ func (r *syncJobResource) Read(ctx context.Context, req resource.ReadRequest, re
 	} else {
 		state.Owner = types.StringNull()
 	}
-	if job.RateLimitKBPS != nil {
-		state.RateLimitKbps = types.Int64Value(int64(*job.RateLimitKBPS))
+	if job.RateLimitIn != "" {
+		state.RateLimitIn = types.StringValue(job.RateLimitIn)
 	} else {
-		state.RateLimitKbps = types.Int64Value(0)
+		state.RateLimitIn = types.StringNull()
 	}
 	if job.Comment != "" {
 		state.Comment = types.StringValue(job.Comment)
 	} else {
 		state.Comment = types.StringNull()
 	}
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
-	}
+	// Disable field removed in PBS 4.0
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -330,17 +313,13 @@ func (r *syncJobResource) Update(ctx context.Context, req resource.UpdateRequest
 	if !plan.Owner.IsNull() {
 		job.Owner = plan.Owner.ValueString()
 	}
-	if !plan.RateLimitKbps.IsNull() {
-		rateLimit := int(plan.RateLimitKbps.ValueInt64())
-		job.RateLimitKBPS = &rateLimit
+	if !plan.RateLimitIn.IsNull() {
+		job.RateLimitIn = plan.RateLimitIn.ValueString()
 	}
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.UpdateSyncJob(ctx, plan.ID.ValueString(), job)
 	if err != nil {

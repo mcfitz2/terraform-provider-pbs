@@ -44,7 +44,7 @@ type PruneJob struct {
 	BackupType  string `json:"backup-type,omitempty"` // vm, ct, host
 	BackupID    string `json:"backup-id,omitempty"`
 	Comment     string `json:"comment,omitempty"`
-	Disable     *bool  `json:"disable,omitempty"`
+	// Disable field removed in PBS 4.0
 }
 
 // ListPruneJobs lists all prune job configurations
@@ -129,9 +129,7 @@ func (c *Client) CreatePruneJob(ctx context.Context, job *PruneJob) error {
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	_, err := c.api.Post(ctx, "/config/prune", body)
 	if err != nil {
@@ -188,9 +186,7 @@ func (c *Client) UpdatePruneJob(ctx context.Context, id string, job *PruneJob) e
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	path := fmt.Sprintf("/config/prune/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)
@@ -230,9 +226,9 @@ type SyncJob struct {
 	GroupFilter    []string `json:"group-filter,omitempty"`
 	RemoveVanished *bool    `json:"remove-vanished,omitempty"`
 	Comment        string   `json:"comment,omitempty"`
-	Disable        *bool    `json:"disable,omitempty"`
-	Owner          string   `json:"owner,omitempty"`
-	RateLimitKBPS  *int     `json:"rate-in,omitempty"`
+	// Disable field removed in PBS 4.0
+	Owner      string  `json:"owner,omitempty"`
+	RateLimitIn string `json:"rate-in,omitempty"` // PBS 4.0 expects byte size string format (e.g., "10M", "1G")
 }
 
 // ListSyncJobs lists all sync job configurations
@@ -307,14 +303,12 @@ func (c *Client) CreateSyncJob(ctx context.Context, job *SyncJob) error {
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 	if job.Owner != "" {
 		body["owner"] = job.Owner
 	}
-	if job.RateLimitKBPS != nil {
-		body["rate-in"] = *job.RateLimitKBPS
+	if job.RateLimitIn != "" {
+		body["rate-in"] = job.RateLimitIn
 	}
 
 	_, err := c.api.Post(ctx, "/config/sync", body)
@@ -360,14 +354,12 @@ func (c *Client) UpdateSyncJob(ctx context.Context, id string, job *SyncJob) err
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 	if job.Owner != "" {
 		body["owner"] = job.Owner
 	}
-	if job.RateLimitKBPS != nil {
-		body["rate-in"] = *job.RateLimitKBPS
+	if job.RateLimitIn != "" {
+		body["rate-in"] = job.RateLimitIn
 	}
 
 	path := fmt.Sprintf("/config/sync/%s", url.PathEscape(id))
@@ -406,7 +398,7 @@ type VerifyJob struct {
 	NamespaceRE    string `json:"ns,omitempty"`
 	MaxDepth       *int   `json:"max-depth,omitempty"`
 	Comment        string `json:"comment,omitempty"`
-	Disable        *bool  `json:"disable,omitempty"`
+	// Disable field removed in PBS 4.0
 }
 
 // ListVerifyJobs lists all verify job configurations
@@ -473,9 +465,7 @@ func (c *Client) CreateVerifyJob(ctx context.Context, job *VerifyJob) error {
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	_, err := c.api.Post(ctx, "/config/verify", body)
 	if err != nil {
@@ -514,9 +504,7 @@ func (c *Client) UpdateVerifyJob(ctx context.Context, id string, job *VerifyJob)
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)
@@ -550,7 +538,7 @@ type GCJob struct {
 	Store    string `json:"store"`
 	Schedule string `json:"schedule"`
 	Comment  string `json:"comment,omitempty"`
-	Disable  *bool  `json:"disable,omitempty"`
+	// Disable field removed in PBS 4.0
 }
 
 // ListGCJobs lists all GC job configurations
@@ -605,9 +593,7 @@ func (c *Client) CreateGCJob(ctx context.Context, job *GCJob) error {
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	_, err := c.api.Post(ctx, "/config/garbage-collection", body)
 	if err != nil {
@@ -634,9 +620,7 @@ func (c *Client) UpdateGCJob(ctx context.Context, id string, job *GCJob) error {
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
+	// Disable field removed in PBS 4.0
 
 	path := fmt.Sprintf("/config/garbage-collection/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)

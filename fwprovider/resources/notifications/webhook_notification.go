@@ -9,6 +9,7 @@ package notifications
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -161,7 +162,8 @@ func (r *webhookNotificationResource) Create(ctx context.Context, req resource.C
 		target.Body = plan.Body.ValueString()
 	}
 	if !plan.Method.IsNull() {
-		target.Method = plan.Method.ValueString()
+		// PBS 4.0 requires lowercase method values
+		target.Method = strings.ToLower(plan.Method.ValueString())
 	}
 	if !plan.Headers.IsNull() {
 		headers := make(map[string]string)
@@ -218,7 +220,8 @@ func (r *webhookNotificationResource) Read(ctx context.Context, req resource.Rea
 		state.Body = types.StringValue(target.Body)
 	}
 	if target.Method != "" {
-		state.Method = types.StringValue(target.Method)
+		// Store uppercase to match API format
+		state.Method = types.StringValue(strings.ToLower(target.Method))
 	}
 	if len(target.Headers) > 0 {
 		headers, diags := types.MapValueFrom(ctx, types.StringType, target.Headers)
@@ -257,7 +260,8 @@ func (r *webhookNotificationResource) Update(ctx context.Context, req resource.U
 		target.Body = plan.Body.ValueString()
 	}
 	if !plan.Method.IsNull() {
-		target.Method = plan.Method.ValueString()
+		// PBS 4.0 requires lowercase method values
+		target.Method = strings.ToLower(plan.Method.ValueString())
 	}
 	if !plan.Headers.IsNull() {
 		headers := make(map[string]string)

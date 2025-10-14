@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -46,7 +45,7 @@ type gcJobResourceModel struct {
 	Store    types.String `tfsdk:"store"`
 	Schedule types.String `tfsdk:"schedule"`
 	Comment  types.String `tfsdk:"comment"`
-	Disable  types.Bool   `tfsdk:"disable"`
+	// Disable field removed in PBS 4.0
 }
 
 // Metadata returns the resource type name.
@@ -88,13 +87,7 @@ be I/O intensive.`,
 				MarkdownDescription: "A comment describing this garbage collection job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this GC job.",
-				MarkdownDescription: "Disable this garbage collection job. Defaults to `false`.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
+			// disable attribute removed in PBS 4.0
 		},
 	}
 }
@@ -135,10 +128,7 @@ func (r *gcJobResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.CreateGCJob(ctx, job)
 	if err != nil {
@@ -180,11 +170,7 @@ func (r *gcJobResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	} else {
 		state.Comment = types.StringNull()
 	}
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
-	}
+	// Disable field removed in PBS 4.0
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -207,10 +193,7 @@ func (r *gcJobResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.UpdateGCJob(ctx, plan.ID.ValueString(), job)
 	if err != nil {

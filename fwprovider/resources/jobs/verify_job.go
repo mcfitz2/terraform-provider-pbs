@@ -50,7 +50,7 @@ type verifyJobResourceModel struct {
 	Namespace      types.String `tfsdk:"namespace"`
 	MaxDepth       types.Int64  `tfsdk:"max_depth"`
 	Comment        types.String `tfsdk:"comment"`
-	Disable        types.Bool   `tfsdk:"disable"`
+	// Disable field removed in PBS 4.0
 }
 
 // Metadata returns the resource type name.
@@ -114,13 +114,7 @@ determines how many days until a backup is considered due for re-verification.`,
 				MarkdownDescription: "A comment describing this verification job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this verify job.",
-				MarkdownDescription: "Disable this verification job. Defaults to `false`.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
+			// disable attribute removed in PBS 4.0
 		},
 	}
 }
@@ -176,10 +170,7 @@ func (r *verifyJobResource) Create(ctx context.Context, req resource.CreateReque
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.CreateVerifyJob(ctx, job)
 	if err != nil {
@@ -241,11 +232,7 @@ func (r *verifyJobResource) Read(ctx context.Context, req resource.ReadRequest, 
 	} else {
 		state.Comment = types.StringNull()
 	}
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
-	}
+	// Disable field removed in PBS 4.0
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -283,10 +270,7 @@ func (r *verifyJobResource) Update(ctx context.Context, req resource.UpdateReque
 	if !plan.Comment.IsNull() {
 		job.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disable.IsNull() {
-		disable := plan.Disable.ValueBool()
-		job.Disable = &disable
-	}
+	// Disable field removed in PBS 4.0
 
 	err := r.client.Jobs.UpdateVerifyJob(ctx, plan.ID.ValueString(), job)
 	if err != nil {
