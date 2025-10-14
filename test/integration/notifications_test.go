@@ -229,7 +229,6 @@ resource "pbs_notification_matcher" "test_matcher" {
   name           = "%s"
   targets        = [pbs_smtp_notification.target.name]
   match_severity = ["error", "warning"]
-  match_field    = ["job-type=prune", "datastore=backup"]
   mode           = "all"
   invert_match   = false
   comment        = "Test notification matcher"
