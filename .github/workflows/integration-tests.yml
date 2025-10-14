@@ -147,8 +147,7 @@ jobs:
         echo "PBS container: $PBS_CONTAINER"
         
         # Create base datastore directory with proper permissions
-        # This is needed for API-based datastore creation since the API client
-        # doesn't support the create-base-path parameter
+        # PBS API requires directories to exist before datastores can be registered
         docker exec $PBS_CONTAINER mkdir -p /datastore
         docker exec $PBS_CONTAINER chmod 755 /datastore
         docker exec $PBS_CONTAINER chown backup:backup /datastore

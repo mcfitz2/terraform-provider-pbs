@@ -59,9 +59,6 @@ type Datastore struct {
 	GCSchedule    string        `json:"gc-schedule,omitempty"`
 	PruneSchedule string        `json:"prune-schedule,omitempty"`
 
-	// Directory-specific options
-	CreateBasePath *bool `json:"create-base-path,omitempty"`
-
 	// ZFS-specific options
 	ZFSPool     string `json:"pool,omitempty"`
 	ZFSDataset  string `json:"dataset,omitempty"`
@@ -283,8 +280,8 @@ func (c *Client) datastoreToMap(ds *Datastore) map[string]interface{} {
 	}
 
 	// Only add fields that we know are accepted by the PBS API
-	// Based on the errors, even "content" and "create-base-path" are rejected
-	// So for now, stick to just name, path, and backend (for S3)
+	// Testing showed that only name, path, and backend (for S3) are accepted
+	// Other fields like content, gc-schedule, etc. must be set via update API
 
 	return body
 }

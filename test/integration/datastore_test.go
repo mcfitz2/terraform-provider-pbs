@@ -26,23 +26,21 @@ func TestDatastoreDirectoryIntegration(t *testing.T) {
 	// Generate unique test name
 	datastoreName := GenerateTestName("dir-datastore")
 
-	// Test configuration for directory datastore
-	testConfig := fmt.Sprintf(`
+	// Create config
+	config := fmt.Sprintf(`
 resource "pbs_datastore" "test_directory" {
   name             = "%s"
   type             = "dir"
   path             = "/datastore/%s"
   content          = ["backup"]
   comment          = "Test directory datastore"
-  create_base_path = true
   gc_schedule      = "daily"
   prune_schedule   = "weekly"
-  max_backups      = 10
 }
 `, datastoreName, datastoreName)
 
 	// Write terraform configuration
-	tc.WriteMainTF(t, testConfig)
+	tc.WriteMainTF(t, config)
 
 	// Apply terraform
 	tc.ApplyTerraform(t)
@@ -53,7 +51,6 @@ resource "pbs_datastore" "test_directory" {
 	assert.Equal(t, "dir", resource.AttributeValues["type"])
 	assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), resource.AttributeValues["path"])
 	assert.Equal(t, "Test directory datastore", resource.AttributeValues["comment"])
-	assert.Equal(t, true, resource.AttributeValues["create_base_path"])
 	assert.Equal(t, "daily", resource.AttributeValues["gc_schedule"])
 	assert.Equal(t, "weekly", resource.AttributeValues["prune_schedule"])
 
@@ -78,7 +75,6 @@ resource "pbs_datastore" "test_directory" {
   path             = "/datastore/%s"
   content          = ["backup"]
   comment          = "Updated test directory datastore"
-  create_base_path = true
   gc_schedule      = "weekly"
   prune_schedule   = "daily"
   max_backups      = 20
@@ -323,8 +319,8 @@ func TestDatastoreImport(t *testing.T) {
 	datastorePath := fmt.Sprintf("/datastore/%s", datastoreName)
 
 	// First, create a datastore manually via API
-	// Note: The API client's datastoreToMap() doesn't include create-base-path,
-	// but the /datastore directory is pre-created by the CI workflow
+	// Note: PBS API requires directories to exist before datastores can be registered.
+	// The /datastore directory is pre-created by the CI workflow.
 	datastoreClient := datastores.NewClient(tc.APIClient)
 	testDatastore := &datastores.Datastore{
 		Name: datastoreName,

@@ -22,7 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -64,7 +63,6 @@ type datastoreResourceModel struct {
 	Disabled       types.Bool   `tfsdk:"disabled"`
 	GCSchedule     types.String `tfsdk:"gc_schedule"`
 	PruneSchedule  types.String `tfsdk:"prune_schedule"`
-	CreateBasePath types.Bool   `tfsdk:"create_base_path"`
 
 	// ZFS-specific options
 	ZFSPool     types.String `tfsdk:"zfs_pool"`
@@ -179,16 +177,6 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description:         "Prune schedule in cron format.",
 				MarkdownDescription: "Prune schedule in cron format (e.g., `daily`, `weekly`, or `0 2 * * *`).",
 				Optional:            true,
-			},
-			"create_base_path": schema.BoolAttribute{
-				Description:         "Create base directory if it doesn't exist (dir type only).",
-				MarkdownDescription: "Create base directory if it doesn't exist. Only applicable for directory datastores.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
 			},
 
 			// ZFS-specific attributes
@@ -601,12 +589,6 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel) (*data
 		ds.PruneSchedule = plan.PruneSchedule.ValueString()
 	}
 
-	// Directory-specific
-	if !plan.CreateBasePath.IsNull() {
-		createBasePath := plan.CreateBasePath.ValueBool()
-		ds.CreateBasePath = &createBasePath
-	}
-
 	// ZFS-specific
 	if !plan.ZFSPool.IsNull() {
 		ds.ZFSPool = plan.ZFSPool.ValueString()
@@ -711,11 +693,6 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 	}
 	if ds.PruneSchedule != "" {
 		state.PruneSchedule = types.StringValue(ds.PruneSchedule)
-	}
-
-	// Directory-specific
-	if ds.CreateBasePath != nil {
-		state.CreateBasePath = types.BoolValue(*ds.CreateBasePath)
 	}
 
 	// ZFS-specific
