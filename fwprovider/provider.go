@@ -258,6 +258,5 @@ func (p *pbsProvider) Resources(_ context.Context) []func() resource.Resource {
 		jobs.NewPruneJobResource,
 		jobs.NewSyncJobResource,
 		jobs.NewVerifyJobResource,
-		jobs.NewGCJobResource,
 	}
 }

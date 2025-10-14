@@ -47,10 +47,6 @@ func TestIntegration(t *testing.T) {
 		t.Run("VerifyJob", func(t *testing.T) {
 			TestVerifyJobIntegration(t)
 		})
-
-		t.Run("GCJob", func(t *testing.T) {
-			TestGCJobIntegration(t)
-		})
 	})
 
 	t.Run("Notifications", func(t *testing.T) {
