@@ -47,6 +47,7 @@ type metricsServerResource struct {
 type metricsServerResourceModel struct {
 	Name         types.String `tfsdk:"name"`
 	Type         types.String `tfsdk:"type"`
+	URL          types.String `tfsdk:"url"`
 	Server       types.String `tfsdk:"server"`
 	Port         types.Int64  `tfsdk:"port"`
 	Enable       types.Bool   `tfsdk:"enable"`
@@ -94,15 +95,20 @@ PBS should send its performance and usage metrics.`,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"url": schema.StringAttribute{
+				Description:         "Full URL for InfluxDB HTTP (e.g., http://host:8086 or https://host:443). Takes precedence over server+port.",
+				MarkdownDescription: "Full URL for InfluxDB HTTP, including protocol (e.g., `http://influxdb:8086` or `https://influxdb:443`). If specified, this takes precedence over separate `server` and `port` fields. Only applicable for `influxdb-http` type.",
+				Optional:            true,
+			},
 			"server": schema.StringAttribute{
 				Description:         "The server address (hostname or IP).",
-				MarkdownDescription: "The server address (hostname or IP) of the metrics server.",
-				Required:            true,
+				MarkdownDescription: "The server address (hostname or IP) of the metrics server. Can be used instead of `url` for backwards compatibility.",
+				Optional:            true,
 			},
 			"port": schema.Int64Attribute{
 				Description:         "The server port.",
-				MarkdownDescription: "The server port. Typical ports: `8089` (InfluxDB UDP), `8086` (InfluxDB HTTP).",
-				Required:            true,
+				MarkdownDescription: "The server port. Typical ports: `8089` (InfluxDB UDP), `8086` (InfluxDB HTTP). Can be used instead of `url` for backwards compatibility.",
+				Optional:            true,
 			},
 			"enable": schema.BoolAttribute{
 				Description:         "Enable or disable this metrics server.",
@@ -201,10 +207,16 @@ func (r *metricsServerResource) Create(ctx context.Context, req resource.CreateR
 
 	// Create metrics server via API
 	server := &metrics.MetricsServer{
-		Name:   plan.Name.ValueString(),
-		Type:   metrics.MetricsServerType(plan.Type.ValueString()),
-		Server: plan.Server.ValueString(),
-		Port:   int(plan.Port.ValueInt64()),
+		Name: plan.Name.ValueString(),
+		Type: metrics.MetricsServerType(plan.Type.ValueString()),
+	}
+
+	// Set URL or Server+Port
+	if !plan.URL.IsNull() {
+		server.URL = plan.URL.ValueString()
+	} else {
+		server.Server = plan.Server.ValueString()
+		server.Port = int(plan.Port.ValueInt64())
 	}
 
 	// Set optional fields
@@ -279,8 +291,12 @@ func (r *metricsServerResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	// Update state with values from API
-	state.Server = types.StringValue(server.Server)
-	state.Port = types.Int64Value(int64(server.Port))
+	if server.URL != "" {
+		state.URL = types.StringValue(server.URL)
+	} else {
+		state.Server = types.StringValue(server.Server)
+		state.Port = types.Int64Value(int64(server.Port))
+	}
 
 	if server.Enable != nil {
 		state.Enable = types.BoolValue(*server.Enable)
@@ -328,9 +344,15 @@ func (r *metricsServerResource) Update(ctx context.Context, req resource.UpdateR
 
 	// Update metrics server via API
 	server := &metrics.MetricsServer{
-		Name:   plan.Name.ValueString(),
-		Server: plan.Server.ValueString(),
-		Port:   int(plan.Port.ValueInt64()),
+		Name: plan.Name.ValueString(),
+	}
+
+	// Set URL or Server+Port
+	if !plan.URL.IsNull() {
+		server.URL = plan.URL.ValueString()
+	} else {
+		server.Server = plan.Server.ValueString()
+		server.Port = int(plan.Port.ValueInt64())
 	}
 
 	// Set optional fields

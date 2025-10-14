@@ -22,6 +22,27 @@ services:
       retries: 30
       start_period: 60s
 
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb-test
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=testorg
+      - DOCKER_INFLUXDB_INIT_BUCKET=pbs-metrics
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=test-token-123456
+    mem_limit: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "influx ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 networks:
   default:
     name: pbs-test-network

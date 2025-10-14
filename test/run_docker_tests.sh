@@ -197,6 +197,8 @@ if [[ "$START_ONLY" == "true" ]]; then
     echo "  export PBS_USERNAME=admin@pbs"
     echo "  export PBS_PASSWORD=pbspbs"
     echo "  export PBS_INSECURE_TLS=true"
+    echo "  export TEST_INFLUXDB_HOST=localhost"
+    echo "  export TEST_INFLUXDB_PORT=8086"
     echo "  go test $VERBOSE ./test/integration -run \"\${TEST_PATTERN:-.*}\""
     echo
     echo "To stop the container:"
@@ -211,6 +213,10 @@ export PBS_ADDRESS="https://localhost:8007"
 export PBS_USERNAME="admin@pbs"
 export PBS_PASSWORD="pbspbs"
 export PBS_INSECURE_TLS="true"
+
+# Configure InfluxDB for metrics server tests
+export TEST_INFLUXDB_HOST="${TEST_INFLUXDB_HOST:-localhost}"
+export TEST_INFLUXDB_PORT="${TEST_INFLUXDB_PORT:-8086}"
 
 # Show S3 provider status
 if [[ ${#S3_PROVIDERS_AVAILABLE[@]} -gt 0 ]]; then

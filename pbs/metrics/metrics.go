@@ -147,7 +147,8 @@ func (c *Client) CreateMetricsServer(ctx context.Context, server *MetricsServer)
 			body["url"] = server.URL
 		} else if server.Server != "" && server.Port > 0 {
 			// Backwards compatibility: construct URL from server+port
-			body["url"] = fmt.Sprintf("https://%s:%d", server.Server, server.Port)
+			// Default to HTTP, user should use URL field for HTTPS
+			body["url"] = fmt.Sprintf("http://%s:%d", server.Server, server.Port)
 		} else {
 			return fmt.Errorf("either url or server+port is required for InfluxDB HTTP")
 		}
@@ -217,7 +218,8 @@ func (c *Client) UpdateMetricsServer(ctx context.Context, serverType MetricsServ
 			body["url"] = server.URL
 		} else if server.Server != "" && server.Port > 0 {
 			// Backwards compatibility: construct URL from server+port
-			body["url"] = fmt.Sprintf("https://%s:%d", server.Server, server.Port)
+			// Default to HTTP, user should use URL field for HTTPS
+			body["url"] = fmt.Sprintf("http://%s:%d", server.Server, server.Port)
 		}
 
 		if server.Organization != "" {
