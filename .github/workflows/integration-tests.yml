@@ -146,9 +146,10 @@ jobs:
         PBS_USERNAME: "admin@pbs"
         PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
-        TEST_INFLUXDB_HOST: "localhost"
+        # Use service names for inter-container communication in GitHub Actions
+        TEST_INFLUXDB_HOST: "influxdb"
         TEST_INFLUXDB_PORT: "8086"
-        TEST_INFLUXDB_UDP_HOST: "localhost"
+        TEST_INFLUXDB_UDP_HOST: "influxdb-udp"
         TEST_INFLUXDB_UDP_PORT: "8089"
       run: |
         # Run all tests except S3 and hardware-dependent tests (ZFS)

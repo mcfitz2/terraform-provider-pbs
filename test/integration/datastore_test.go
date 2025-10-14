@@ -331,8 +331,19 @@ func TestDatastoreImport(t *testing.T) {
 	err := datastoreClient.CreateDatastore(context.Background(), testDatastore)
 	require.NoError(t, err, "Failed to create datastore via API for import test")
 
-	// Verify the datastore was created by reading it back
-	createdDatastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
+	// Verify the datastore was created by reading it back with retry logic
+	// PBS may need a moment to fully register the datastore
+	var createdDatastore *datastores.Datastore
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		createdDatastore, err = datastoreClient.GetDatastore(context.Background(), datastoreName)
+		if err == nil {
+			break
+		}
+		if i < maxRetries-1 {
+			time.Sleep(time.Second)
+		}
+	}
 	require.NoError(t, err, "Failed to verify datastore creation")
 	require.Equal(t, datastoreName, createdDatastore.Name, "Datastore name mismatch after creation")
 

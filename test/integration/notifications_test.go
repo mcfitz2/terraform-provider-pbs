@@ -44,7 +44,14 @@ resource "pbs_smtp_notification" "test_smtp" {
 	resource := tc.GetResourceFromState(t, "pbs_smtp_notification.test_smtp")
 	assert.Equal(t, targetName, resource.AttributeValues["name"])
 	assert.Equal(t, "smtp.example.com", resource.AttributeValues["server"])
-	assert.Equal(t, "587", resource.AttributeValues["port"])
+	// Port is stored as json.Number in Terraform state
+	portVal := resource.AttributeValues["port"]
+	if portStr, ok := portVal.(string); ok {
+		assert.Equal(t, "587", portStr)
+	} else {
+		// Handle json.Number type
+		assert.Equal(t, "587", fmt.Sprint(portVal))
+	}
 	assert.Equal(t, "test@example.com", resource.AttributeValues["username"])
 
 	// Verify via API
@@ -222,7 +229,7 @@ resource "pbs_notification_matcher" "test_matcher" {
   name           = "%s"
   targets        = [pbs_smtp_notification.target.name]
   match_severity = ["error", "warning"]
-  match_field    = ["type=prune", "datastore=backup"]
+  match_field    = ["job-type=prune", "datastore=backup"]
   mode           = "all"
   invert_match   = false
   comment        = "Test notification matcher"
@@ -338,7 +345,8 @@ resource "pbs_notification_matcher" "test_calendar" {
 	notifClient := notifications.NewClient(tc.APIClient)
 	matcher, err := notifClient.GetNotificationMatcher(context.Background(), matcherName)
 	require.NoError(t, err)
-	assert.Equal(t, "Mon..Fri 08:00-17:00", matcher.MatchCalendar)
+	// MatchCalendar is an array in the API
+	assert.Equal(t, []string{"Mon..Fri 08:00-17:00"}, matcher.MatchCalendar)
 }
 
 // TestNotificationMatcherInvertMatch tests matcher with inverted matching
