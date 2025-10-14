@@ -66,10 +66,6 @@ func TestIntegration(t *testing.T) {
 			TestWebhookNotificationIntegration(t)
 		})
 
-		t.Run("NotificationEndpoint", func(t *testing.T) {
-			TestNotificationEndpointIntegration(t)
-		})
-
 		t.Run("NotificationMatcher", func(t *testing.T) {
 			TestNotificationMatcherIntegration(t)
 		})

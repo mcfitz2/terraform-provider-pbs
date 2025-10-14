@@ -195,62 +195,6 @@ resource "pbs_webhook_notification" "test_webhook" {
 	assert.True(t, target.Method == "post" || target.Method == "POST", "method should be 'post' or 'POST', got: %s", target.Method)
 }
 
-// TestNotificationEndpointIntegration tests notification endpoint lifecycle
-func TestNotificationEndpointIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
-	tc := SetupTest(t)
-	defer tc.DestroyTerraform(t)
-
-	endpointName := GenerateTestName("endpoint")
-	smtpTarget := GenerateTestName("smtp")
-	gotifyTarget := GenerateTestName("gotify")
-
-	// Create notification targets first
-	testConfig := fmt.Sprintf(`
-resource "pbs_smtp_notification" "target1" {
-  name         = "%s"
-  server       = "smtp.example.com"
-  port         = 587
-  username     = "test@example.com"
-  password     = "secret"
-  mailto       = "admin@example.com"
-  from_address = "pbs@example.com"
-}
-
-resource "pbs_gotify_notification" "target2" {
-  name   = "%s"
-  server = "https://gotify.example.com"
-  token  = "Atest123"
-}
-
-resource "pbs_notification_endpoint" "test_endpoint" {
-  name    = "%s"
-  targets = [pbs_smtp_notification.target1.name, pbs_gotify_notification.target2.name]
-  comment = "Test notification endpoint"
-  disable = false
-}
-`, smtpTarget, gotifyTarget, endpointName)
-
-	tc.WriteMainTF(t, testConfig)
-	tc.ApplyTerraform(t)
-
-	resource := tc.GetResourceFromState(t, "pbs_notification_endpoint.test_endpoint")
-	assert.Equal(t, endpointName, resource.AttributeValues["name"])
-	assert.NotNil(t, resource.AttributeValues["targets"])
-
-	// Verify via API
-	notifClient := notifications.NewClient(tc.APIClient)
-	endpoint, err := notifClient.GetNotificationEndpoint(context.Background(), endpointName)
-	require.NoError(t, err)
-	assert.Equal(t, endpointName, endpoint.Name)
-	assert.Len(t, endpoint.Targets, 2)
-	assert.Contains(t, endpoint.Targets, smtpTarget)
-	assert.Contains(t, endpoint.Targets, gotifyTarget)
-}
-
 // TestNotificationMatcherIntegration tests notification matcher lifecycle
 func TestNotificationMatcherIntegration(t *testing.T) {
 	if testing.Short() {
@@ -261,7 +205,6 @@ func TestNotificationMatcherIntegration(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	matcherName := GenerateTestName("matcher")
-	endpointName := GenerateTestName("endpoint")
 	smtpTarget := GenerateTestName("smtp")
 
 	testConfig := fmt.Sprintf(`
@@ -275,14 +218,9 @@ resource "pbs_smtp_notification" "target" {
   from_address = "pbs@example.com"
 }
 
-resource "pbs_notification_endpoint" "endpoint" {
-  name    = "%s"
-  targets = [pbs_smtp_notification.target.name]
-}
-
 resource "pbs_notification_matcher" "test_matcher" {
   name           = "%s"
-  targets        = [pbs_notification_endpoint.endpoint.name]
+  targets        = [pbs_smtp_notification.target.name]
   match_severity = ["error", "warning"]
   match_field    = ["type=prune", "datastore=backup"]
   mode           = "all"
@@ -290,7 +228,7 @@ resource "pbs_notification_matcher" "test_matcher" {
   comment        = "Test notification matcher"
   disable        = false
 }
-`, smtpTarget, endpointName, matcherName)
+`, smtpTarget, matcherName)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
@@ -306,7 +244,7 @@ resource "pbs_notification_matcher" "test_matcher" {
 	require.NoError(t, err)
 	assert.Equal(t, matcherName, matcher.Name)
 	assert.Len(t, matcher.Targets, 1)
-	assert.Contains(t, matcher.Targets, endpointName)
+	assert.Contains(t, matcher.Targets, smtpTarget)
 	assert.Len(t, matcher.MatchSeverity, 2)
 	assert.Contains(t, matcher.MatchSeverity, "error")
 	assert.Contains(t, matcher.MatchSeverity, "warning")
@@ -323,7 +261,6 @@ func TestNotificationMatcherModes(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	matcherName := GenerateTestName("matcher-any")
-	endpointName := GenerateTestName("endpoint")
 	smtpTarget := GenerateTestName("smtp")
 
 	// Test "any" mode
@@ -338,19 +275,14 @@ resource "pbs_smtp_notification" "target" {
   from_address = "pbs@example.com"
 }
 
-resource "pbs_notification_endpoint" "endpoint" {
-  name    = "%s"
-  targets = [pbs_smtp_notification.target.name]
-}
-
 resource "pbs_notification_matcher" "test_any" {
   name           = "%s"
-  targets        = [pbs_notification_endpoint.endpoint.name]
+  targets        = [pbs_smtp_notification.target.name]
   match_severity = ["info", "notice"]
   mode           = "any"
   comment        = "Matcher with any mode"
 }
-`, smtpTarget, endpointName, matcherName)
+`, smtpTarget, matcherName)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
@@ -374,7 +306,6 @@ func TestNotificationMatcherWithCalendar(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	matcherName := GenerateTestName("matcher-calendar")
-	endpointName := GenerateTestName("endpoint")
 	smtpTarget := GenerateTestName("smtp")
 
 	testConfig := fmt.Sprintf(`
@@ -388,20 +319,15 @@ resource "pbs_smtp_notification" "target" {
   from_address = "pbs@example.com"
 }
 
-resource "pbs_notification_endpoint" "endpoint" {
-  name    = "%s"
-  targets = [pbs_smtp_notification.target.name]
-}
-
 resource "pbs_notification_matcher" "test_calendar" {
   name            = "%s"
-  targets         = [pbs_notification_endpoint.endpoint.name]
+  targets         = [pbs_smtp_notification.target.name]
   match_severity  = ["error"]
   match_calendar  = ["Mon..Fri 08:00-17:00"]
   mode            = "all"
   comment         = "Matcher with calendar - business hours only"
 }
-`, smtpTarget, endpointName, matcherName)
+`, smtpTarget, matcherName)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
@@ -425,7 +351,6 @@ func TestNotificationMatcherInvertMatch(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	matcherName := GenerateTestName("matcher-invert")
-	endpointName := GenerateTestName("endpoint")
 	smtpTarget := GenerateTestName("smtp")
 
 	testConfig := fmt.Sprintf(`
@@ -439,20 +364,15 @@ resource "pbs_smtp_notification" "target" {
   from_address = "pbs@example.com"
 }
 
-resource "pbs_notification_endpoint" "endpoint" {
-  name    = "%s"
-  targets = [pbs_smtp_notification.target.name]
-}
-
 resource "pbs_notification_matcher" "test_invert" {
   name           = "%s"
-  targets        = [pbs_notification_endpoint.endpoint.name]
+  targets        = [pbs_smtp_notification.target.name]
   match_severity = ["info"]
   mode           = "all"
   invert_match   = true
   comment        = "Matcher with inverted match - notify on anything except info"
 }
-`, smtpTarget, endpointName, matcherName)
+`, smtpTarget, matcherName)
 
 	tc.WriteMainTF(t, testConfig)
 	tc.ApplyTerraform(t)
