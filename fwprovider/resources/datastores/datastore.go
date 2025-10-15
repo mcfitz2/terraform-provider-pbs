@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -54,15 +55,21 @@ type datastoreResource struct {
 
 // datastoreResourceModel maps the resource schema data.
 type datastoreResourceModel struct {
-	Name           types.String `tfsdk:"name"`
-	Type           types.String `tfsdk:"type"`
-	Path           types.String `tfsdk:"path"`
-	Content        types.List   `tfsdk:"content"`
-	MaxBackups     types.Int64  `tfsdk:"max_backups"`
-	Comment        types.String `tfsdk:"comment"`
-	Disabled       types.Bool   `tfsdk:"disabled"`
-	GCSchedule     types.String `tfsdk:"gc_schedule"`
-	PruneSchedule  types.String `tfsdk:"prune_schedule"`
+	Name          types.String `tfsdk:"name"`
+	Type          types.String `tfsdk:"type"`
+	Path          types.String `tfsdk:"path"`
+	Content       types.List   `tfsdk:"content"`
+	MaxBackups    types.Int64  `tfsdk:"max_backups"`
+	Comment       types.String `tfsdk:"comment"`
+	Disabled      types.Bool   `tfsdk:"disabled"`
+	GCSchedule    types.String `tfsdk:"gc_schedule"`
+	PruneSchedule types.String `tfsdk:"prune_schedule"`
+	KeepLast      types.Int64  `tfsdk:"keep_last"`
+	KeepHourly    types.Int64  `tfsdk:"keep_hourly"`
+	KeepDaily     types.Int64  `tfsdk:"keep_daily"`
+	KeepWeekly    types.Int64  `tfsdk:"keep_weekly"`
+	KeepMonthly   types.Int64  `tfsdk:"keep_monthly"`
+	KeepYearly    types.Int64  `tfsdk:"keep_yearly"`
 
 	// ZFS-specific options
 	ZFSPool     types.String `tfsdk:"zfs_pool"`
@@ -85,14 +92,42 @@ type datastoreResourceModel struct {
 	Options  types.String `tfsdk:"options"`
 
 	// Advanced options
-	NotifyUser  types.String `tfsdk:"notify_user"`
-	NotifyLevel types.String `tfsdk:"notify_level"`
-	TuneLevel   types.Int64  `tfsdk:"tune_level"`
-	Fingerprint types.String `tfsdk:"fingerprint"`
+	NotifyUser       types.String          `tfsdk:"notify_user"`
+	NotifyLevel      types.String          `tfsdk:"notify_level"`
+	NotificationMode types.String          `tfsdk:"notification_mode"`
+	Notify           *notifyModel          `tfsdk:"notify"`
+	MaintenanceMode  *maintenanceModeModel `tfsdk:"maintenance_mode"`
+	VerifyNew        types.Bool            `tfsdk:"verify_new"`
+	ReuseDatastore   types.Bool            `tfsdk:"reuse_datastore"`
+	OverwriteInUse   types.Bool            `tfsdk:"overwrite_in_use"`
+	Tuning           *tuningModel          `tfsdk:"tuning"`
+	TuneLevel        types.Int64           `tfsdk:"tune_level"`
+	Fingerprint      types.String          `tfsdk:"fingerprint"`
+	Digest           types.String          `tfsdk:"digest"`
 
 	// S3 backend options
 	S3Client types.String `tfsdk:"s3_client"`
 	S3Bucket types.String `tfsdk:"s3_bucket"`
+}
+
+type maintenanceModeModel struct {
+	Type    types.String `tfsdk:"type"`
+	Message types.String `tfsdk:"message"`
+}
+
+type notifyModel struct {
+	GC     types.String `tfsdk:"gc"`
+	Prune  types.String `tfsdk:"prune"`
+	Sync   types.String `tfsdk:"sync"`
+	Verify types.String `tfsdk:"verify"`
+}
+
+type tuningModel struct {
+	ChunkOrder         types.String `tfsdk:"chunk_order"`
+	GCAtimeCutoff      types.Int64  `tfsdk:"gc_atime_cutoff"`
+	GCAtimeSafetyCheck types.Bool   `tfsdk:"gc_atime_safety_check"`
+	GCCacheCapacity    types.Int64  `tfsdk:"gc_cache_capacity"`
+	SyncLevel          types.String `tfsdk:"sync_level"`
 }
 
 // Metadata returns the resource type name.
@@ -177,6 +212,54 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description:         "Prune schedule in cron format.",
 				MarkdownDescription: "Prune schedule in cron format (e.g., `daily`, `weekly`, or `0 2 * * *`).",
 				Optional:            true,
+			},
+			"keep_last": schema.Int64Attribute{
+				Description:         "Number of latest backups to keep.",
+				MarkdownDescription: "Number of latest backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"keep_hourly": schema.Int64Attribute{
+				Description:         "Number of hourly backups to keep.",
+				MarkdownDescription: "Number of hourly backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"keep_daily": schema.Int64Attribute{
+				Description:         "Number of daily backups to keep.",
+				MarkdownDescription: "Number of daily backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"keep_weekly": schema.Int64Attribute{
+				Description:         "Number of weekly backups to keep.",
+				MarkdownDescription: "Number of weekly backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"keep_monthly": schema.Int64Attribute{
+				Description:         "Number of monthly backups to keep.",
+				MarkdownDescription: "Number of monthly backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"keep_yearly": schema.Int64Attribute{
+				Description:         "Number of yearly backups to keep.",
+				MarkdownDescription: "Number of yearly backups to keep when pruning.",
+				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
 			},
 
 			// ZFS-specific attributes
@@ -273,18 +356,150 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringvalidator.OneOf("info", "notice", "warning", "error"),
 				},
 			},
+			"notification_mode": schema.StringAttribute{
+				Description:         "Notification delivery mode.",
+				MarkdownDescription: "Notification delivery mode. Valid values: `legacy-sendmail`, `notification-system`.",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("legacy-sendmail", "notification-system"),
+				},
+			},
+			"notify": schema.SingleNestedAttribute{
+				Description:         "Per-job notification settings overriding datastore defaults.",
+				MarkdownDescription: "Per-job notification settings overriding datastore defaults.",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"gc": schema.StringAttribute{
+						Description:         "Garbage collection notification level.",
+						MarkdownDescription: "Garbage collection notification level. Valid values: `always`, `error`, `never`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("always", "error", "never"),
+						},
+					},
+					"prune": schema.StringAttribute{
+						Description:         "Prune job notification level.",
+						MarkdownDescription: "Prune job notification level. Valid values: `always`, `error`, `never`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("always", "error", "never"),
+						},
+					},
+					"sync": schema.StringAttribute{
+						Description:         "Sync job notification level.",
+						MarkdownDescription: "Sync job notification level. Valid values: `always`, `error`, `never`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("always", "error", "never"),
+						},
+					},
+					"verify": schema.StringAttribute{
+						Description:         "Verification job notification level.",
+						MarkdownDescription: "Verification job notification level. Valid values: `always`, `error`, `never`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("always", "error", "never"),
+						},
+					},
+				},
+			},
+			"maintenance_mode": schema.SingleNestedAttribute{
+				Description:         "Maintenance mode configuration.",
+				MarkdownDescription: "Maintenance mode configuration allowing `offline` or `read-only` modes with optional message.",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"type": schema.StringAttribute{
+						Description:         "Maintenance mode type.",
+						MarkdownDescription: "Maintenance mode type. Valid values: `offline`, `read-only`.",
+						Required:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("offline", "read-only"),
+						},
+					},
+					"message": schema.StringAttribute{
+						Description:         "Message shown in maintenance mode.",
+						MarkdownDescription: "Optional message presented for maintenance mode.",
+						Optional:            true,
+					},
+				},
+			},
+			"verify_new": schema.BoolAttribute{
+				Description:         "Verify newly created snapshots immediately after backup.",
+				MarkdownDescription: "Verify newly created snapshots immediately after backup.",
+				Optional:            true,
+			},
+			"reuse_datastore": schema.BoolAttribute{
+				Description:         "Reuse existing datastore chunks when possible.",
+				MarkdownDescription: "Reuse existing datastore chunks when possible.",
+				Optional:            true,
+			},
+			"overwrite_in_use": schema.BoolAttribute{
+				Description:         "Allow overwriting chunks that are currently in use.",
+				MarkdownDescription: "Allow overwriting chunks that are currently in use.",
+				Optional:            true,
+			},
+			"tuning": schema.SingleNestedAttribute{
+				Description:         "Advanced tuning options for datastore behaviour.",
+				MarkdownDescription: "Advanced tuning options for datastore behaviour such as chunk order and sync level.",
+				Optional:            true,
+				Attributes: map[string]schema.Attribute{
+					"chunk_order": schema.StringAttribute{
+						Description:         "Chunk iteration order.",
+						MarkdownDescription: "Chunk iteration order. Valid values: `inode`, `none`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("inode", "none"),
+						},
+					},
+					"gc_atime_cutoff": schema.Int64Attribute{
+						Description:         "Garbage collection access time cutoff (seconds).",
+						MarkdownDescription: "Garbage collection access time cutoff in seconds.",
+						Optional:            true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+					},
+					"gc_atime_safety_check": schema.BoolAttribute{
+						Description:         "Enable garbage collection access time safety check.",
+						MarkdownDescription: "Enable garbage collection access time safety check.",
+						Optional:            true,
+					},
+					"gc_cache_capacity": schema.Int64Attribute{
+						Description:         "Garbage collection cache capacity.",
+						MarkdownDescription: "Garbage collection cache capacity.",
+						Optional:            true,
+						Validators: []validator.Int64{
+							int64validator.AtLeast(0),
+						},
+					},
+					"sync_level": schema.StringAttribute{
+						Description:         "Datastore fsync level.",
+						MarkdownDescription: "Datastore fsync level. Valid values: `none`, `filesystem`, `file`.",
+						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("none", "filesystem", "file"),
+						},
+					},
+				},
+			},
 			"tune_level": schema.Int64Attribute{
 				Description:         "Tuning level for performance optimization.",
 				MarkdownDescription: "Tuning level for performance optimization (0-4).",
 				Optional:            true,
-				Validators:          []validator.Int64{
-					// Add range validator for 0-4
+				DeprecationMessage:  "Use tuning.sync_level instead.",
+				Validators: []validator.Int64{
+					int64validator.Between(0, 4),
 				},
 			},
 			"fingerprint": schema.StringAttribute{
 				Description:         "Certificate fingerprint for secure connections.",
 				MarkdownDescription: "Certificate fingerprint for secure connections (network datastores).",
 				Optional:            true,
+			},
+			"digest": schema.StringAttribute{
+				Description:         "Opaque digest returned by PBS for optimistic locking.",
+				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
+				Computed:            true,
 			},
 			"s3_client": schema.StringAttribute{
 				Description:         "S3 endpoint ID for S3 datastores.",
@@ -344,7 +559,7 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Convert plan to datastore struct
-	datastore, err := r.planToDatastore(&plan)
+	datastore, err := r.planToDatastore(&plan, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Configuration Error", err.Error())
 		return
@@ -433,6 +648,16 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	var state datastoreResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Digest.IsNull() && !state.Digest.IsNull() && !state.Digest.IsUnknown() {
+		plan.Digest = state.Digest
+	}
+
 	// Validate type-specific requirements
 	if err := r.validateDatastoreConfig(&plan); err != nil {
 		resp.Diagnostics.AddError("Configuration Validation Error", err.Error())
@@ -440,7 +665,7 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Convert plan to datastore struct
-	datastore, err := r.planToDatastore(&plan)
+	datastore, err := r.planToDatastore(&plan, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Configuration Error", err.Error())
 		return
@@ -553,114 +778,344 @@ func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel
 	return nil
 }
 
-// planToDatastore converts a Terraform plan to a datastore struct
-func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel) (*datastores.Datastore, error) {
+// planToDatastore converts a Terraform plan to a datastore struct, applying state-aware deletions when provided.
+func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state *datastoreResourceModel) (*datastores.Datastore, error) {
 	ds := &datastores.Datastore{
 		Name: plan.Name.ValueString(),
 		Type: datastores.DatastoreType(plan.Type.ValueString()),
 	}
 
 	// Common fields
-	if !plan.Path.IsNull() {
+	if !plan.Path.IsNull() && !plan.Path.IsUnknown() {
 		ds.Path = plan.Path.ValueString()
 	}
-	if !plan.Content.IsNull() {
-		var content []string
-		for _, item := range plan.Content.Elements() {
-			content = append(content, item.(types.String).ValueString())
+	if !plan.Content.IsNull() && !plan.Content.IsUnknown() {
+		elements := plan.Content.Elements()
+		content := make([]string, 0, len(elements))
+		for _, item := range elements {
+			strVal := item.(types.String)
+			if strVal.IsNull() || strVal.IsUnknown() {
+				continue
+			}
+			content = append(content, strVal.ValueString())
 		}
-		ds.Content = content
+		if len(content) > 0 {
+			ds.Content = content
+		}
 	}
-	if !plan.MaxBackups.IsNull() {
-		maxBackups := int(plan.MaxBackups.ValueInt64())
-		ds.MaxBackups = &maxBackups
+	if ptr := optionalInt64Pointer(plan.MaxBackups); ptr != nil {
+		ds.MaxBackups = ptr
 	}
-	if !plan.Comment.IsNull() {
+	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
 		ds.Comment = plan.Comment.ValueString()
 	}
-	if !plan.Disabled.IsNull() {
-		disabled := plan.Disabled.ValueBool()
-		ds.Disabled = &disabled
+	if ptr := optionalBoolPointer(plan.Disabled); ptr != nil {
+		ds.Disabled = ptr
 	}
-	if !plan.GCSchedule.IsNull() {
+	if !plan.GCSchedule.IsNull() && !plan.GCSchedule.IsUnknown() {
 		ds.GCSchedule = plan.GCSchedule.ValueString()
 	}
-	if !plan.PruneSchedule.IsNull() {
+	if !plan.PruneSchedule.IsNull() && !plan.PruneSchedule.IsUnknown() {
 		ds.PruneSchedule = plan.PruneSchedule.ValueString()
+	}
+	if ptr := optionalInt64Pointer(plan.KeepLast); ptr != nil {
+		ds.KeepLast = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepHourly); ptr != nil {
+		ds.KeepHourly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepDaily); ptr != nil {
+		ds.KeepDaily = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepWeekly); ptr != nil {
+		ds.KeepWeekly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepMonthly); ptr != nil {
+		ds.KeepMonthly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepYearly); ptr != nil {
+		ds.KeepYearly = ptr
 	}
 
 	// ZFS-specific
-	if !plan.ZFSPool.IsNull() {
+	if !plan.ZFSPool.IsNull() && !plan.ZFSPool.IsUnknown() {
 		ds.ZFSPool = plan.ZFSPool.ValueString()
 	}
-	if !plan.ZFSDataset.IsNull() {
+	if !plan.ZFSDataset.IsNull() && !plan.ZFSDataset.IsUnknown() {
 		ds.ZFSDataset = plan.ZFSDataset.ValueString()
 	}
-	if !plan.BlockSize.IsNull() {
+	if !plan.BlockSize.IsNull() && !plan.BlockSize.IsUnknown() {
 		ds.BlockSize = plan.BlockSize.ValueString()
 	}
-	if !plan.Compression.IsNull() {
+	if !plan.Compression.IsNull() && !plan.Compression.IsUnknown() {
 		ds.Compression = plan.Compression.ValueString()
 	}
 
 	// LVM-specific
-	if !plan.VolumeGroup.IsNull() {
+	if !plan.VolumeGroup.IsNull() && !plan.VolumeGroup.IsUnknown() {
 		ds.VolumeGroup = plan.VolumeGroup.ValueString()
 	}
-	if !plan.ThinPool.IsNull() {
+	if !plan.ThinPool.IsNull() && !plan.ThinPool.IsUnknown() {
 		ds.ThinPool = plan.ThinPool.ValueString()
 	}
 
 	// Network storage
-	if !plan.Server.IsNull() {
+	if !plan.Server.IsNull() && !plan.Server.IsUnknown() {
 		ds.Server = plan.Server.ValueString()
 	}
-	if !plan.Export.IsNull() {
+	if !plan.Export.IsNull() && !plan.Export.IsUnknown() {
 		ds.Export = plan.Export.ValueString()
 	}
-	if !plan.Username.IsNull() {
+	if !plan.Username.IsNull() && !plan.Username.IsUnknown() {
 		ds.Username = plan.Username.ValueString()
 	}
-	if !plan.Password.IsNull() {
+	if !plan.Password.IsNull() && !plan.Password.IsUnknown() {
 		ds.Password = plan.Password.ValueString()
 	}
-	if !plan.Domain.IsNull() {
+	if !plan.Domain.IsNull() && !plan.Domain.IsUnknown() {
 		ds.Domain = plan.Domain.ValueString()
 	}
-	if !plan.Share.IsNull() {
+	if !plan.Share.IsNull() && !plan.Share.IsUnknown() {
 		ds.Share = plan.Share.ValueString()
 	}
-	if !plan.SubDir.IsNull() {
+	if !plan.SubDir.IsNull() && !plan.SubDir.IsUnknown() {
 		ds.SubDir = plan.SubDir.ValueString()
 	}
-	if !plan.Options.IsNull() {
+	if !plan.Options.IsNull() && !plan.Options.IsUnknown() {
 		ds.Options = plan.Options.ValueString()
 	}
 
-	// Advanced options
-	if !plan.NotifyUser.IsNull() {
+	// Advanced options & toggles
+	if !plan.NotifyUser.IsNull() && !plan.NotifyUser.IsUnknown() {
 		ds.NotifyUser = plan.NotifyUser.ValueString()
 	}
-	if !plan.NotifyLevel.IsNull() {
+	if !plan.NotifyLevel.IsNull() && !plan.NotifyLevel.IsUnknown() {
 		ds.NotifyLevel = plan.NotifyLevel.ValueString()
 	}
-	if !plan.TuneLevel.IsNull() {
-		tuneLevel := int(plan.TuneLevel.ValueInt64())
-		ds.TuneLevel = &tuneLevel
+	if !plan.NotificationMode.IsNull() && !plan.NotificationMode.IsUnknown() {
+		ds.NotificationMode = plan.NotificationMode.ValueString()
 	}
-	if !plan.Fingerprint.IsNull() {
+	if ptr := optionalBoolPointer(plan.VerifyNew); ptr != nil {
+		ds.VerifyNew = ptr
+	}
+	if ptr := optionalBoolPointer(plan.ReuseDatastore); ptr != nil {
+		ds.ReuseDatastore = ptr
+	}
+	if ptr := optionalBoolPointer(plan.OverwriteInUse); ptr != nil {
+		ds.OverwriteInUse = ptr
+	}
+
+	notifyBlockDefined := plan.Notify != nil
+	notifyHasValues := false
+	if plan.Notify != nil {
+		notify := &datastores.DatastoreNotify{}
+		if !plan.Notify.GC.IsNull() && !plan.Notify.GC.IsUnknown() {
+			notify.GC = strings.ToLower(plan.Notify.GC.ValueString())
+			notifyHasValues = notifyHasValues || notify.GC != ""
+		}
+		if !plan.Notify.Prune.IsNull() && !plan.Notify.Prune.IsUnknown() {
+			notify.Prune = strings.ToLower(plan.Notify.Prune.ValueString())
+			notifyHasValues = notifyHasValues || notify.Prune != ""
+		}
+		if !plan.Notify.Sync.IsNull() && !plan.Notify.Sync.IsUnknown() {
+			notify.Sync = strings.ToLower(plan.Notify.Sync.ValueString())
+			notifyHasValues = notifyHasValues || notify.Sync != ""
+		}
+		if !plan.Notify.Verify.IsNull() && !plan.Notify.Verify.IsUnknown() {
+			notify.Verify = strings.ToLower(plan.Notify.Verify.ValueString())
+			notifyHasValues = notifyHasValues || notify.Verify != ""
+		}
+		if notifyHasValues {
+			ds.Notify = notify
+		}
+	}
+
+	if plan.MaintenanceMode != nil {
+		mmType := ""
+		if !plan.MaintenanceMode.Type.IsNull() && !plan.MaintenanceMode.Type.IsUnknown() {
+			mmType = strings.ToLower(plan.MaintenanceMode.Type.ValueString())
+		}
+		mm := &datastores.MaintenanceMode{Type: mmType}
+		if !plan.MaintenanceMode.Message.IsNull() && !plan.MaintenanceMode.Message.IsUnknown() {
+			mm.Message = plan.MaintenanceMode.Message.ValueString()
+		}
+		if mm.Type != "" || mm.Message != "" {
+			ds.MaintenanceMode = mm
+		}
+	}
+
+	tuningBlockDefined := plan.Tuning != nil
+	tuningHasValues := false
+	if plan.Tuning != nil {
+		tuning := &datastores.DatastoreTuning{}
+		if !plan.Tuning.ChunkOrder.IsNull() && !plan.Tuning.ChunkOrder.IsUnknown() {
+			tuning.ChunkOrder = strings.ToLower(plan.Tuning.ChunkOrder.ValueString())
+		}
+		if ptr := optionalInt64Pointer(plan.Tuning.GCAtimeCutoff); ptr != nil {
+			tuning.GCAtimeCutoff = ptr
+		}
+		if ptr := optionalBoolPointer(plan.Tuning.GCAtimeSafetyCheck); ptr != nil {
+			tuning.GCAtimeSafetyCheck = ptr
+		}
+		if ptr := optionalInt64Pointer(plan.Tuning.GCCacheCapacity); ptr != nil {
+			tuning.GCCacheCapacity = ptr
+		}
+		if !plan.Tuning.SyncLevel.IsNull() && !plan.Tuning.SyncLevel.IsUnknown() {
+			tuning.SyncLevel = strings.ToLower(plan.Tuning.SyncLevel.ValueString())
+		}
+		if !isEmptyTuning(tuning) {
+			ds.Tuning = tuning
+			tuningHasValues = true
+		}
+	}
+
+	if !plan.TuneLevel.IsNull() && !plan.TuneLevel.IsUnknown() {
+		syncLevel, err := tuneLevelToSyncLevel(int(plan.TuneLevel.ValueInt64()))
+		if err != nil {
+			return nil, err
+		}
+		if ds.Tuning == nil {
+			ds.Tuning = &datastores.DatastoreTuning{}
+		}
+		ds.Tuning.SyncLevel = syncLevel
+		tuningHasValues = true
+	}
+
+	if !plan.Fingerprint.IsNull() && !plan.Fingerprint.IsUnknown() {
 		ds.Fingerprint = plan.Fingerprint.ValueString()
 	}
 
-	// S3-specific options
-	if !plan.S3Client.IsNull() {
+	if !plan.S3Client.IsNull() && !plan.S3Client.IsUnknown() {
 		ds.S3Client = plan.S3Client.ValueString()
 	}
-	if !plan.S3Bucket.IsNull() {
+	if !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() {
 		ds.S3Bucket = plan.S3Bucket.ValueString()
 	}
 
+	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
+		ds.Digest = plan.Digest.ValueString()
+	}
+
+	if state != nil {
+		var deletes []string
+
+		if shouldDeleteStringAttr(plan.NotifyUser, state.NotifyUser) {
+			deletes = append(deletes, "notify-user")
+		}
+		if shouldDeleteStringAttr(plan.NotifyLevel, state.NotifyLevel) {
+			deletes = append(deletes, "notify-level")
+		}
+		if shouldDeleteStringAttr(plan.NotificationMode, state.NotificationMode) {
+			deletes = append(deletes, "notification-mode")
+		}
+		if (plan.Notify == nil && state.Notify != nil) || (notifyBlockDefined && !notifyHasValues && state.Notify != nil) {
+			deletes = append(deletes, "notify")
+		}
+		if plan.MaintenanceMode == nil && state.MaintenanceMode != nil {
+			deletes = append(deletes, "maintenance-mode")
+		}
+		if ((plan.Tuning == nil && plan.TuneLevel.IsNull()) || (tuningBlockDefined && !tuningHasValues && plan.TuneLevel.IsNull())) && state.Tuning != nil {
+			deletes = append(deletes, "tuning")
+		}
+		if plan.VerifyNew.IsNull() && hasBoolValue(state.VerifyNew) {
+			deletes = append(deletes, "verify-new")
+		}
+		if plan.ReuseDatastore.IsNull() && hasBoolValue(state.ReuseDatastore) {
+			deletes = append(deletes, "reuse-datastore")
+		}
+		if plan.OverwriteInUse.IsNull() && hasBoolValue(state.OverwriteInUse) {
+			deletes = append(deletes, "overwrite-in-use")
+		}
+		if len(deletes) > 0 {
+			ds.Delete = deletes
+		}
+	}
+
 	return ds, nil
+}
+
+func optionalInt64Pointer(value types.Int64) *int {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	v := int(value.ValueInt64())
+	return &v
+}
+
+func optionalBoolPointer(value types.Bool) *bool {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	v := value.ValueBool()
+	return &v
+}
+
+func hasBoolValue(value types.Bool) bool {
+	return !value.IsNull() && !value.IsUnknown()
+}
+
+func isEmptyTuning(t *datastores.DatastoreTuning) bool {
+	if t == nil {
+		return true
+	}
+	return t.ChunkOrder == "" && t.GCAtimeCutoff == nil && t.GCAtimeSafetyCheck == nil && t.GCCacheCapacity == nil && t.SyncLevel == ""
+}
+
+func shouldDeleteStringAttr(plan types.String, state types.String) bool {
+	if state.IsNull() || state.IsUnknown() {
+		return false
+	}
+	if plan.IsNull() || plan.IsUnknown() {
+		return state.ValueString() != ""
+	}
+	return false
+}
+
+func tuneLevelToSyncLevel(level int) (string, error) {
+	switch level {
+	case 0:
+		return "none", nil
+	case 1:
+		return "filesystem", nil
+	case 2:
+		return "file", nil
+	default:
+		return "", fmt.Errorf("unsupported tune_level %d; valid values are 0-2", level)
+	}
+}
+
+func syncLevelToTuneLevel(syncLevel string) (int, bool) {
+	switch strings.ToLower(syncLevel) {
+	case "none":
+		return 0, true
+	case "filesystem":
+		return 1, true
+	case "file":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+func stringValueOrNull(value string) types.String {
+	if value == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(value)
+}
+
+func intValueOrNull(ptr *int) types.Int64 {
+	if ptr == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*ptr))
+}
+
+func boolValueOrNull(ptr *bool) types.Bool {
+	if ptr == nil {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*ptr)
 }
 
 // datastoreToState converts a datastore struct to Terraform state
@@ -669,99 +1124,111 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 	state.Type = types.StringValue(string(ds.Type))
 
 	// Common fields
-	if ds.Path != "" {
-		state.Path = types.StringValue(ds.Path)
-	}
+	state.Path = stringValueOrNull(ds.Path)
 	if len(ds.Content) > 0 {
 		contentValues := make([]attr.Value, len(ds.Content))
 		for i, content := range ds.Content {
 			contentValues[i] = types.StringValue(content)
 		}
 		state.Content = types.ListValueMust(types.StringType, contentValues)
+	} else {
+		state.Content = types.ListNull(types.StringType)
 	}
-	if ds.MaxBackups != nil {
-		state.MaxBackups = types.Int64Value(int64(*ds.MaxBackups))
-	}
-	if ds.Comment != "" {
-		state.Comment = types.StringValue(ds.Comment)
-	}
-	if ds.Disabled != nil {
-		state.Disabled = types.BoolValue(*ds.Disabled)
-	}
-	if ds.GCSchedule != "" {
-		state.GCSchedule = types.StringValue(ds.GCSchedule)
-	}
-	if ds.PruneSchedule != "" {
-		state.PruneSchedule = types.StringValue(ds.PruneSchedule)
-	}
+	state.MaxBackups = intValueOrNull(ds.MaxBackups)
+	state.Comment = stringValueOrNull(ds.Comment)
+	state.Disabled = boolValueOrNull(ds.Disabled)
+	state.GCSchedule = stringValueOrNull(ds.GCSchedule)
+	state.PruneSchedule = stringValueOrNull(ds.PruneSchedule)
+	state.KeepLast = intValueOrNull(ds.KeepLast)
+	state.KeepHourly = intValueOrNull(ds.KeepHourly)
+	state.KeepDaily = intValueOrNull(ds.KeepDaily)
+	state.KeepWeekly = intValueOrNull(ds.KeepWeekly)
+	state.KeepMonthly = intValueOrNull(ds.KeepMonthly)
+	state.KeepYearly = intValueOrNull(ds.KeepYearly)
 
 	// ZFS-specific
-	if ds.ZFSPool != "" {
-		state.ZFSPool = types.StringValue(ds.ZFSPool)
-	}
-	if ds.ZFSDataset != "" {
-		state.ZFSDataset = types.StringValue(ds.ZFSDataset)
-	}
-	if ds.BlockSize != "" {
-		state.BlockSize = types.StringValue(ds.BlockSize)
-	}
-	if ds.Compression != "" {
-		state.Compression = types.StringValue(ds.Compression)
-	}
+	state.ZFSPool = stringValueOrNull(ds.ZFSPool)
+	state.ZFSDataset = stringValueOrNull(ds.ZFSDataset)
+	state.BlockSize = stringValueOrNull(ds.BlockSize)
+	state.Compression = stringValueOrNull(ds.Compression)
 
 	// LVM-specific
-	if ds.VolumeGroup != "" {
-		state.VolumeGroup = types.StringValue(ds.VolumeGroup)
-	}
-	if ds.ThinPool != "" {
-		state.ThinPool = types.StringValue(ds.ThinPool)
-	}
+	state.VolumeGroup = stringValueOrNull(ds.VolumeGroup)
+	state.ThinPool = stringValueOrNull(ds.ThinPool)
 
 	// Network storage
-	if ds.Server != "" {
-		state.Server = types.StringValue(ds.Server)
-	}
-	if ds.Export != "" {
-		state.Export = types.StringValue(ds.Export)
-	}
-	if ds.Username != "" {
-		state.Username = types.StringValue(ds.Username)
-	}
-	// Note: Password is sensitive and not returned by the API
-	if ds.Domain != "" {
-		state.Domain = types.StringValue(ds.Domain)
-	}
-	if ds.Share != "" {
-		state.Share = types.StringValue(ds.Share)
-	}
-	if ds.SubDir != "" {
-		state.SubDir = types.StringValue(ds.SubDir)
-	}
-	if ds.Options != "" {
-		state.Options = types.StringValue(ds.Options)
-	}
+	state.Server = stringValueOrNull(ds.Server)
+	state.Export = stringValueOrNull(ds.Export)
+	state.Username = stringValueOrNull(ds.Username)
+	// Password is not returned by API; keep whatever is currently in state
+	state.Domain = stringValueOrNull(ds.Domain)
+	state.Share = stringValueOrNull(ds.Share)
+	state.SubDir = stringValueOrNull(ds.SubDir)
+	state.Options = stringValueOrNull(ds.Options)
 
 	// Advanced options
-	if ds.NotifyUser != "" {
-		state.NotifyUser = types.StringValue(ds.NotifyUser)
+	state.NotifyUser = stringValueOrNull(ds.NotifyUser)
+	state.NotifyLevel = stringValueOrNull(ds.NotifyLevel)
+	state.NotificationMode = stringValueOrNull(ds.NotificationMode)
+	state.VerifyNew = boolValueOrNull(ds.VerifyNew)
+	state.ReuseDatastore = boolValueOrNull(ds.ReuseDatastore)
+	state.OverwriteInUse = boolValueOrNull(ds.OverwriteInUse)
+	state.Fingerprint = stringValueOrNull(ds.Fingerprint)
+	state.Digest = stringValueOrNull(ds.Digest)
+
+	if ds.Notify != nil {
+		notify := &notifyModel{
+			GC:     stringValueOrNull(ds.Notify.GC),
+			Prune:  stringValueOrNull(ds.Notify.Prune),
+			Sync:   stringValueOrNull(ds.Notify.Sync),
+			Verify: stringValueOrNull(ds.Notify.Verify),
+		}
+		if notify.GC.IsNull() && notify.Prune.IsNull() && notify.Sync.IsNull() && notify.Verify.IsNull() {
+			state.Notify = nil
+		} else {
+			state.Notify = notify
+		}
+	} else {
+		state.Notify = nil
 	}
-	if ds.NotifyLevel != "" {
-		state.NotifyLevel = types.StringValue(ds.NotifyLevel)
+
+	if ds.MaintenanceMode != nil {
+		mm := &maintenanceModeModel{
+			Type:    stringValueOrNull(ds.MaintenanceMode.Type),
+			Message: stringValueOrNull(ds.MaintenanceMode.Message),
+		}
+		if mm.Type.IsNull() && mm.Message.IsNull() {
+			state.MaintenanceMode = nil
+		} else {
+			state.MaintenanceMode = mm
+		}
+	} else {
+		state.MaintenanceMode = nil
 	}
-	if ds.TuneLevel != nil {
-		state.TuneLevel = types.Int64Value(int64(*ds.TuneLevel))
-	}
-	if ds.Fingerprint != "" {
-		state.Fingerprint = types.StringValue(ds.Fingerprint)
+
+	if ds.Tuning != nil && !isEmptyTuning(ds.Tuning) {
+		tuning := &tuningModel{
+			ChunkOrder:         stringValueOrNull(ds.Tuning.ChunkOrder),
+			GCAtimeCutoff:      intValueOrNull(ds.Tuning.GCAtimeCutoff),
+			GCAtimeSafetyCheck: boolValueOrNull(ds.Tuning.GCAtimeSafetyCheck),
+			GCCacheCapacity:    intValueOrNull(ds.Tuning.GCCacheCapacity),
+			SyncLevel:          stringValueOrNull(ds.Tuning.SyncLevel),
+		}
+		state.Tuning = tuning
+
+		if level, ok := syncLevelToTuneLevel(ds.Tuning.SyncLevel); ok {
+			state.TuneLevel = types.Int64Value(int64(level))
+		} else {
+			state.TuneLevel = types.Int64Null()
+		}
+	} else {
+		state.Tuning = nil
+		state.TuneLevel = types.Int64Null()
 	}
 
 	// S3-specific
-	if ds.S3Client != "" {
-		state.S3Client = types.StringValue(ds.S3Client)
-	}
-	if ds.S3Bucket != "" {
-		state.S3Bucket = types.StringValue(ds.S3Bucket)
-	}
+	state.S3Client = stringValueOrNull(ds.S3Client)
+	state.S3Bucket = stringValueOrNull(ds.S3Bucket)
 
 	return nil
 }
