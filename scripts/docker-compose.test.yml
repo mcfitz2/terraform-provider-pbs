@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # InfluxDB for metrics testing
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: pbs-test-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=testpass123
+      - DOCKER_INFLUXDB_INIT_ORG=testorg
+      - DOCKER_INFLUXDB_INIT_BUCKET=pbs-metrics
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=test-token-for-pbs-provider
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NFS Server for datastore testing
+  nfs:
+    image: erichough/nfs-server:latest
+    container_name: pbs-test-nfs
+    ports:
+      - "2049:2049"
+    privileged: true
+    environment:
+      - NFS_EXPORT_0=/exports/test *(rw,sync,no_subtree_check,no_root_squash,insecure,fsid=0)
+    volumes:
+      - nfs-data:/exports/test
+
+  # Samba/CIFS Server for datastore testing
+  samba:
+    image: dperson/samba:latest
+    container_name: pbs-test-samba
+    ports:
+      - "445:445"
+    environment:
+      - USER=testuser;testpass
+      - SHARE=testshare;/mount;yes;no;no;testuser
+      - PERMISSIONS=yes
+      - SMB=yes
+    volumes:
+      - samba-data:/mount
+    command: '-s "testshare;/mount;yes;no;no;testuser" -u "testuser;testpass" -p'
+
+  # Gotify for notification testing
+  gotify:
+    image: gotify/server:latest
+    container_name: pbs-test-gotify
+    ports:
+      - "8080:80"
+    environment:
+      - GOTIFY_DEFAULTUSER_NAME=admin
+      - GOTIFY_DEFAULTUSER_PASS=admin
+    volumes:
+      - gotify-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Simple HTTP webhook receiver for testing
+  webhook-receiver:
+    image: tarampampam/webhook-tester:latest
+    container_name: pbs-test-webhook
+    ports:
+      - "8081:8080"
+    environment:
+      - LISTEN_ADDR=0.0.0.0
+      - LISTEN_PORT=8080
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  influxdb-data:
+    driver: local
+  nfs-data:
+    driver: local
+  samba-data:
+    driver: local
+  gotify-data:
+    driver: local

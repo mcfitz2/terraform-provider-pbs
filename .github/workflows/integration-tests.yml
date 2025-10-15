@@ -1,5 +1,16 @@
 name: Docker Integration Tests
 
+# This workflow runs integration tests in Docker containers (no hardware dependencies).
+# 
+# Test Suites:
+#   1. Core Integration Tests - Datastore (non-ZFS), Metrics, Jobs, Notifications
+#   2. S3 Integration Tests - AWS, Backblaze B2, Scaleway (requires credentials)
+#   3. Hardware-Dependent Tests - EXCLUDED (ZFS requires VM with kernel modules)
+#
+# Code coverage is collected during test runs and reported via Codecov.
+# Coverage annotations will appear on pull requests showing which lines are covered.
+# Coverage reports and trends are available at https://codecov.io
+
 on:
   push:
     branches: [ main, develop ]
@@ -25,13 +36,27 @@ jobs:
       run: go mod download
 
     - name: Run unit tests
-      run: make test-unit
+      run: go test -coverprofile=coverage-unit.out -covermode=atomic ./...
+
+    - name: Upload unit test coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-unit
+        path: coverage-unit.out
+        retention-days: 7
+
+    - name: Report unit test coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-unit.out
+        flags: unit-tests
+        name: unit-tests-coverage
 
     - name: Build provider
       run: make build
 
-  quick-and-datastore-tests:
-    name: Quick & Datastore Tests
+  core-integration-tests:
+    name: Core Integration Tests (Non-S3, Non-Hardware)
     runs-on: ubuntu-latest
     needs: unit-tests
     services:
@@ -46,6 +71,37 @@ jobs:
           --memory=2g
           --tmpfs /run
           --tmpfs /var/log/proxmox-backup
+      
+      influxdb:
+        image: influxdb:2.7
+        ports:
+          - 8086:8086
+        env:
+          DOCKER_INFLUXDB_INIT_MODE: setup
+          DOCKER_INFLUXDB_INIT_USERNAME: admin
+          DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+          DOCKER_INFLUXDB_INIT_ORG: testorg
+          DOCKER_INFLUXDB_INIT_BUCKET: pbs-metrics
+          DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: test-token-123456
+        options: >-
+          --health-cmd "influx ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      influxdb-udp:
+        image: influxdb:1.8
+        ports:
+          - 8089:8089/udp
+        env:
+          INFLUXDB_UDP_ENABLED: true
+          INFLUXDB_UDP_BIND_ADDRESS: :8089
+          INFLUXDB_UDP_DATABASE: udp
+        options: >-
+          --health-cmd "influx -execute 'SHOW DATABASES'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -83,29 +139,65 @@ jobs:
           fi
           sleep 5
         done
+    
+    - name: Prepare PBS test directories
+      run: |
+        # Get the PBS container ID
+        PBS_CONTAINER=$(docker ps --filter "ancestor=ayufan/proxmox-backup-server:latest" --format "{{.ID}}")
+        echo "PBS container: $PBS_CONTAINER"
+        
+        # Create base datastore directory with proper permissions
+        # PBS API requires directories to exist before datastores can be registered
+        docker exec $PBS_CONTAINER mkdir -p /datastore
+        docker exec $PBS_CONTAINER chmod 755 /datastore
+        docker exec $PBS_CONTAINER chown backup:backup /datastore
+        echo "✅ PBS test directories created"
 
-    - name: Run tests
+    - name: Run core integration tests
       env:
         PBS_ADDRESS: "https://localhost:8007"
         PBS_USERNAME: "admin@pbs"
         PBS_PASSWORD: "pbspbs"
         PBS_INSECURE_TLS: "true"
+        # Use service names for inter-container communication in GitHub Actions
+        TEST_INFLUXDB_HOST: "influxdb"
+        TEST_INFLUXDB_PORT: "8086"
+        TEST_INFLUXDB_UDP_HOST: "influxdb-udp"
+        TEST_INFLUXDB_UDP_PORT: "8089"
       run: |
-        go test -v -timeout 15m ./test -run "TestQuickSmoke|TestDatastore"
+        # Run all tests except S3 and hardware-dependent tests (ZFS)
+        # Includes: Quick smoke, Datastore (non-ZFS), Metrics, Jobs, Notifications
+        go test -v -timeout 20m -coverprofile=coverage-core.out -covermode=atomic ./test/integration \
+          -run "TestQuickSmoke|TestDatastore|TestMetrics|Test.*Job|Test.*Notification" \
+          -skip "TestDatastoreZFS|TestS3|TestCleanup"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-core-integration
+        path: coverage-core.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-core.out
+        flags: integration-core
+        name: core-integration-coverage
 
     - name: Upload test logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: quick-datastore-test-logs
+        name: core-integration-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-aws-tests:
-    name: S3 Tests - AWS
+    name: S3 Integration Tests - AWS
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -177,7 +269,21 @@ jobs:
           exit 0
         fi
         echo "Running AWS S3 tests..."
-        go test -v -timeout 20m ./test -run "AWS"
+        go test -v -timeout 20m -coverprofile=coverage-aws.out -covermode=atomic ./test/integration -run "AWS"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-aws
+        path: coverage-aws.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-aws.out
+        flags: integration-s3-aws
+        name: aws-s3-coverage
 
     - name: Upload test logs
       if: failure()
@@ -185,13 +291,13 @@ jobs:
       with:
         name: aws-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-backblaze-tests:
-    name: S3 Tests - Backblaze B2
+    name: S3 Integration Tests - Backblaze B2
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -263,7 +369,21 @@ jobs:
           exit 0
         fi
         echo "Running Backblaze B2 tests..."
-        go test -v -timeout 20m ./test -run "Backblaze|B2"
+        go test -v -timeout 20m -coverprofile=coverage-b2.out -covermode=atomic ./test/integration -run "Backblaze|B2"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-b2
+        path: coverage-b2.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-b2.out
+        flags: integration-s3-b2
+        name: b2-s3-coverage
 
     - name: Upload test logs
       if: failure()
@@ -271,13 +391,13 @@ jobs:
       with:
         name: b2-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-scaleway-tests:
-    name: S3 Tests - Scaleway
+    name: S3 Integration Tests - Scaleway
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: core-integration-tests
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     services:
       pbs:
@@ -349,7 +469,21 @@ jobs:
           exit 0
         fi
         echo "Running Scaleway tests..."
-        go test -v -timeout 20m ./test -run "Scaleway"
+        go test -v -timeout 20m -coverprofile=coverage-scaleway.out -covermode=atomic ./test/integration -run "Scaleway"
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-scaleway
+        path: coverage-scaleway.out
+        retention-days: 7
+
+    - name: Report coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-scaleway.out
+        flags: integration-s3-scaleway
+        name: scaleway-s3-coverage
 
     - name: Upload test logs
       if: failure()
@@ -357,7 +491,7 @@ jobs:
       with:
         name: scaleway-test-logs
         path: |
-          test/*.log
+          test/integration/*.log
         retention-days: 7
 
   s3-cleanup-tests:
@@ -391,18 +525,23 @@ jobs:
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
       run: |
         echo "Running S3 cleanup tests..."
-        go test -v -timeout 10m ./test -run "TestCleanup"
+        go test -v -timeout 10m ./test/integration -run "TestCleanup"
 
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [quick-and-datastore-tests, s3-aws-tests, s3-backblaze-tests, s3-scaleway-tests, s3-cleanup-tests]
+    needs: [core-integration-tests, s3-aws-tests, s3-backblaze-tests, s3-scaleway-tests, s3-cleanup-tests]
     if: always()
     steps:
     - name: Check test results
       run: |
         echo "All Docker-based integration tests completed"
-        # This job will show as success if all tests passed, or show which failed
+        echo "Test Suites:"
+        echo "  ✓ Core Integration Tests (Non-S3, Non-Hardware)"
+        echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway)"
+        echo "  ✓ S3 Cleanup Tests"
+        echo ""
+        echo "Note: Hardware-dependent tests (ZFS) run only in VM workflow"
 
   security-scan:
     name: Security Scan

@@ -1,4 +1,4 @@
-package test
+package integration
 
 import (
 	"context"
@@ -78,9 +78,9 @@ func GetS3ProviderConfigs(t *testing.T) []*S3ProviderConfig {
 			// - Endpoint format: s3.{region}.backblazeb2.com
 			//
 			// With this configuration, B2 works reliably with PBS for:
-			// ✓ S3 endpoint creation and management
-			// ✓ Datastore creation and verification
-			// ✓ Chunk upload operations
+			// - S3 endpoint creation and management
+			// - Datastore creation and verification
+			// - Chunk upload operations
 			//
 			// Reference: docs/BACKBLAZE_B2_REMEDIATION.md
 			providers = append(providers, &S3ProviderConfig{
@@ -420,7 +420,7 @@ func (p *S3ProviderConfig) TestS3Connectivity(t *testing.T) {
 		Key:    aws.String(testKey),
 	})
 	require.NoError(t, err, "Failed to download test object from %s bucket %s", p.Name, p.BucketName)
-	result.Body.Close()
+	_ = result.Body.Close()
 
 	// Clean up test object
 	_, err = p.S3Client.DeleteObject(&s3.DeleteObjectInput{

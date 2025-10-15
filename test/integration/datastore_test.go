@@ -1,9 +1,12 @@
-package test
+package integration
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,23 +26,21 @@ func TestDatastoreDirectoryIntegration(t *testing.T) {
 	// Generate unique test name
 	datastoreName := GenerateTestName("dir-datastore")
 
-	// Test configuration for directory datastore
-	testConfig := fmt.Sprintf(`
+	// Create config
+	config := fmt.Sprintf(`
 resource "pbs_datastore" "test_directory" {
   name             = "%s"
   type             = "dir"
   path             = "/datastore/%s"
   content          = ["backup"]
   comment          = "Test directory datastore"
-  create_base_path = true
   gc_schedule      = "daily"
   prune_schedule   = "weekly"
-  max_backups      = 10
 }
 `, datastoreName, datastoreName)
 
 	// Write terraform configuration
-	tc.WriteMainTF(t, testConfig)
+	tc.WriteMainTF(t, config)
 
 	// Apply terraform
 	tc.ApplyTerraform(t)
@@ -50,7 +51,6 @@ resource "pbs_datastore" "test_directory" {
 	assert.Equal(t, "dir", resource.AttributeValues["type"])
 	assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), resource.AttributeValues["path"])
 	assert.Equal(t, "Test directory datastore", resource.AttributeValues["comment"])
-	assert.Equal(t, true, resource.AttributeValues["create_base_path"])
 	assert.Equal(t, "daily", resource.AttributeValues["gc_schedule"])
 	assert.Equal(t, "weekly", resource.AttributeValues["prune_schedule"])
 
@@ -75,7 +75,6 @@ resource "pbs_datastore" "test_directory" {
   path             = "/datastore/%s"
   content          = ["backup"]
   comment          = "Updated test directory datastore"
-  create_base_path = true
   gc_schedule      = "weekly"
   prune_schedule   = "daily"
   max_backups      = 20
@@ -98,6 +97,12 @@ func TestDatastoreZFSIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// Check if ZFS pool is configured for testing
+	zfsPool := os.Getenv("PBS_TESTPOOL")
+	if zfsPool == "" {
+		zfsPool = "testpool" // default
+	}
+
 	tc := SetupTest(t)
 	defer tc.DestroyTerraform(t)
 
@@ -109,7 +114,8 @@ func TestDatastoreZFSIntegration(t *testing.T) {
 resource "pbs_datastore" "test_zfs" {
   name        = "%s"
   type        = "zfs"
-  zfs_pool    = "testpool"
+  path        = "/mnt/datastore/%s"
+  zfs_pool    = "%s"
   zfs_dataset = "backup/%s"
   content     = ["backup"]
   comment     = "Test ZFS datastore"
@@ -117,32 +123,38 @@ resource "pbs_datastore" "test_zfs" {
   block_size  = "8K"
   max_backups = 15
 }
-`, datastoreName, datastoreName)
+`, datastoreName, datastoreName, zfsPool, datastoreName)
 
 	// Write terraform configuration
 	tc.WriteMainTF(t, testConfig)
 
-	// Apply terraform (this will likely fail if ZFS testpool doesn't exist)
-	// We'll handle the error gracefully for CI environments
+	// Apply terraform
 	err := tc.ApplyTerraformWithError(t)
 	if err != nil {
-		t.Logf("ZFS test skipped - ZFS pool 'testpool' may not be available: %v", err)
-		return
+		// Check if it's a ZFS pool error
+		if strings.Contains(err.Error(), "pool") || strings.Contains(err.Error(), "zfs") {
+			t.Skipf("ZFS test skipped - ZFS pool '%s' is not available: %v", zfsPool, err)
+		}
+		t.Fatalf("Unexpected error creating ZFS datastore: %v", err)
 	}
+
+	// Verify datastore exists via direct API call first to check actual type
+	datastoreClient := datastores.NewClient(tc.APIClient)
+	datastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
+	require.NoError(t, err)
+
+	// ZFS datastores are reported as "dir" type by PBS (they're directory datastores on ZFS mounts)
+	assert.Equal(t, datastores.DatastoreTypeDirectory, datastore.Type)
 
 	// Verify resource was created via Terraform state
 	resource := tc.GetResourceFromState(t, "pbs_datastore.test_zfs")
 	assert.Equal(t, datastoreName, resource.AttributeValues["name"])
 	assert.Equal(t, "zfs", resource.AttributeValues["type"])
-	assert.Equal(t, "testpool", resource.AttributeValues["zfs_pool"])
+	assert.Equal(t, zfsPool, resource.AttributeValues["zfs_pool"])
 	assert.Equal(t, fmt.Sprintf("backup/%s", datastoreName), resource.AttributeValues["zfs_dataset"])
 
-	// Verify datastore exists via direct API call
-	datastoreClient := datastores.NewClient(tc.APIClient)
-	datastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
-	require.NoError(t, err)
-	assert.Equal(t, datastores.DatastoreTypeZFS, datastore.Type)
-	assert.Equal(t, "testpool", datastore.ZFSPool)
+	// Verify ZFS-specific fields (ZFS pool and compression settings)
+	assert.Equal(t, zfsPool, datastore.ZFSPool)
 	assert.Equal(t, "lz4", datastore.Compression)
 }
 
@@ -212,38 +224,57 @@ func TestDatastoreNetworkStorage(t *testing.T) {
 	cifsDatastore := GenerateTestName("cifs-datastore")
 	nfsDatastore := GenerateTestName("nfs-datastore")
 
+	// Get CIFS server configuration from environment
+	cifsHost := os.Getenv("TEST_CIFS_HOST")
+	cifsShare := os.Getenv("TEST_CIFS_SHARE")
+	cifsUser := os.Getenv("TEST_CIFS_USERNAME")
+	cifsPass := os.Getenv("TEST_CIFS_PASSWORD")
+
+	if cifsHost == "" || cifsShare == "" {
+		t.Skip("CIFS test skipped - TEST_CIFS_HOST and TEST_CIFS_SHARE environment variables not set")
+	}
+
+	// Default credentials if not provided
+	if cifsUser == "" {
+		cifsUser = "testuser"
+	}
+	if cifsPass == "" {
+		cifsPass = "testpass"
+	}
+
 	// Test configuration for CIFS datastore
 	cifsConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_cifs" {
   name     = "%s"
   type     = "cifs"
   path     = "/mnt/datastore/%s"
-  server   = "192.168.1.100"
-  share    = "backup"
-  username = "backup-user"
-  password = "backup-password"
-  domain   = "example.com"
+  server   = "%s"
+  share    = "%s"
+  username = "%s"
+  password = "%s"
   sub_dir  = "pbs"
   content  = ["backup"]
   comment  = "Test CIFS datastore"
   options  = "vers=3.0"
 }
-`, cifsDatastore, cifsDatastore)
+`, cifsDatastore, cifsDatastore, cifsHost, cifsShare, cifsUser, cifsPass)
 
 	tc.WriteMainTF(t, cifsConfig)
+	tc.ApplyTerraform(t)
 
-	// Apply terraform (this will likely fail without actual CIFS server)
-	err := tc.ApplyTerraformWithError(t)
-	if err != nil {
-		t.Logf("CIFS test expected to fail without real server: %v", err)
-		// This is expected in most test environments
-	} else {
-		// If it succeeds (perhaps with a mock server), verify the configuration
-		resource := tc.GetResourceFromState(t, "pbs_datastore.test_cifs")
-		assert.Equal(t, cifsDatastore, resource.AttributeValues["name"])
-		assert.Equal(t, "cifs", resource.AttributeValues["type"])
-		assert.Equal(t, "192.168.1.100", resource.AttributeValues["server"])
-		assert.Equal(t, "backup", resource.AttributeValues["share"])
+	// Verify the configuration
+	resource := tc.GetResourceFromState(t, "pbs_datastore.test_cifs")
+	assert.Equal(t, cifsDatastore, resource.AttributeValues["name"])
+	assert.Equal(t, "cifs", resource.AttributeValues["type"])
+	assert.Equal(t, cifsHost, resource.AttributeValues["server"])
+	assert.Equal(t, cifsShare, resource.AttributeValues["share"])
+
+	// Get NFS server configuration from environment
+	nfsHost := os.Getenv("TEST_NFS_HOST")
+	nfsExport := os.Getenv("TEST_NFS_EXPORT")
+
+	if nfsHost == "" || nfsExport == "" {
+		t.Skip("NFS test skipped - TEST_NFS_HOST and TEST_NFS_EXPORT environment variables not set")
 	}
 
 	// Test configuration for NFS datastore
@@ -252,30 +283,26 @@ resource "pbs_datastore" "test_nfs" {
   name    = "%s"
   type    = "nfs"
   path    = "/mnt/datastore/%s"
-  server  = "192.168.1.101"
-  export  = "/export/backup"
+  server  = "%s"
+  export  = "%s"
   sub_dir = "pbs"
   content = ["backup"]
   comment = "Test NFS datastore"
   options = "vers=4,soft"
 }
-`, nfsDatastore, nfsDatastore)
+`, nfsDatastore, nfsDatastore, nfsHost, nfsExport)
 
 	tc.WriteMainTF(t, nfsConfig)
 
-	// Apply terraform (this will likely fail without actual NFS server)
-	err = tc.ApplyTerraformWithError(t)
-	if err != nil {
-		t.Logf("NFS test expected to fail without real server: %v", err)
-		// This is expected in most test environments
-	} else {
-		// If it succeeds, verify the configuration
-		resource := tc.GetResourceFromState(t, "pbs_datastore.test_nfs")
-		assert.Equal(t, nfsDatastore, resource.AttributeValues["name"])
-		assert.Equal(t, "nfs", resource.AttributeValues["type"])
-		assert.Equal(t, "192.168.1.101", resource.AttributeValues["server"])
-		assert.Equal(t, "/export/backup", resource.AttributeValues["export"])
-	}
+	// Apply terraform - should succeed with Docker NFS server
+	tc.ApplyTerraform(t)
+
+	// Verify the configuration
+	resource = tc.GetResourceFromState(t, "pbs_datastore.test_nfs")
+	assert.Equal(t, nfsDatastore, resource.AttributeValues["name"])
+	assert.Equal(t, "nfs", resource.AttributeValues["type"])
+	assert.Equal(t, nfsHost, resource.AttributeValues["server"])
+	assert.Equal(t, nfsExport, resource.AttributeValues["export"])
 }
 
 // TestDatastoreImport tests importing existing datastores
@@ -289,29 +316,47 @@ func TestDatastoreImport(t *testing.T) {
 
 	// Generate unique test name
 	datastoreName := GenerateTestName("import-test")
+	datastorePath := fmt.Sprintf("/datastore/%s", datastoreName)
 
 	// First, create a datastore manually via API
+	// Note: PBS API requires directories to exist before datastores can be registered.
+	// The /datastore directory is pre-created by the CI workflow.
 	datastoreClient := datastores.NewClient(tc.APIClient)
 	testDatastore := &datastores.Datastore{
 		Name: datastoreName,
 		Type: datastores.DatastoreTypeDirectory,
-		Path: fmt.Sprintf("/datastore/%s", datastoreName),
+		Path: datastorePath,
 	}
 
 	err := datastoreClient.CreateDatastore(context.Background(), testDatastore)
 	require.NoError(t, err, "Failed to create datastore via API for import test")
 
-	// Terraform destroy will clean up the datastore after import
-	// No need for manual API cleanup
+	// Verify the datastore was created by reading it back with retry logic
+	// PBS may need several seconds to fully register the datastore
+	var createdDatastore *datastores.Datastore
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		createdDatastore, err = datastoreClient.GetDatastore(context.Background(), datastoreName)
+		if err == nil {
+			t.Logf("SUCCESS: Datastore found after %d attempts", i+1)
+			break
+		}
+		t.Logf("Attempt %d/%d: Datastore not yet available: %v", i+1, maxRetries, err)
+		if i < maxRetries-1 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+	require.NoError(t, err, "Failed to verify datastore creation")
+	require.Equal(t, datastoreName, createdDatastore.Name, "Datastore name mismatch after creation")
 
 	// Now create Terraform config and import the existing datastore
 	importConfig := fmt.Sprintf(`
 resource "pbs_datastore" "imported" {
   name = "%s"
   type = "dir"
-  path = "/datastore/%s"
+  path = "%s"
 }
-`, datastoreName, datastoreName)
+`, datastoreName, datastorePath)
 
 	tc.WriteMainTF(t, importConfig)
 

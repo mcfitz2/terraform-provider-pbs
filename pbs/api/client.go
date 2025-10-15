@@ -78,10 +78,6 @@ func NewClient(creds Credentials, opts ClientOptions) (*Client, error) {
 		},
 	}
 
-	if opts.Insecure {
-		fmt.Println("[WARNING] TLS certificate verification is disabled (Insecure=true). This should only be used for development or testing environments.")
-	}
-
 	client := &Client{
 		httpClient: &http.Client{
 			Transport: transport,
@@ -158,7 +154,7 @@ func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body int
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -214,7 +210,7 @@ func (c *Client) authenticate() error {
 	if err != nil {
 		return fmt.Errorf("login request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
