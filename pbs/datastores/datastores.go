@@ -68,25 +68,25 @@ type Datastore struct {
 	KeepYearly  *int `json:"keep-yearly,omitempty"`
 
 	// Maintenance and notification fields
-	MaintenanceModeRaw string            `json:"maintenance-mode,omitempty"`
-	MaintenanceMode    *MaintenanceMode  `json:"-"`
-	NotifyRaw          string            `json:"notify,omitempty"`
-	Notify             *DatastoreNotify  `json:"-"`
-	NotifyUser         string            `json:"notify-user,omitempty"`
-	NotificationMode   string            `json:"notification-mode,omitempty"`
-	NotifyLevel        string            `json:"notify-level,omitempty"`
+	MaintenanceModeRaw string           `json:"maintenance-mode,omitempty"`
+	MaintenanceMode    *MaintenanceMode `json:"-"`
+	NotifyRaw          string           `json:"notify,omitempty"`
+	Notify             *DatastoreNotify `json:"-"`
+	NotifyUser         string           `json:"notify-user,omitempty"`
+	NotificationMode   string           `json:"notification-mode,omitempty"`
+	NotifyLevel        string           `json:"notify-level,omitempty"`
 
 	// Verification and reuse toggles
-	VerifyNew       *bool  `json:"verify-new,omitempty"`
-	ReuseDatastore  *bool  `json:"reuse-datastore,omitempty"`
-	OverwriteInUse  *bool  `json:"overwrite-in-use,omitempty"`
+	VerifyNew      *bool `json:"verify-new,omitempty"`
+	ReuseDatastore *bool `json:"reuse-datastore,omitempty"`
+	OverwriteInUse *bool `json:"overwrite-in-use,omitempty"`
 
 	// Tuning options
 	TuningRaw string           `json:"tuning,omitempty"`
 	Tuning    *DatastoreTuning `json:"-"`
 
 	// Advanced options
-	Fingerprint  string `json:"fingerprint,omitempty"`
+	Fingerprint   string `json:"fingerprint,omitempty"`
 	BackingDevice string `json:"backing-device,omitempty"`
 
 	// ZFS-specific options

@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -52,10 +53,9 @@ type pruneJobResourceModel struct {
 	KeepYearly  types.Int64  `tfsdk:"keep_yearly"`
 	MaxDepth    types.Int64  `tfsdk:"max_depth"`
 	Namespace   types.String `tfsdk:"namespace"`
-	// BackupType field removed in PBS 4.0
-	BackupID types.String `tfsdk:"backup_id"`
-	Comment  types.String `tfsdk:"comment"`
-	// Disable field removed in PBS 4.0
+	Comment     types.String `tfsdk:"comment"`
+	Disable     types.Bool   `tfsdk:"disable"`
+	Digest      types.String `tfsdk:"digest"`
 }
 
 // Metadata returns the resource type name.
@@ -132,18 +132,26 @@ keep-monthly, and keep-yearly parameters.`,
 				MarkdownDescription: "Namespace filter as a regular expression. Only backups in matching namespaces will be pruned.",
 				Optional:            true,
 			},
-			// backup_type field removed in PBS 4.0
-			"backup_id": schema.StringAttribute{
-				Description:         "Specific backup ID filter.",
-				MarkdownDescription: "Specific backup ID to prune. If set, only this backup ID will be affected.",
-				Optional:            true,
-			},
 			"comment": schema.StringAttribute{
 				Description:         "A comment describing this prune job.",
 				MarkdownDescription: "A comment describing this prune job.",
 				Optional:            true,
 			},
-			// disable attribute removed in PBS 4.0
+			"disable": schema.BoolAttribute{
+				Description:         "Disable this prune job without deleting it.",
+				MarkdownDescription: "Disable this prune job without deleting it.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"digest": schema.StringAttribute{
+				Description:         "Opaque digest returned by PBS for optimistic locking.",
+				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -169,60 +177,14 @@ func (r *pruneJobResource) Configure(_ context.Context, req resource.ConfigureRe
 // Create creates the resource and sets the initial Terraform state.
 func (r *pruneJobResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan pruneJobResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	job := &jobs.PruneJob{
-		ID:       plan.ID.ValueString(),
-		Store:    plan.Store.ValueString(),
-		Schedule: plan.Schedule.ValueString(),
-	}
+	job := buildPruneJobFromPlan(&plan)
 
-	if !plan.KeepLast.IsNull() {
-		keepLast := int(plan.KeepLast.ValueInt64())
-		job.KeepLast = &keepLast
-	}
-	if !plan.KeepHourly.IsNull() {
-		keepHourly := int(plan.KeepHourly.ValueInt64())
-		job.KeepHourly = &keepHourly
-	}
-	if !plan.KeepDaily.IsNull() {
-		keepDaily := int(plan.KeepDaily.ValueInt64())
-		job.KeepDaily = &keepDaily
-	}
-	if !plan.KeepWeekly.IsNull() {
-		keepWeekly := int(plan.KeepWeekly.ValueInt64())
-		job.KeepWeekly = &keepWeekly
-	}
-	if !plan.KeepMonthly.IsNull() {
-		keepMonthly := int(plan.KeepMonthly.ValueInt64())
-		job.KeepMonthly = &keepMonthly
-	}
-	if !plan.KeepYearly.IsNull() {
-		keepYearly := int(plan.KeepYearly.ValueInt64())
-		job.KeepYearly = &keepYearly
-	}
-	if !plan.MaxDepth.IsNull() {
-		maxDepth := int(plan.MaxDepth.ValueInt64())
-		job.MaxDepth = &maxDepth
-	}
-	if !plan.Namespace.IsNull() {
-		job.NamespaceRE = plan.Namespace.ValueString()
-	}
-	// BackupType field removed in PBS 4.0
-	if !plan.BackupID.IsNull() {
-		job.BackupID = plan.BackupID.ValueString()
-	}
-	if !plan.Comment.IsNull() {
-		job.Comment = plan.Comment.ValueString()
-	}
-	// Disable field removed in PBS 4.0
-
-	err := r.client.Jobs.CreatePruneJob(ctx, job)
-	if err != nil {
+	if err := r.client.Jobs.CreatePruneJob(ctx, job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating prune job",
 			fmt.Sprintf("Could not create prune job %s: %s", plan.ID.ValueString(), err.Error()),
@@ -230,14 +192,25 @@ func (r *pruneJobResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	createdJob, err := r.client.Jobs.GetPruneJob(ctx, job.ID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading prune job",
+			fmt.Sprintf("Could not read prune job %s after creation: %s", plan.ID.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	var state pruneJobResourceModel
+	setPruneStateFromAPI(createdJob, &state)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Read refreshes the Terraform state with the latest data.
 func (r *pruneJobResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state pruneJobResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -251,64 +224,7 @@ func (r *pruneJobResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	// Update state
-	state.ID = types.StringValue(job.ID)
-	state.Store = types.StringValue(job.Store)
-	state.Schedule = types.StringValue(job.Schedule)
-
-	if job.KeepLast != nil {
-		state.KeepLast = types.Int64Value(int64(*job.KeepLast))
-	} else {
-		state.KeepLast = types.Int64Null()
-	}
-	if job.KeepHourly != nil {
-		state.KeepHourly = types.Int64Value(int64(*job.KeepHourly))
-	} else {
-		state.KeepHourly = types.Int64Null()
-	}
-	if job.KeepDaily != nil {
-		state.KeepDaily = types.Int64Value(int64(*job.KeepDaily))
-	} else {
-		state.KeepDaily = types.Int64Null()
-	}
-	if job.KeepWeekly != nil {
-		state.KeepWeekly = types.Int64Value(int64(*job.KeepWeekly))
-	} else {
-		state.KeepWeekly = types.Int64Null()
-	}
-	if job.KeepMonthly != nil {
-		state.KeepMonthly = types.Int64Value(int64(*job.KeepMonthly))
-	} else {
-		state.KeepMonthly = types.Int64Null()
-	}
-	if job.KeepYearly != nil {
-		state.KeepYearly = types.Int64Value(int64(*job.KeepYearly))
-	} else {
-		state.KeepYearly = types.Int64Null()
-	}
-	if job.MaxDepth != nil {
-		state.MaxDepth = types.Int64Value(int64(*job.MaxDepth))
-	} else {
-		state.MaxDepth = types.Int64Null()
-	}
-
-	if job.NamespaceRE != "" {
-		state.Namespace = types.StringValue(job.NamespaceRE)
-	} else {
-		state.Namespace = types.StringNull()
-	}
-	// BackupType field removed in PBS 4.0
-	if job.BackupID != "" {
-		state.BackupID = types.StringValue(job.BackupID)
-	} else {
-		state.BackupID = types.StringNull()
-	}
-	if job.Comment != "" {
-		state.Comment = types.StringValue(job.Comment)
-	} else {
-		state.Comment = types.StringNull()
-	}
-	// Disable field removed in PBS 4.0
+	setPruneStateFromAPI(job, &state)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -316,60 +232,25 @@ func (r *pruneJobResource) Read(ctx context.Context, req resource.ReadRequest, r
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *pruneJobResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan pruneJobResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	job := &jobs.PruneJob{
-		ID:       plan.ID.ValueString(),
-		Store:    plan.Store.ValueString(),
-		Schedule: plan.Schedule.ValueString(),
+	var state pruneJobResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	if !plan.KeepLast.IsNull() {
-		keepLast := int(plan.KeepLast.ValueInt64())
-		job.KeepLast = &keepLast
+	if (plan.Digest.IsNull() || plan.Digest.IsUnknown()) && !state.Digest.IsNull() && !state.Digest.IsUnknown() {
+		plan.Digest = state.Digest
 	}
-	if !plan.KeepHourly.IsNull() {
-		keepHourly := int(plan.KeepHourly.ValueInt64())
-		job.KeepHourly = &keepHourly
-	}
-	if !plan.KeepDaily.IsNull() {
-		keepDaily := int(plan.KeepDaily.ValueInt64())
-		job.KeepDaily = &keepDaily
-	}
-	if !plan.KeepWeekly.IsNull() {
-		keepWeekly := int(plan.KeepWeekly.ValueInt64())
-		job.KeepWeekly = &keepWeekly
-	}
-	if !plan.KeepMonthly.IsNull() {
-		keepMonthly := int(plan.KeepMonthly.ValueInt64())
-		job.KeepMonthly = &keepMonthly
-	}
-	if !plan.KeepYearly.IsNull() {
-		keepYearly := int(plan.KeepYearly.ValueInt64())
-		job.KeepYearly = &keepYearly
-	}
-	if !plan.MaxDepth.IsNull() {
-		maxDepth := int(plan.MaxDepth.ValueInt64())
-		job.MaxDepth = &maxDepth
-	}
-	if !plan.Namespace.IsNull() {
-		job.NamespaceRE = plan.Namespace.ValueString()
-	}
-	// BackupType field removed in PBS 4.0
-	if !plan.BackupID.IsNull() {
-		job.BackupID = plan.BackupID.ValueString()
-	}
-	if !plan.Comment.IsNull() {
-		job.Comment = plan.Comment.ValueString()
-	}
-	// Disable field removed in PBS 4.0
 
-	err := r.client.Jobs.UpdatePruneJob(ctx, plan.ID.ValueString(), job)
-	if err != nil {
+	job := buildPruneJobFromPlan(&plan)
+	job.Delete = computePruneDeletes(&plan, &state)
+
+	if err := r.client.Jobs.UpdatePruneJob(ctx, plan.ID.ValueString(), job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating prune job",
 			fmt.Sprintf("Could not update prune job %s: %s", plan.ID.ValueString(), err.Error()),
@@ -377,7 +258,18 @@ func (r *pruneJobResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	updatedJob, err := r.client.Jobs.GetPruneJob(ctx, plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading prune job",
+			fmt.Sprintf("Could not read prune job %s after update: %s", plan.ID.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	setPruneStateFromAPI(updatedJob, &state)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -389,7 +281,12 @@ func (r *pruneJobResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	err := r.client.Jobs.DeletePruneJob(ctx, state.ID.ValueString())
+	digest := ""
+	if !state.Digest.IsNull() && !state.Digest.IsUnknown() {
+		digest = state.Digest.ValueString()
+	}
+
+	err := r.client.Jobs.DeletePruneJob(ctx, state.ID.ValueString(), digest)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting prune job",
@@ -402,4 +299,94 @@ func (r *pruneJobResource) Delete(ctx context.Context, req resource.DeleteReques
 // ImportState imports the resource into Terraform state.
 func (r *pruneJobResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func buildPruneJobFromPlan(plan *pruneJobResourceModel) *jobs.PruneJob {
+	job := &jobs.PruneJob{
+		ID:       plan.ID.ValueString(),
+		Store:    plan.Store.ValueString(),
+		Schedule: plan.Schedule.ValueString(),
+	}
+
+	job.KeepLast = intPointerFromAttr(plan.KeepLast)
+	job.KeepHourly = intPointerFromAttr(plan.KeepHourly)
+	job.KeepDaily = intPointerFromAttr(plan.KeepDaily)
+	job.KeepWeekly = intPointerFromAttr(plan.KeepWeekly)
+	job.KeepMonthly = intPointerFromAttr(plan.KeepMonthly)
+	job.KeepYearly = intPointerFromAttr(plan.KeepYearly)
+	job.MaxDepth = intPointerFromAttr(plan.MaxDepth)
+
+	if !plan.Namespace.IsNull() && !plan.Namespace.IsUnknown() {
+		job.Namespace = plan.Namespace.ValueString()
+	}
+	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
+		job.Comment = plan.Comment.ValueString()
+	}
+	if ptr := boolPointerFromAttr(plan.Disable); ptr != nil {
+		job.Disable = ptr
+	}
+	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
+		job.Digest = plan.Digest.ValueString()
+	}
+
+	return job
+}
+
+func computePruneDeletes(plan, state *pruneJobResourceModel) []string {
+	if state == nil {
+		return nil
+	}
+
+	var deletes []string
+
+	if shouldDeleteIntAttr(plan.KeepLast, state.KeepLast) {
+		deletes = append(deletes, "keep-last")
+	}
+	if shouldDeleteIntAttr(plan.KeepHourly, state.KeepHourly) {
+		deletes = append(deletes, "keep-hourly")
+	}
+	if shouldDeleteIntAttr(plan.KeepDaily, state.KeepDaily) {
+		deletes = append(deletes, "keep-daily")
+	}
+	if shouldDeleteIntAttr(plan.KeepWeekly, state.KeepWeekly) {
+		deletes = append(deletes, "keep-weekly")
+	}
+	if shouldDeleteIntAttr(plan.KeepMonthly, state.KeepMonthly) {
+		deletes = append(deletes, "keep-monthly")
+	}
+	if shouldDeleteIntAttr(plan.KeepYearly, state.KeepYearly) {
+		deletes = append(deletes, "keep-yearly")
+	}
+	if shouldDeleteIntAttr(plan.MaxDepth, state.MaxDepth) {
+		deletes = append(deletes, "max-depth")
+	}
+	if shouldDeleteStringAttr(plan.Namespace, state.Namespace) {
+		deletes = append(deletes, "ns")
+	}
+	if shouldDeleteStringAttr(plan.Comment, state.Comment) {
+		deletes = append(deletes, "comment")
+	}
+
+	return deletes
+}
+
+func setPruneStateFromAPI(job *jobs.PruneJob, state *pruneJobResourceModel) {
+	state.ID = types.StringValue(job.ID)
+	state.Store = types.StringValue(job.Store)
+	state.Schedule = types.StringValue(job.Schedule)
+	state.KeepLast = int64ValueOrNull(job.KeepLast)
+	state.KeepHourly = int64ValueOrNull(job.KeepHourly)
+	state.KeepDaily = int64ValueOrNull(job.KeepDaily)
+	state.KeepWeekly = int64ValueOrNull(job.KeepWeekly)
+	state.KeepMonthly = int64ValueOrNull(job.KeepMonthly)
+	state.KeepYearly = int64ValueOrNull(job.KeepYearly)
+	state.MaxDepth = int64ValueOrNull(job.MaxDepth)
+	state.Namespace = stringValueOrNull(job.Namespace)
+	state.Comment = stringValueOrNull(job.Comment)
+	if job.Disable != nil {
+		state.Disable = types.BoolValue(*job.Disable)
+	} else {
+		state.Disable = types.BoolValue(false)
+	}
+	state.Digest = stringValueOrNull(job.Digest)
 }

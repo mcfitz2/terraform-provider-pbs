@@ -24,17 +24,17 @@ func TestSMTPNotificationIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "test_smtp" {
-  name         = "%s"
-  server       = "smtp.example.com"
-  port         = 587
-  mode         = "insecure"
-  username     = "test@example.com"
-  password     = "secret123"
-  mailto       = "admin@example.com,backup@example.com"
-  from_address = "pbs@example.com"
-  author       = "PBS Admin"
-  comment      = "Test SMTP notification"
-  disable      = false
+	name         = "%s"
+	server       = "smtp.example.com"
+	port         = 587
+	mode         = "insecure"
+	username     = "test@example.com"
+	password     = "secret123"
+	mailto       = ["admin@example.com", "backup@example.com"]
+	from_address = "pbs@example.com"
+	author       = "PBS Admin"
+	comment      = "Test SMTP notification"
+	disable      = false
 }
 `, targetName)
 
@@ -53,6 +53,9 @@ resource "pbs_smtp_notification" "test_smtp" {
 		assert.Equal(t, "587", fmt.Sprint(portVal))
 	}
 	assert.Equal(t, "test@example.com", resource.AttributeValues["username"])
+	mailtoState, ok := resource.AttributeValues["mailto"].([]interface{})
+	require.True(t, ok, "expected mailto to be a list in state")
+	assert.ElementsMatch(t, []interface{}{"admin@example.com", "backup@example.com"}, mailtoState)
 
 	// Verify via API
 	notifClient := notifications.NewClient(tc.APIClient)
@@ -61,6 +64,7 @@ resource "pbs_smtp_notification" "test_smtp" {
 	assert.Equal(t, targetName, target.Name)
 	assert.Equal(t, "smtp.example.com", target.Server)
 	assert.Equal(t, 587, *target.Port)
+	assert.ElementsMatch(t, []string{"admin@example.com", "backup@example.com"}, target.To)
 
 	// Test update
 	updatedConfig := fmt.Sprintf(`
@@ -70,7 +74,7 @@ resource "pbs_smtp_notification" "test_smtp" {
   port         = 465
   username     = "updated@example.com"
   password     = "newsecret456"
-  mailto       = "newadmin@example.com"
+	mailto       = ["newadmin@example.com"]
   from_address = "pbs-updated@example.com"
   author       = "Updated PBS Admin"
   comment      = "Updated SMTP notification"
@@ -81,11 +85,17 @@ resource "pbs_smtp_notification" "test_smtp" {
 	tc.WriteMainTF(t, updatedConfig)
 	tc.ApplyTerraform(t)
 
+	resource = tc.GetResourceFromState(t, "pbs_smtp_notification.test_smtp")
+	mailtoState, ok = resource.AttributeValues["mailto"].([]interface{})
+	require.True(t, ok, "expected mailto to be a list in state after update")
+	assert.ElementsMatch(t, []interface{}{"newadmin@example.com"}, mailtoState)
+
 	target, err = notifClient.GetSMTPTarget(context.Background(), targetName)
 	require.NoError(t, err)
 	assert.Equal(t, "smtp.newserver.com", target.Server)
 	assert.Equal(t, 465, *target.Port)
 	assert.Equal(t, "Updated SMTP notification", target.Comment)
+	assert.ElementsMatch(t, []string{"newadmin@example.com"}, target.To)
 }
 
 // TestGotifyNotificationIntegration tests Gotify notification target lifecycle
@@ -137,12 +147,12 @@ func TestSendmailNotificationIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_sendmail_notification" "test_sendmail" {
-  name         = "%s"
-  mailto       = "admin@example.com"
-  from_address = "pbs@example.com"
-  author       = "PBS System"
-  comment      = "Test Sendmail notification"
-  disable      = false
+	name         = "%s"
+	mailto       = ["admin@example.com"]
+	from_address = "pbs@example.com"
+	author       = "PBS System"
+	comment      = "Test Sendmail notification"
+	disable      = false
 }
 `, targetName)
 
@@ -152,6 +162,9 @@ resource "pbs_sendmail_notification" "test_sendmail" {
 	resource := tc.GetResourceFromState(t, "pbs_sendmail_notification.test_sendmail")
 	assert.Equal(t, targetName, resource.AttributeValues["name"])
 	assert.Equal(t, "pbs@example.com", resource.AttributeValues["from_address"])
+	mailtoState, ok := resource.AttributeValues["mailto"].([]interface{})
+	require.True(t, ok, "expected mailto to be a list in state")
+	assert.ElementsMatch(t, []interface{}{"admin@example.com"}, mailtoState)
 
 	// Verify via API
 	notifClient := notifications.NewClient(tc.APIClient)
@@ -159,6 +172,111 @@ resource "pbs_sendmail_notification" "test_sendmail" {
 	require.NoError(t, err)
 	assert.Equal(t, targetName, target.Name)
 	assert.Equal(t, "pbs@example.com", target.From)
+	assert.ElementsMatch(t, []string{"admin@example.com"}, target.Mailto)
+}
+
+// TestNotificationEndpointIntegration tests notification endpoint lifecycle
+func TestNotificationEndpointIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tc := SetupTest(t)
+	defer tc.DestroyTerraform(t)
+
+	endpointName := GenerateTestName("endpoint")
+	smtpTarget := GenerateTestName("smtp")
+	sendmailTarget := GenerateTestName("sendmail")
+
+	testConfig := fmt.Sprintf(`
+resource "pbs_smtp_notification" "smtp" {
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = ["alerts@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_sendmail_notification" "sendmail" {
+  name         = "%s"
+  mailto       = ["backup@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_notification_endpoint" "test_endpoint" {
+  name    = "%s"
+  targets = [
+    pbs_smtp_notification.smtp.name,
+    pbs_sendmail_notification.sendmail.name,
+  ]
+  comment = "Test notification endpoint"
+  disable = false
+}
+`, smtpTarget, sendmailTarget, endpointName)
+
+	tc.WriteMainTF(t, testConfig)
+	tc.ApplyTerraform(t)
+
+	resource := tc.GetResourceFromState(t, "pbs_notification_endpoint.test_endpoint")
+	assert.Equal(t, endpointName, resource.AttributeValues["name"])
+	targetsState, ok := resource.AttributeValues["targets"].([]interface{})
+	require.True(t, ok, "expected targets to be a list in state")
+	assert.ElementsMatch(t, []interface{}{smtpTarget, sendmailTarget}, targetsState)
+
+	notifClient := notifications.NewClient(tc.APIClient)
+	endpoint, err := notifClient.GetNotificationEndpoint(context.Background(), endpointName)
+	require.NoError(t, err)
+	assert.Equal(t, endpointName, endpoint.Name)
+	assert.ElementsMatch(t, []string{smtpTarget, sendmailTarget}, endpoint.Targets)
+	assert.Equal(t, "Test notification endpoint", endpoint.Comment)
+	if assert.NotNil(t, endpoint.Disable) {
+		assert.False(t, *endpoint.Disable)
+	}
+
+	updatedConfig := fmt.Sprintf(`
+resource "pbs_smtp_notification" "smtp" {
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = ["alerts@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_sendmail_notification" "sendmail" {
+  name         = "%s"
+  mailto       = ["backup@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_notification_endpoint" "test_endpoint" {
+  name    = "%s"
+  targets = [pbs_smtp_notification.smtp.name]
+  comment = "Updated notification endpoint"
+  disable = true
+}
+`, smtpTarget, sendmailTarget, endpointName)
+
+	tc.WriteMainTF(t, updatedConfig)
+	tc.ApplyTerraform(t)
+
+	resource = tc.GetResourceFromState(t, "pbs_notification_endpoint.test_endpoint")
+	targetsState, ok = resource.AttributeValues["targets"].([]interface{})
+	require.True(t, ok, "expected targets to be a list in state after update")
+	assert.ElementsMatch(t, []interface{}{smtpTarget}, targetsState)
+	assert.Equal(t, "Updated notification endpoint", resource.AttributeValues["comment"])
+	assert.Equal(t, true, resource.AttributeValues["disable"])
+
+	endpoint, err = notifClient.GetNotificationEndpoint(context.Background(), endpointName)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{smtpTarget}, endpoint.Targets)
+	assert.Equal(t, "Updated notification endpoint", endpoint.Comment)
+	if assert.NotNil(t, endpoint.Disable) {
+		assert.True(t, *endpoint.Disable)
+	}
 }
 
 // TestWebhookNotificationIntegration tests Webhook notification target lifecycle
@@ -216,13 +334,13 @@ func TestNotificationMatcherIntegration(t *testing.T) {
 
 	testConfig := fmt.Sprintf(`
 resource "pbs_smtp_notification" "target" {
-  name         = "%s"
-  server       = "smtp.example.com"
-  port         = 587
-  username     = "test@example.com"
-  password     = "secret"
-  mailto       = "admin@example.com"
-  from_address = "pbs@example.com"
+	name         = "%s"
+	server       = "smtp.example.com"
+	port         = 587
+	username     = "test@example.com"
+	password     = "secret"
+	mailto       = ["admin@example.com"]
+	from_address = "pbs@example.com"
 }
 
 resource "pbs_notification_matcher" "test_matcher" {
@@ -277,7 +395,7 @@ resource "pbs_smtp_notification" "target" {
   port         = 587
   username     = "test@example.com"
   password     = "secret"
-  mailto       = "admin@example.com"
+	mailto       = ["admin@example.com"]
   from_address = "pbs@example.com"
 }
 
@@ -321,7 +439,7 @@ resource "pbs_smtp_notification" "target" {
   port         = 587
   username     = "test@example.com"
   password     = "secret"
-  mailto       = "admin@example.com"
+	mailto       = ["admin@example.com"]
   from_address = "pbs@example.com"
 }
 
@@ -367,7 +485,7 @@ resource "pbs_smtp_notification" "target" {
   port         = 587
   username     = "test@example.com"
   password     = "secret"
-  mailto       = "admin@example.com"
+	mailto       = ["admin@example.com"]
   from_address = "pbs@example.com"
 }
 

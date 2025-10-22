@@ -9,7 +9,6 @@ package notifications
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -17,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -52,13 +52,14 @@ type smtpNotificationResourceModel struct {
 	Port       types.Int64  `tfsdk:"port"`
 	Mode       types.String `tfsdk:"mode"`
 	From       types.String `tfsdk:"from_address"`
-	Mailto     types.String `tfsdk:"mailto"`
-	MailtoUser types.String `tfsdk:"mailto_user"`
+	Mailto     types.List   `tfsdk:"mailto"`
+	MailtoUser types.List   `tfsdk:"mailto_user"`
 	Username   types.String `tfsdk:"username"`
 	Password   types.String `tfsdk:"password"`
 	Author     types.String `tfsdk:"author"`
 	Comment    types.String `tfsdk:"comment"`
 	Disable    types.Bool   `tfsdk:"disable"`
+	Origin     types.String `tfsdk:"origin"`
 }
 
 // Metadata returns the resource type name.
@@ -110,15 +111,23 @@ verification tasks, and system events.`,
 				MarkdownDescription: "Sender email address. This will appear as the 'From' address in notification emails.",
 				Required:            true,
 			},
-			"mailto": schema.StringAttribute{
+			"mailto": schema.ListAttribute{
 				Description:         "Recipient email address(es).",
-				MarkdownDescription: "Recipient email address(es). Multiple addresses can be specified separated by commas or semicolons.",
+				MarkdownDescription: "Recipient email address(es). Specify as a list of email strings.",
 				Optional:            true,
+				ElementType:         types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
-			"mailto_user": schema.StringAttribute{
+			"mailto_user": schema.ListAttribute{
 				Description:         "User(s) from PBS user database to receive notifications.",
-				MarkdownDescription: "User(s) from PBS user database to receive notifications. Email addresses will be looked up from user configuration.",
+				MarkdownDescription: "User(s) from PBS user database to receive notifications. Specify as PBS user IDs.",
 				Optional:            true,
+				ElementType:         types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"username": schema.StringAttribute{
 				Description:         "SMTP authentication username.",
@@ -147,6 +156,11 @@ verification tasks, and system events.`,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+			},
+			"origin": schema.StringAttribute{
+				Description:         "Origin of this configuration as reported by PBS (e.g., config file or built-in).",
+				MarkdownDescription: "Origin of this configuration as reported by PBS (e.g., `user`, `builtin`).",
+				Computed:            true,
 			},
 		},
 	}
@@ -194,19 +208,27 @@ func (r *smtpNotificationResource) Create(ctx context.Context, req resource.Crea
 	if !plan.Mode.IsNull() && !plan.Mode.IsUnknown() {
 		target.Mode = plan.Mode.ValueString()
 	}
-	if !plan.Mailto.IsNull() {
-		// PBS 4.0: mailto is an array, split comma-separated string
-		mailtoStr := plan.Mailto.ValueString()
-		if mailtoStr != "" {
-			target.To = strings.Split(mailtoStr, ",")
-			// Trim spaces from each email address
-			for i := range target.To {
-				target.To[i] = strings.TrimSpace(target.To[i])
-			}
+	if plan.Mailto.IsNull() {
+		target.To = []string{}
+	} else if !plan.Mailto.IsUnknown() {
+		var mailto []string
+		diags := plan.Mailto.ElementsAs(ctx, &mailto, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
+		target.To = mailto
 	}
-	if !plan.MailtoUser.IsNull() {
-		target.MailtoUser = plan.MailtoUser.ValueString()
+	if plan.MailtoUser.IsNull() {
+		target.MailtoUser = []string{}
+	} else if !plan.MailtoUser.IsUnknown() {
+		var mailtoUsers []string
+		diags := plan.MailtoUser.ElementsAs(ctx, &mailtoUsers, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		target.MailtoUser = mailtoUsers
 	}
 	if !plan.Username.IsNull() {
 		target.Username = plan.Username.ValueString()
@@ -256,23 +278,50 @@ func (r *smtpNotificationResource) Create(ctx context.Context, req resource.Crea
 		// If API doesn't return mode and plan has no value, use default
 		plan.Mode = types.StringValue("insecure")
 	}
-	if len(created.To) > 0 {
-		plan.Mailto = types.StringValue(strings.Join(created.To, ","))
+	if created.To != nil {
+		mailtoList, diags := types.ListValueFrom(ctx, types.StringType, created.To)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Mailto = mailtoList
+	} else {
+		plan.Mailto = types.ListNull(types.StringType)
 	}
-	if created.MailtoUser != "" {
-		plan.MailtoUser = types.StringValue(created.MailtoUser)
+	if created.MailtoUser != nil {
+		mailtoUserList, diags := types.ListValueFrom(ctx, types.StringType, created.MailtoUser)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MailtoUser = mailtoUserList
+	} else {
+		plan.MailtoUser = types.ListNull(types.StringType)
 	}
 	if created.Username != "" {
 		plan.Username = types.StringValue(created.Username)
+	} else {
+		plan.Username = types.StringNull()
 	}
 	if created.Author != "" {
 		plan.Author = types.StringValue(created.Author)
+	} else {
+		plan.Author = types.StringNull()
 	}
 	if created.Comment != "" {
 		plan.Comment = types.StringValue(created.Comment)
+	} else {
+		plan.Comment = types.StringNull()
 	}
 	if created.Disable != nil {
 		plan.Disable = types.BoolValue(*created.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+	if created.Origin != "" {
+		plan.Origin = types.StringValue(created.Origin)
+	} else {
+		plan.Origin = types.StringNull()
 	}
 
 	// Set state to fully populated data
@@ -310,25 +359,51 @@ func (r *smtpNotificationResource) Read(ctx context.Context, req resource.ReadRe
 	} else {
 		state.Mode = types.StringNull()
 	}
-	if len(target.To) > 0 {
-		// PBS 4.0: mailto is an array, join into comma-separated string
-		state.Mailto = types.StringValue(strings.Join(target.To, ","))
+	if target.To != nil {
+		mailtoList, diags := types.ListValueFrom(ctx, types.StringType, target.To)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.Mailto = mailtoList
+	} else {
+		state.Mailto = types.ListNull(types.StringType)
 	}
-	if target.MailtoUser != "" {
-		state.MailtoUser = types.StringValue(target.MailtoUser)
+	if target.MailtoUser != nil {
+		mailtoUserList, diags := types.ListValueFrom(ctx, types.StringType, target.MailtoUser)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.MailtoUser = mailtoUserList
+	} else {
+		state.MailtoUser = types.ListNull(types.StringType)
 	}
 	if target.Username != "" {
 		state.Username = types.StringValue(target.Username)
+	} else {
+		state.Username = types.StringNull()
 	}
 	// Don't update password from API (sensitive field)
 	if target.Author != "" {
 		state.Author = types.StringValue(target.Author)
+	} else {
+		state.Author = types.StringNull()
 	}
 	if target.Comment != "" {
 		state.Comment = types.StringValue(target.Comment)
+	} else {
+		state.Comment = types.StringNull()
 	}
 	if target.Disable != nil {
 		state.Disable = types.BoolValue(*target.Disable)
+	} else {
+		state.Disable = types.BoolNull()
+	}
+	if target.Origin != "" {
+		state.Origin = types.StringValue(target.Origin)
+	} else {
+		state.Origin = types.StringNull()
 	}
 
 	// Set refreshed state
@@ -359,19 +434,23 @@ func (r *smtpNotificationResource) Update(ctx context.Context, req resource.Upda
 	if !plan.Mode.IsNull() {
 		target.Mode = plan.Mode.ValueString()
 	}
-	if !plan.Mailto.IsNull() {
-		// PBS 4.0: mailto is an array, split comma-separated string
-		mailtoStr := plan.Mailto.ValueString()
-		if mailtoStr != "" {
-			target.To = strings.Split(mailtoStr, ",")
-			// Trim spaces from each email address
-			for i := range target.To {
-				target.To[i] = strings.TrimSpace(target.To[i])
-			}
+	if !plan.Mailto.IsNull() && !plan.Mailto.IsUnknown() {
+		var mailto []string
+		diags := plan.Mailto.ElementsAs(ctx, &mailto, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
 		}
+		target.To = mailto
 	}
-	if !plan.MailtoUser.IsNull() {
-		target.MailtoUser = plan.MailtoUser.ValueString()
+	if !plan.MailtoUser.IsNull() && !plan.MailtoUser.IsUnknown() {
+		var mailtoUsers []string
+		diags := plan.MailtoUser.ElementsAs(ctx, &mailtoUsers, false)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		target.MailtoUser = mailtoUsers
 	}
 	if !plan.Username.IsNull() {
 		target.Username = plan.Username.ValueString()
@@ -399,7 +478,75 @@ func (r *smtpNotificationResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	// Set state
+	updated, err := r.client.Notifications.GetSMTPTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading updated SMTP notification target",
+			fmt.Sprintf("Updated SMTP notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.Server = types.StringValue(updated.Server)
+	plan.From = types.StringValue(updated.From)
+
+	if updated.Port != nil {
+		plan.Port = types.Int64Value(int64(*updated.Port))
+	}
+	if updated.Mode != "" {
+		plan.Mode = types.StringValue(updated.Mode)
+	} else {
+		plan.Mode = types.StringNull()
+	}
+
+	if updated.To != nil {
+		mailtoList, diags := types.ListValueFrom(ctx, types.StringType, updated.To)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Mailto = mailtoList
+	} else {
+		plan.Mailto = types.ListNull(types.StringType)
+	}
+
+	if updated.MailtoUser != nil {
+		mailtoUserList, diags := types.ListValueFrom(ctx, types.StringType, updated.MailtoUser)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MailtoUser = mailtoUserList
+	} else {
+		plan.MailtoUser = types.ListNull(types.StringType)
+	}
+
+	if updated.Username != "" {
+		plan.Username = types.StringValue(updated.Username)
+	} else {
+		plan.Username = types.StringNull()
+	}
+	if updated.Author != "" {
+		plan.Author = types.StringValue(updated.Author)
+	} else {
+		plan.Author = types.StringNull()
+	}
+	if updated.Comment != "" {
+		plan.Comment = types.StringValue(updated.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+	if updated.Disable != nil {
+		plan.Disable = types.BoolValue(*updated.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+	if updated.Origin != "" {
+		plan.Origin = types.StringValue(updated.Origin)
+	} else {
+		plan.Origin = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 

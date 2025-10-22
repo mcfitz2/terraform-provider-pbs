@@ -55,6 +55,7 @@ type notificationMatcherResourceModel struct {
 	InvertMatch   types.Bool   `tfsdk:"invert_match"`
 	Comment       types.String `tfsdk:"comment"`
 	Disable       types.Bool   `tfsdk:"disable"`
+	Origin        types.String `tfsdk:"origin"`
 }
 
 // Metadata returns the resource type name.
@@ -145,6 +146,11 @@ informational messages to specific channels.`,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+			},
+			"origin": schema.StringAttribute{
+				Description:         "Origin of this configuration as reported by PBS.",
+				MarkdownDescription: "Origin of this configuration as reported by PBS (e.g., `user`, `builtin`).",
+				Computed:            true,
 			},
 		},
 	}
@@ -249,6 +255,91 @@ func (r *notificationMatcherResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
+	created, err := r.client.Notifications.GetNotificationMatcher(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading created notification matcher",
+			fmt.Sprintf("Created notification matcher %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.Name = types.StringValue(created.Name)
+
+	if len(created.Targets) > 0 {
+		targets, diags := types.ListValueFrom(ctx, types.StringType, created.Targets)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Targets = targets
+	} else {
+		plan.Targets = types.ListNull(types.StringType)
+	}
+
+	if len(created.MatchSeverity) > 0 {
+		matchSeverity, diags := types.ListValueFrom(ctx, types.StringType, created.MatchSeverity)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchSeverity = matchSeverity
+	} else {
+		plan.MatchSeverity = types.ListNull(types.StringType)
+	}
+
+	if len(created.MatchField) > 0 {
+		matchField, diags := types.ListValueFrom(ctx, types.StringType, created.MatchField)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchField = matchField
+	} else {
+		plan.MatchField = types.ListNull(types.StringType)
+	}
+
+	if len(created.MatchCalendar) > 0 {
+		matchCalendar, diags := types.ListValueFrom(ctx, types.StringType, created.MatchCalendar)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchCalendar = matchCalendar
+	} else {
+		plan.MatchCalendar = types.ListNull(types.StringType)
+	}
+
+	if created.Mode != "" {
+		plan.Mode = types.StringValue(created.Mode)
+	} else {
+		plan.Mode = types.StringValue("all")
+	}
+
+	if created.InvertMatch != nil {
+		plan.InvertMatch = types.BoolValue(*created.InvertMatch)
+	} else {
+		plan.InvertMatch = types.BoolValue(false)
+	}
+
+	if created.Comment != "" {
+		plan.Comment = types.StringValue(created.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if created.Disable != nil {
+		plan.Disable = types.BoolValue(*created.Disable)
+	} else {
+		plan.Disable = types.BoolValue(false)
+	}
+
+	if created.Origin != "" {
+		plan.Origin = types.StringValue(created.Origin)
+	} else {
+		plan.Origin = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -341,6 +432,12 @@ func (r *notificationMatcherResource) Read(ctx context.Context, req resource.Rea
 		state.Disable = types.BoolValue(false)
 	}
 
+	if matcher.Origin != "" {
+		state.Origin = types.StringValue(matcher.Origin)
+	} else {
+		state.Origin = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -423,6 +520,91 @@ func (r *notificationMatcherResource) Update(ctx context.Context, req resource.U
 			fmt.Sprintf("Could not update notification matcher %s: %s", plan.Name.ValueString(), err.Error()),
 		)
 		return
+	}
+
+	updated, err := r.client.Notifications.GetNotificationMatcher(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading updated notification matcher",
+			fmt.Sprintf("Updated notification matcher %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.Name = types.StringValue(updated.Name)
+
+	if len(updated.Targets) > 0 {
+		targets, diags := types.ListValueFrom(ctx, types.StringType, updated.Targets)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Targets = targets
+	} else {
+		plan.Targets = types.ListNull(types.StringType)
+	}
+
+	if len(updated.MatchSeverity) > 0 {
+		matchSeverity, diags := types.ListValueFrom(ctx, types.StringType, updated.MatchSeverity)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchSeverity = matchSeverity
+	} else {
+		plan.MatchSeverity = types.ListNull(types.StringType)
+	}
+
+	if len(updated.MatchField) > 0 {
+		matchField, diags := types.ListValueFrom(ctx, types.StringType, updated.MatchField)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchField = matchField
+	} else {
+		plan.MatchField = types.ListNull(types.StringType)
+	}
+
+	if len(updated.MatchCalendar) > 0 {
+		matchCalendar, diags := types.ListValueFrom(ctx, types.StringType, updated.MatchCalendar)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.MatchCalendar = matchCalendar
+	} else {
+		plan.MatchCalendar = types.ListNull(types.StringType)
+	}
+
+	if updated.Mode != "" {
+		plan.Mode = types.StringValue(updated.Mode)
+	} else {
+		plan.Mode = types.StringValue("all")
+	}
+
+	if updated.InvertMatch != nil {
+		plan.InvertMatch = types.BoolValue(*updated.InvertMatch)
+	} else {
+		plan.InvertMatch = types.BoolValue(false)
+	}
+
+	if updated.Comment != "" {
+		plan.Comment = types.StringValue(updated.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if updated.Disable != nil {
+		plan.Disable = types.BoolValue(*updated.Disable)
+	} else {
+		plan.Disable = types.BoolValue(false)
+	}
+
+	if updated.Origin != "" {
+		plan.Origin = types.StringValue(updated.Origin)
+	} else {
+		plan.Origin = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)

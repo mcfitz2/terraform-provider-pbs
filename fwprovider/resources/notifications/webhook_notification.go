@@ -54,6 +54,7 @@ type webhookNotificationResourceModel struct {
 	Secret  types.String `tfsdk:"secret"`
 	Comment types.String `tfsdk:"comment"`
 	Disable types.Bool   `tfsdk:"disable"`
+	Origin  types.String `tfsdk:"origin"`
 }
 
 // Metadata returns the resource type name.
@@ -90,12 +91,12 @@ verification tasks, and system events.`,
 			},
 			"method": schema.StringAttribute{
 				Description:         "HTTP method for webhook requests.",
-				MarkdownDescription: "HTTP method for webhook requests. Valid values: `POST`, `PUT`. Defaults to `POST`.",
+				MarkdownDescription: "HTTP method for webhook requests. Valid values: `post`, `put`. Defaults to `post`.",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("POST"),
+				Default:             stringdefault.StaticString("post"),
 				Validators: []validator.String{
-					stringvalidator.OneOf("POST", "PUT"),
+					stringvalidator.OneOf("post", "put"),
 				},
 			},
 			"headers": schema.MapAttribute{
@@ -121,6 +122,11 @@ verification tasks, and system events.`,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+			},
+			"origin": schema.StringAttribute{
+				Description:         "Origin of this configuration as reported by PBS.",
+				MarkdownDescription: "Origin of this configuration as reported by PBS (e.g., `user`, `builtin`).",
+				Computed:            true,
 			},
 		},
 	}
@@ -194,6 +200,58 @@ func (r *webhookNotificationResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
+	created, err := r.client.Notifications.GetWebhookTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading created Webhook notification target",
+			fmt.Sprintf("Created Webhook notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.URL = types.StringValue(created.URL)
+
+	if created.Body != "" {
+		plan.Body = types.StringValue(created.Body)
+	} else {
+		plan.Body = types.StringNull()
+	}
+
+	if created.Method != "" {
+		plan.Method = types.StringValue(strings.ToLower(created.Method))
+	} else {
+		plan.Method = types.StringNull()
+	}
+
+	if len(created.Headers) > 0 {
+		headersVal, diags := types.MapValueFrom(ctx, types.StringType, created.Headers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Headers = headersVal
+	} else {
+		plan.Headers = types.MapNull(types.StringType)
+	}
+
+	if created.Comment != "" {
+		plan.Comment = types.StringValue(created.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if created.Disable != nil {
+		plan.Disable = types.BoolValue(*created.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+
+	if created.Origin != "" {
+		plan.Origin = types.StringValue(created.Origin)
+	} else {
+		plan.Origin = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -218,10 +276,13 @@ func (r *webhookNotificationResource) Read(ctx context.Context, req resource.Rea
 	state.URL = types.StringValue(target.URL)
 	if target.Body != "" {
 		state.Body = types.StringValue(target.Body)
+	} else {
+		state.Body = types.StringNull()
 	}
 	if target.Method != "" {
-		// Store uppercase to match API format
 		state.Method = types.StringValue(strings.ToLower(target.Method))
+	} else {
+		state.Method = types.StringNull()
 	}
 	if len(target.Headers) > 0 {
 		headers, diags := types.MapValueFrom(ctx, types.StringType, target.Headers)
@@ -230,13 +291,25 @@ func (r *webhookNotificationResource) Read(ctx context.Context, req resource.Rea
 			return
 		}
 		state.Headers = headers
+	} else {
+		state.Headers = types.MapNull(types.StringType)
 	}
 	// Don't update secret from API (sensitive field)
 	if target.Comment != "" {
 		state.Comment = types.StringValue(target.Comment)
+	} else {
+		state.Comment = types.StringNull()
 	}
 	if target.Disable != nil {
 		state.Disable = types.BoolValue(*target.Disable)
+	} else {
+		state.Disable = types.BoolNull()
+	}
+
+	if target.Origin != "" {
+		state.Origin = types.StringValue(target.Origin)
+	} else {
+		state.Origin = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -290,6 +363,58 @@ func (r *webhookNotificationResource) Update(ctx context.Context, req resource.U
 			fmt.Sprintf("Could not update Webhook notification target %s: %s", plan.Name.ValueString(), err.Error()),
 		)
 		return
+	}
+
+	updated, err := r.client.Notifications.GetWebhookTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading updated Webhook notification target",
+			fmt.Sprintf("Updated Webhook notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.URL = types.StringValue(updated.URL)
+
+	if updated.Body != "" {
+		plan.Body = types.StringValue(updated.Body)
+	} else {
+		plan.Body = types.StringNull()
+	}
+
+	if updated.Method != "" {
+		plan.Method = types.StringValue(strings.ToLower(updated.Method))
+	} else {
+		plan.Method = types.StringNull()
+	}
+
+	if len(updated.Headers) > 0 {
+		headersVal, diags := types.MapValueFrom(ctx, types.StringType, updated.Headers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.Headers = headersVal
+	} else {
+		plan.Headers = types.MapNull(types.StringType)
+	}
+
+	if updated.Comment != "" {
+		plan.Comment = types.StringValue(updated.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if updated.Disable != nil {
+		plan.Disable = types.BoolValue(*updated.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+
+	if updated.Origin != "" {
+		plan.Origin = types.StringValue(updated.Origin)
+	} else {
+		plan.Origin = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)

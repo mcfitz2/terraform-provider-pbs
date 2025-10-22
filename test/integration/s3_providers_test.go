@@ -309,7 +309,7 @@ func testS3ProviderDatastore(t *testing.T, provider *S3ProviderConfig) {
 		// Terraform destroy will handle PBS resources (datastore -> endpoint)
 		// in the correct order thanks to depends_on relationships
 		tc.DestroyTerraform(t)
-		
+
 		// Clean up the S3 bucket (external to PBS)
 		provider.DeleteTestBucket(t)
 	}()
@@ -359,7 +359,7 @@ resource "pbs_s3_endpoint" "test_%s" {
 
 	terraformConfig += "}\n"
 
-	// Add S3 datastore configuration  
+	// Add S3 datastore configuration
 	// NOTE: We use the .id attribute reference which creates an implicit dependency
 	// ensuring the datastore can only be created after the endpoint exists.
 	// During destroy, Terraform reverses this dependency, destroying the datastore first.
@@ -467,5 +467,3 @@ resource "pbs_datastore" "test_%s" {
 
 	// Terraform destroy will be handled by defer
 }
-
-

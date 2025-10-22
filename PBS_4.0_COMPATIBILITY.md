@@ -165,12 +165,12 @@ Actual: json.Number("7")
 | Verify Jobs | ✅ | ❌ |
 | GC Jobs | ✅ | ❌ |
 | Metrics (InfluxDB) | ✅ | ❌ |
-| SMTP Notifications | ✅ | ❌ |
-| Gotify Notifications | ✅ | ❌ |
-| Sendmail Notifications | ✅ | ❌ |
-| Webhook Notifications | ✅ | ❌ |
-| Notification Endpoints | ✅ | ❌ |
-| Notification Matchers | ✅ | ❌ |
+| SMTP Notifications | ✅ | ✅ |
+| Gotify Notifications | ✅ | ✅ |
+| Sendmail Notifications | ✅ | ✅ |
+| Webhook Notifications | ✅ | ✅ |
+| Notification Endpoints | ✅ | ✅ |
+| Notification Matchers | ✅ | ✅ |
 
 ## Next Steps
 

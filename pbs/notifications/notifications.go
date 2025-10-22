@@ -49,7 +49,8 @@ type SMTPTarget struct {
 	Author     string   `json:"author,omitempty"`
 	Comment    string   `json:"comment,omitempty"`
 	Disable    *bool    `json:"disable,omitempty"`
-	MailtoUser string   `json:"mailto-user,omitempty"`
+	MailtoUser []string `json:"mailto-user,omitempty"`
+	Origin     string   `json:"origin,omitempty"`
 }
 
 // GotifyTarget represents a Gotify notification target configuration
@@ -59,6 +60,7 @@ type GotifyTarget struct {
 	Token   string `json:"token"`
 	Comment string `json:"comment,omitempty"`
 	Disable *bool  `json:"disable,omitempty"`
+	Origin  string `json:"origin,omitempty"`
 }
 
 // SendmailTarget represents a Sendmail notification target configuration
@@ -66,10 +68,11 @@ type SendmailTarget struct {
 	Name       string   `json:"name"`
 	From       string   `json:"from-address"`
 	Mailto     []string `json:"mailto,omitempty"` // PBS 4.0: array of email addresses
-	MailtoUser string   `json:"mailto-user,omitempty"`
+	MailtoUser []string `json:"mailto-user,omitempty"`
 	Author     string   `json:"author,omitempty"`
 	Comment    string   `json:"comment,omitempty"`
 	Disable    *bool    `json:"disable,omitempty"`
+	Origin     string   `json:"origin,omitempty"`
 }
 
 // WebhookTarget represents a Webhook notification target configuration
@@ -82,6 +85,7 @@ type WebhookTarget struct {
 	Secret  string            `json:"secret,omitempty"`
 	Comment string            `json:"comment,omitempty"`
 	Disable *bool             `json:"disable,omitempty"`
+	Origin  string            `json:"origin,omitempty"`
 }
 
 // SMTP Target Methods
@@ -135,10 +139,10 @@ func (c *Client) CreateSMTPTarget(ctx context.Context, target *SMTPTarget) error
 		"from-address": target.From,
 	}
 
-	if len(target.To) > 0 {
+	if target.To != nil {
 		body["mailto"] = target.To
 	}
-	if target.MailtoUser != "" {
+	if target.MailtoUser != nil {
 		body["mailto-user"] = target.MailtoUser
 	}
 	if target.Port != nil {
@@ -185,10 +189,10 @@ func (c *Client) UpdateSMTPTarget(ctx context.Context, name string, target *SMTP
 	if target.From != "" {
 		body["from-address"] = target.From
 	}
-	if len(target.To) > 0 {
+	if target.To != nil {
 		body["mailto"] = target.To
 	}
-	if target.MailtoUser != "" {
+	if target.MailtoUser != nil {
 		body["mailto-user"] = target.MailtoUser
 	}
 	if target.Port != nil {
@@ -395,10 +399,10 @@ func (c *Client) CreateSendmailTarget(ctx context.Context, target *SendmailTarge
 		"from-address": target.From,
 	}
 
-	if len(target.Mailto) > 0 {
+	if target.Mailto != nil {
 		body["mailto"] = target.Mailto
 	}
-	if target.MailtoUser != "" {
+	if target.MailtoUser != nil {
 		body["mailto-user"] = target.MailtoUser
 	}
 	if target.Author != "" {
@@ -430,10 +434,10 @@ func (c *Client) UpdateSendmailTarget(ctx context.Context, name string, target *
 	if target.From != "" {
 		body["from-address"] = target.From
 	}
-	if len(target.Mailto) > 0 {
+	if target.Mailto != nil {
 		body["mailto"] = target.Mailto
 	}
-	if target.MailtoUser != "" {
+	if target.MailtoUser != nil {
 		body["mailto-user"] = target.MailtoUser
 	}
 	if target.Author != "" {
@@ -606,6 +610,7 @@ type NotificationEndpoint struct {
 	Targets []string `json:"target,omitempty"`
 	Comment string   `json:"comment,omitempty"`
 	Disable *bool    `json:"disable,omitempty"`
+	Origin  string   `json:"origin,omitempty"`
 }
 
 // ListNotificationEndpoints lists all notification endpoints
@@ -639,6 +644,76 @@ func (c *Client) GetNotificationEndpoint(ctx context.Context, name string) (*Not
 	return &endpoint, nil
 }
 
+// CreateNotificationEndpoint creates a new notification endpoint
+func (c *Client) CreateNotificationEndpoint(ctx context.Context, endpoint *NotificationEndpoint) error {
+	if endpoint.Name == "" {
+		return fmt.Errorf("endpoint name is required")
+	}
+
+	body := map[string]interface{}{
+		"name": endpoint.Name,
+	}
+
+	if endpoint.Targets != nil {
+		body["target"] = endpoint.Targets
+	}
+	if endpoint.Comment != "" {
+		body["comment"] = endpoint.Comment
+	}
+	if endpoint.Disable != nil {
+		body["disable"] = *endpoint.Disable
+	}
+
+	_, err := c.api.Post(ctx, "/config/notifications/endpoints", body)
+	if err != nil {
+		return fmt.Errorf("failed to create notification endpoint %s: %w", endpoint.Name, err)
+	}
+
+	return nil
+}
+
+// UpdateNotificationEndpoint updates an existing notification endpoint
+func (c *Client) UpdateNotificationEndpoint(ctx context.Context, name string, endpoint *NotificationEndpoint) error {
+	if name == "" {
+		return fmt.Errorf("endpoint name is required")
+	}
+
+	body := map[string]interface{}{}
+
+	if endpoint.Targets != nil {
+		body["target"] = endpoint.Targets
+	}
+	if endpoint.Comment != "" {
+		body["comment"] = endpoint.Comment
+	}
+	if endpoint.Disable != nil {
+		body["disable"] = *endpoint.Disable
+	}
+
+	path := fmt.Sprintf("/config/notifications/endpoints/%s", url.PathEscape(name))
+	_, err := c.api.Put(ctx, path, body)
+	if err != nil {
+		return fmt.Errorf("failed to update notification endpoint %s: %w", name, err)
+	}
+
+	return nil
+}
+
+// DeleteNotificationEndpoint deletes a notification endpoint
+func (c *Client) DeleteNotificationEndpoint(ctx context.Context, name string) error {
+	if name == "" {
+		return fmt.Errorf("endpoint name is required")
+	}
+
+	path := fmt.Sprintf("/config/notifications/endpoints/%s", url.PathEscape(name))
+	_, err := c.api.Delete(ctx, path)
+	if err != nil {
+		return fmt.Errorf("failed to delete notification endpoint %s: %w", name, err)
+	}
+
+	return nil
+}
+
 // Notification Matchers
 
 // NotificationMatcher represents a notification matcher (routing rule)
@@ -652,6 +727,7 @@ type NotificationMatcher struct {
 	InvertMatch   *bool    `json:"invert-match,omitempty"`
 	Comment       string   `json:"comment,omitempty"`
 	Disable       *bool    `json:"disable,omitempty"`
+	Origin        string   `json:"origin,omitempty"`
 }
 
 // ListNotificationMatchers lists all notification matchers

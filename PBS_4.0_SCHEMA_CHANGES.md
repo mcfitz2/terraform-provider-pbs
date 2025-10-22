@@ -177,61 +177,74 @@ parameter verification failed - 'mailto': Expected array - got scalar value.
 parameter verification failed - 'method': value 'POST' is not defined in the enumeration.
 ```
 
-### Jobs - Verification
+### Jobs - Verify
 
-**Old Schema:**
+PBS 4.0 keeps the existing core fields for verify jobs but adds optimistic locking support via digests and tightens validation around optional attributes.
+
+**PBS 3.x Payload (conceptual):**
 ```json
 {
-  "store": "datastore-name",
-  "schedule": "daily",
-  "disable": false,  // Had disable field
-  "comment": "string"
+   "store": "datastore-name",
+   "schedule": "daily",
+   "ignore-verified": false,
+   "outdated-after": 30,
+   "max-depth": 2,
+   "disable": false,
+   "comment": "string"
 }
 ```
 
-**New Schema:**
+**PBS 4.0 Payload:**
 ```json
 {
-  "store": "datastore-name",
-  "schedule": "daily",
-  // No disable field
-  "comment": "string"
+   "store": "datastore-name",
+   "schedule": "daily",
+   "ignore-verified": false,
+   "outdated-after": 30,
+   "max-depth": 2,
+   "disable": false,
+   "ns": "namespace/child",
+   "comment": "string",
+   "digest": "6f1f2..."
 }
 ```
 
 **Changes:**
-- ✅ `disable` field removed (not allowed in schema)
+- ✅ Digests are returned for every read and must be echoed back on update/delete (optimistic locking).
+- ✅ `ns` continues to be the canonical field name for namespaces; the provider now validates/normalizes it through helper utilities.
+- ✅ `disable` remains supported (contrary to early assumptions) and is surfaced as an optional boolean.
+- ✅ Added provider-side helpers to compute delete lists when optional attributes are cleared.
 
-**Error Message:**
-```
-parameter verification failed - 'disable': schema does not allow additional properties
-```
+**Notes:**
+- PBS rejects `outdated-after` when `ignore-verified` is false; provider leaves validation to API and documents the relationship.
+- Clearing optional fields requires sending the field name in the `delete` array; helpers now compute this automatically.
 
 ### Jobs - Prune
 
-**Schema Issues:**
-- ✅ `backup-type` field not allowed in schema
-- ✅ `ns` value doesn't match regex pattern (namespace format changed)
+**Key Differences:**
+- ✅ The legacy `backup-type` parameter was removed; provider now maps resource arguments to the supported keep-set fields only.
+- ✅ Namespace values must satisfy the PBS namespace regex; the Terraform schema enforces this via validators and helper conversion.
+- ✅ Digests are returned per job and are required when issuing update/delete calls; provider exposes the computed digest field.
 
-**Error Messages:**
-```
-- 'backup-type': schema does not allow additional properties
-- 'ns': value does not match the regex pattern
-```
+**Error Messages Observed When Migrating:**
+- `'backup-type': schema does not allow additional properties`
+- `'ns': value does not match the regex pattern`
 
 ### Jobs - Sync
 
-**Schema Issues:**
-- ✅ `disable` field not allowed
-- ✅ `rate-in`: Expected string value (not number)
-- ✅ `group-filter[0]`: Format changed to `<group:GROUP||type:<vm|ct|host>|regex:REGEX>`
+PBS 4.0 introduces optional namespace scoping and stricter validation for filter and throttle fields.
 
-**Error Messages:**
-```
-- 'disable': schema does not allow additional properties
-- 'group-filter/[0]': input doesn't match expected format '<group:GROUP||type:<vm|ct|host>|regex:REGEX>'
-- 'rate-in': Expected string value.
-```
+**Key Differences:**
+- ✅ `remote-ns` (surfaced as `remote_namespace`) lets you pull from a specific namespace on the remote PBS.
+- ✅ `ns` (surfaced as `namespace`) continues to scope the local target; provider enforces the PBS namespace regex.
+- ✅ Bandwidth limit fields (`rate-in`, `rate-out`, `burst-in`, `burst-out`) must be encoded as strings using PBS byte-size syntax (e.g., `"10M"`).
+- ✅ `group-filter` now expects `<type>/<id>[/<namespace>]` expressions; provider validates and passes lists directly.
+- ✅ Digests are returned and required for update/delete; provider exposes a computed `digest` attribute and handles optimistic locking.
+- ✅ `disable` is still supported; provider keeps it as an optional boolean and participates in delete tracking when unset.
+
+**Implementation Notes:**
+- Helper functions convert Terraform optional values to pointers, build delete arrays, and normalize group filters.
+- Terraform schema validators enforce non-negative integers for `max_depth`/`transfer_last` and regex-match the group filter strings.
 
 ### Jobs - Garbage Collection
 
@@ -286,29 +299,31 @@ Path '/api2/json/config/garbage-collection' not found.
    - Use lowercase method
 
 ### Phase 3: Job Resources
-1. Update verification job `fwprovider/resources/jobs/verify_job.go`:
-   - Remove `disable` attribute
+1. Update verify job `fwprovider/resources/jobs/verify_job.go`:
+   - Surface digest attribute and pass it through update/delete
+   - Preserve `disable` as optional bool and wire helpers for delete tracking
+   - Add schema validators for `outdated_after`/`max_depth` and namespace helper usage
 
 2. Update prune job `fwprovider/resources/jobs/prune_job.go`:
-   - Remove `backup_type` attribute
-   - Fix `ns` attribute format validation
+   - Validate namespace format and support digest/delete handling
+   - Ensure helper conversions cover optional numeric and boolean fields
 
 3. Update sync job `fwprovider/resources/jobs/sync_job.go`:
-   - Remove `disable` attribute
-   - Change `rate_in` to string type
-   - Fix `group_filter` format validation
+   - Support `remote_namespace` and namespace validators
+   - Require string-based rate/burst values and enforce group filter regex
+   - Keep `disable` optional while honoring digest/delete semantics
 
 4. Handle GC job `fwprovider/resources/jobs/gc_job.go`:
    - Add deprecation notice
    - Document that GC is now configured at datastore level
 
 5. Update `pbs/jobs/jobs.go` API client:
-   - Remove references to removed fields
-   - Update validation logic
+   - Add pointer helpers/digest handling for verify, prune, and sync jobs
+   - Normalize optional values and propagate delete lists
 
 6. Update tests in `test/integration/jobs_test.go`:
-   - Remove usage of removed fields
-   - Update field formats
+   - Cover new fields (remote namespace, digest expectations, namespace validation)
+   - Ensure rate limits are strings and group filters follow PBS regex
 
 ### Phase 4: Integration Testing
 1. Run full test suite against PBS 4.0
@@ -337,8 +352,9 @@ Path '/api2/json/config/garbage-collection' not found.
    - Was: `method = "POST"`
 
 5. **Jobs - All types:**
-   - Remove `disable` attribute (not supported in PBS 4.0)
-   - Use resource lifecycle instead
+   - Ensure rate/burst limits are strings (`"10M"`, not numbers)
+   - Update group filters to `<type>/<id>[/<namespace>]` format
+   - Verify namespace values comply with PBS regex expectations
 
 6. **Jobs - GC:**
    - Resource deprecated - configure GC at datastore level instead
@@ -347,13 +363,13 @@ Path '/api2/json/config/garbage-collection' not found.
 
 - [ ] Metrics InfluxDB HTTP create/read/update/delete
 - [ ] Metrics InfluxDB UDP create/read/update/delete
-- [ ] SMTP notification with array mailto
-- [ ] Sendmail notification with array mailto
-- [ ] Webhook notification with lowercase method
-- [ ] Gotify notification (already passing)
-- [ ] Verification job without disable field
-- [ ] Prune job with correct field formats
-- [ ] Sync job with string rate_in and correct group_filter
+- [x] SMTP notification with array mailto
+- [x] Sendmail notification with array mailto
+- [x] Webhook notification with lowercase method
+- [x] Gotify notification (already passing)
+- [x] Verification job digest/disable regression
+- [x] Prune job namespace validator coverage
+- [x] Sync job namespace + rate limit coverage
 - [ ] GC job deprecation warning
 - [ ] All S3 tests (already passing)
 - [ ] Backwards compatibility tests

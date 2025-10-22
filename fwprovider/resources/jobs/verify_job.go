@@ -10,12 +10,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/micah/terraform-provider-pbs/fwprovider/config"
@@ -50,7 +52,8 @@ type verifyJobResourceModel struct {
 	Namespace      types.String `tfsdk:"namespace"`
 	MaxDepth       types.Int64  `tfsdk:"max_depth"`
 	Comment        types.String `tfsdk:"comment"`
-	// Disable field removed in PBS 4.0
+	Disable        types.Bool   `tfsdk:"disable"`
+	Digest         types.String `tfsdk:"digest"`
 }
 
 // Metadata returns the resource type name.
@@ -98,6 +101,9 @@ determines how many days until a backup is considered due for re-verification.`,
 				Description:         "Number of days after which a backup is considered outdated and needs re-verification.",
 				MarkdownDescription: "Number of days after which a backup is considered outdated and needs re-verification. Only applies when `ignore_verified` is `true`.",
 				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 			"namespace": schema.StringAttribute{
 				Description:         "Namespace to verify (optional, supports pattern matching).",
@@ -108,13 +114,30 @@ determines how many days until a backup is considered due for re-verification.`,
 				Description:         "Maximum recursion depth for namespaces.",
 				MarkdownDescription: "Maximum recursion depth when traversing namespace hierarchy.",
 				Optional:            true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 			"comment": schema.StringAttribute{
 				Description:         "A comment describing this verify job.",
 				MarkdownDescription: "A comment describing this verification job.",
 				Optional:            true,
 			},
-			// disable attribute removed in PBS 4.0
+			"disable": schema.BoolAttribute{
+				Description:         "Disable this verify job without deleting it.",
+				MarkdownDescription: "Disable this verify job without deleting it.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"digest": schema.StringAttribute{
+				Description:         "Opaque digest returned by PBS for optimistic locking.",
+				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 	}
 }
@@ -140,40 +163,14 @@ func (r *verifyJobResource) Configure(_ context.Context, req resource.ConfigureR
 // Create creates the resource and sets the initial Terraform state.
 func (r *verifyJobResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan verifyJobResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	job := &jobs.VerifyJob{
-		ID:       plan.ID.ValueString(),
-		Store:    plan.Store.ValueString(),
-		Schedule: plan.Schedule.ValueString(),
-	}
+	job := buildVerifyJobFromPlan(&plan)
 
-	if !plan.IgnoreVerified.IsNull() {
-		ignoreVerified := plan.IgnoreVerified.ValueBool()
-		job.IgnoreVerified = &ignoreVerified
-	}
-	if !plan.OutdatedAfter.IsNull() {
-		outdatedAfter := int(plan.OutdatedAfter.ValueInt64())
-		job.OutdatedAfter = &outdatedAfter
-	}
-	if !plan.Namespace.IsNull() {
-		job.NamespaceRE = plan.Namespace.ValueString()
-	}
-	if !plan.MaxDepth.IsNull() {
-		maxDepth := int(plan.MaxDepth.ValueInt64())
-		job.MaxDepth = &maxDepth
-	}
-	if !plan.Comment.IsNull() {
-		job.Comment = plan.Comment.ValueString()
-	}
-	// Disable field removed in PBS 4.0
-
-	err := r.client.Jobs.CreateVerifyJob(ctx, job)
-	if err != nil {
+	if err := r.client.Jobs.CreateVerifyJob(ctx, job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating verify job",
 			fmt.Sprintf("Could not create verify job %s: %s", plan.ID.ValueString(), err.Error()),
@@ -181,14 +178,25 @@ func (r *verifyJobResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	createdJob, err := r.client.Jobs.GetVerifyJob(ctx, job.ID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading verify job",
+			fmt.Sprintf("Could not read verify job %s after creation: %s", plan.ID.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	var state verifyJobResourceModel
+	setVerifyStateFromAPI(createdJob, &state)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Read refreshes the Terraform state with the latest data.
 func (r *verifyJobResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state verifyJobResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -202,78 +210,32 @@ func (r *verifyJobResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	// Update state
-	state.ID = types.StringValue(job.ID)
-	state.Store = types.StringValue(job.Store)
-	state.Schedule = types.StringValue(job.Schedule)
-
-	if job.IgnoreVerified != nil {
-		state.IgnoreVerified = types.BoolValue(*job.IgnoreVerified)
-	} else {
-		state.IgnoreVerified = types.BoolValue(false)
-	}
-	if job.OutdatedAfter != nil {
-		state.OutdatedAfter = types.Int64Value(int64(*job.OutdatedAfter))
-	} else {
-		state.OutdatedAfter = types.Int64Null()
-	}
-	if job.NamespaceRE != "" {
-		state.Namespace = types.StringValue(job.NamespaceRE)
-	} else {
-		state.Namespace = types.StringNull()
-	}
-	if job.MaxDepth != nil {
-		state.MaxDepth = types.Int64Value(int64(*job.MaxDepth))
-	} else {
-		state.MaxDepth = types.Int64Null()
-	}
-	if job.Comment != "" {
-		state.Comment = types.StringValue(job.Comment)
-	} else {
-		state.Comment = types.StringNull()
-	}
-	// Disable field removed in PBS 4.0
-
+	setVerifyStateFromAPI(job, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *verifyJobResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan verifyJobResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	job := &jobs.VerifyJob{
-		ID:       plan.ID.ValueString(),
-		Store:    plan.Store.ValueString(),
-		Schedule: plan.Schedule.ValueString(),
+	var state verifyJobResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	if !plan.IgnoreVerified.IsNull() {
-		ignoreVerified := plan.IgnoreVerified.ValueBool()
-		job.IgnoreVerified = &ignoreVerified
+	if (plan.Digest.IsNull() || plan.Digest.IsUnknown()) && !state.Digest.IsNull() && !state.Digest.IsUnknown() {
+		plan.Digest = state.Digest
 	}
-	if !plan.OutdatedAfter.IsNull() {
-		outdatedAfter := int(plan.OutdatedAfter.ValueInt64())
-		job.OutdatedAfter = &outdatedAfter
-	}
-	if !plan.Namespace.IsNull() {
-		job.NamespaceRE = plan.Namespace.ValueString()
-	}
-	if !plan.MaxDepth.IsNull() {
-		maxDepth := int(plan.MaxDepth.ValueInt64())
-		job.MaxDepth = &maxDepth
-	}
-	if !plan.Comment.IsNull() {
-		job.Comment = plan.Comment.ValueString()
-	}
-	// Disable field removed in PBS 4.0
 
-	err := r.client.Jobs.UpdateVerifyJob(ctx, plan.ID.ValueString(), job)
-	if err != nil {
+	job := buildVerifyJobFromPlan(&plan)
+	job.Delete = computeVerifyDeletes(&plan, &state)
+
+	if err := r.client.Jobs.UpdateVerifyJob(ctx, plan.ID.ValueString(), job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating verify job",
 			fmt.Sprintf("Could not update verify job %s: %s", plan.ID.ValueString(), err.Error()),
@@ -281,20 +243,33 @@ func (r *verifyJobResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	updatedJob, err := r.client.Jobs.GetVerifyJob(ctx, plan.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading verify job",
+			fmt.Sprintf("Could not read verify job %s after update: %s", plan.ID.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	setVerifyStateFromAPI(updatedJob, &state)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *verifyJobResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state verifyJobResourceModel
-	diags := req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.Jobs.DeleteVerifyJob(ctx, state.ID.ValueString())
-	if err != nil {
+	digest := ""
+	if !state.Digest.IsNull() && !state.Digest.IsUnknown() {
+		digest = state.Digest.ValueString()
+	}
+
+	if err := r.client.Jobs.DeleteVerifyJob(ctx, state.ID.ValueString(), digest); err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting verify job",
 			fmt.Sprintf("Could not delete verify job %s: %s", state.ID.ValueString(), err.Error()),
@@ -306,4 +281,80 @@ func (r *verifyJobResource) Delete(ctx context.Context, req resource.DeleteReque
 // ImportState imports the resource into Terraform state.
 func (r *verifyJobResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func buildVerifyJobFromPlan(plan *verifyJobResourceModel) *jobs.VerifyJob {
+	job := &jobs.VerifyJob{
+		ID:       plan.ID.ValueString(),
+		Store:    plan.Store.ValueString(),
+		Schedule: plan.Schedule.ValueString(),
+	}
+
+	if !plan.Namespace.IsNull() && !plan.Namespace.IsUnknown() {
+		job.Namespace = plan.Namespace.ValueString()
+	}
+	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
+		job.Comment = plan.Comment.ValueString()
+	}
+	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
+		job.Digest = plan.Digest.ValueString()
+	}
+
+	job.IgnoreVerified = boolPointerFromAttr(plan.IgnoreVerified)
+	job.Disable = boolPointerFromAttr(plan.Disable)
+	job.OutdatedAfter = intPointerFromAttr(plan.OutdatedAfter)
+	job.MaxDepth = intPointerFromAttr(plan.MaxDepth)
+
+	return job
+}
+
+func computeVerifyDeletes(plan, state *verifyJobResourceModel) []string {
+	if state == nil {
+		return nil
+	}
+
+	var deletes []string
+
+	if shouldDeleteStringAttr(plan.Namespace, state.Namespace) {
+		deletes = append(deletes, "ns")
+	}
+	if shouldDeleteBoolAttr(plan.IgnoreVerified, state.IgnoreVerified) {
+		deletes = append(deletes, "ignore-verified")
+	}
+	if shouldDeleteIntAttr(plan.OutdatedAfter, state.OutdatedAfter) {
+		deletes = append(deletes, "outdated-after")
+	}
+	if shouldDeleteIntAttr(plan.MaxDepth, state.MaxDepth) {
+		deletes = append(deletes, "max-depth")
+	}
+	if shouldDeleteStringAttr(plan.Comment, state.Comment) {
+		deletes = append(deletes, "comment")
+	}
+	if shouldDeleteBoolAttr(plan.Disable, state.Disable) {
+		deletes = append(deletes, "disable")
+	}
+
+	return deletes
+}
+
+func setVerifyStateFromAPI(job *jobs.VerifyJob, state *verifyJobResourceModel) {
+	state.ID = types.StringValue(job.ID)
+	state.Store = types.StringValue(job.Store)
+	state.Schedule = types.StringValue(job.Schedule)
+	state.Namespace = stringValueOrNull(job.Namespace)
+	state.Comment = stringValueOrNull(job.Comment)
+	state.Digest = stringValueOrNull(job.Digest)
+	state.OutdatedAfter = int64ValueOrNull(job.OutdatedAfter)
+	state.MaxDepth = int64ValueOrNull(job.MaxDepth)
+
+	if job.IgnoreVerified != nil {
+		state.IgnoreVerified = types.BoolValue(*job.IgnoreVerified)
+	} else {
+		state.IgnoreVerified = types.BoolValue(false)
+	}
+	if job.Disable != nil {
+		state.Disable = types.BoolValue(*job.Disable)
+	} else {
+		state.Disable = types.BoolValue(false)
+	}
 }

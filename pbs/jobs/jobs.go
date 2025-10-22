@@ -30,21 +30,21 @@ func NewClient(apiClient *api.Client) *Client {
 
 // PruneJob represents a prune job configuration
 type PruneJob struct {
-	ID          string `json:"id"`
-	Store       string `json:"store"`
-	Schedule    string `json:"schedule"`
-	KeepLast    *int   `json:"keep-last,omitempty"`
-	KeepHourly  *int   `json:"keep-hourly,omitempty"`
-	KeepDaily   *int   `json:"keep-daily,omitempty"`
-	KeepWeekly  *int   `json:"keep-weekly,omitempty"`
-	KeepMonthly *int   `json:"keep-monthly,omitempty"`
-	KeepYearly  *int   `json:"keep-yearly,omitempty"`
-	MaxDepth    *int   `json:"max-depth,omitempty"`
-	NamespaceRE string `json:"ns,omitempty"`
-	BackupType  string `json:"backup-type,omitempty"` // vm, ct, host
-	BackupID    string `json:"backup-id,omitempty"`
-	Comment     string `json:"comment,omitempty"`
-	// Disable field removed in PBS 4.0
+	ID          string   `json:"id"`
+	Store       string   `json:"store"`
+	Schedule    string   `json:"schedule"`
+	KeepLast    *int     `json:"keep-last,omitempty"`
+	KeepHourly  *int     `json:"keep-hourly,omitempty"`
+	KeepDaily   *int     `json:"keep-daily,omitempty"`
+	KeepWeekly  *int     `json:"keep-weekly,omitempty"`
+	KeepMonthly *int     `json:"keep-monthly,omitempty"`
+	KeepYearly  *int     `json:"keep-yearly,omitempty"`
+	MaxDepth    *int     `json:"max-depth,omitempty"`
+	Namespace   string   `json:"ns,omitempty"`
+	Comment     string   `json:"comment,omitempty"`
+	Disable     *bool    `json:"disable,omitempty"`
+	Digest      string   `json:"digest,omitempty"`
+	Delete      []string `json:"delete,omitempty"`
 }
 
 // ListPruneJobs lists all prune job configurations
@@ -96,40 +96,30 @@ func (c *Client) CreatePruneJob(ctx context.Context, job *PruneJob) error {
 		"schedule": job.Schedule,
 	}
 
-	if job.KeepLast != nil {
-		body["keep-last"] = *job.KeepLast
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.KeepHourly != nil {
-		body["keep-hourly"] = *job.KeepHourly
+
+	if job.Namespace != "" {
+		body["ns"] = job.Namespace
 	}
-	if job.KeepDaily != nil {
-		body["keep-daily"] = *job.KeepDaily
-	}
-	if job.KeepWeekly != nil {
-		body["keep-weekly"] = *job.KeepWeekly
-	}
-	if job.KeepMonthly != nil {
-		body["keep-monthly"] = *job.KeepMonthly
-	}
-	if job.KeepYearly != nil {
-		body["keep-yearly"] = *job.KeepYearly
-	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
-	}
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
-	}
-	if job.BackupType != "" {
-		body["backup-type"] = job.BackupType
-	}
-	if job.BackupID != "" {
-		body["backup-id"] = job.BackupID
-	}
+
+	setInt("keep-last", job.KeepLast)
+	setInt("keep-hourly", job.KeepHourly)
+	setInt("keep-daily", job.KeepDaily)
+	setInt("keep-weekly", job.KeepWeekly)
+	setInt("keep-monthly", job.KeepMonthly)
+	setInt("keep-yearly", job.KeepYearly)
+	setInt("max-depth", job.MaxDepth)
+
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	// Disable field removed in PBS 4.0
+	if job.Disable != nil {
+		body["disable"] = *job.Disable
+	}
 
 	_, err := c.api.Post(ctx, "/config/prune", body)
 	if err != nil {
@@ -147,46 +137,45 @@ func (c *Client) UpdatePruneJob(ctx context.Context, id string, job *PruneJob) e
 
 	body := map[string]interface{}{}
 
-	if job.Store != "" {
-		body["store"] = job.Store
+	setString := func(key, value string) {
+		if value != "" {
+			body[key] = value
+		}
 	}
-	if job.Schedule != "" {
-		body["schedule"] = job.Schedule
+
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.KeepLast != nil {
-		body["keep-last"] = *job.KeepLast
+
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.KeepHourly != nil {
-		body["keep-hourly"] = *job.KeepHourly
+
+	setString("store", job.Store)
+	setString("schedule", job.Schedule)
+	setString("ns", job.Namespace)
+	setString("comment", job.Comment)
+
+	setInt("keep-last", job.KeepLast)
+	setInt("keep-hourly", job.KeepHourly)
+	setInt("keep-daily", job.KeepDaily)
+	setInt("keep-weekly", job.KeepWeekly)
+	setInt("keep-monthly", job.KeepMonthly)
+	setInt("keep-yearly", job.KeepYearly)
+	setInt("max-depth", job.MaxDepth)
+
+	setBool("disable", job.Disable)
+
+	if len(job.Delete) > 0 {
+		body["delete"] = job.Delete
 	}
-	if job.KeepDaily != nil {
-		body["keep-daily"] = *job.KeepDaily
+	if job.Digest != "" {
+		body["digest"] = job.Digest
 	}
-	if job.KeepWeekly != nil {
-		body["keep-weekly"] = *job.KeepWeekly
-	}
-	if job.KeepMonthly != nil {
-		body["keep-monthly"] = *job.KeepMonthly
-	}
-	if job.KeepYearly != nil {
-		body["keep-yearly"] = *job.KeepYearly
-	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
-	}
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
-	}
-	if job.BackupType != "" {
-		body["backup-type"] = job.BackupType
-	}
-	if job.BackupID != "" {
-		body["backup-id"] = job.BackupID
-	}
-	if job.Comment != "" {
-		body["comment"] = job.Comment
-	}
-	// Disable field removed in PBS 4.0
 
 	path := fmt.Sprintf("/config/prune/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)
@@ -198,12 +187,16 @@ func (c *Client) UpdatePruneJob(ctx context.Context, id string, job *PruneJob) e
 }
 
 // DeletePruneJob deletes a prune job
-func (c *Client) DeletePruneJob(ctx context.Context, id string) error {
+func (c *Client) DeletePruneJob(ctx context.Context, id, digest string) error {
 	if id == "" {
 		return fmt.Errorf("job ID is required")
 	}
 
 	path := fmt.Sprintf("/config/prune/%s", url.PathEscape(id))
+	if digest != "" {
+		path = fmt.Sprintf("%s?digest=%s", path, url.QueryEscape(digest))
+	}
+
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete prune job %s: %w", id, err)
@@ -216,19 +209,31 @@ func (c *Client) DeletePruneJob(ctx context.Context, id string) error {
 
 // SyncJob represents a sync job configuration
 type SyncJob struct {
-	ID             string   `json:"id"`
-	Store          string   `json:"store"`
-	Remote         string   `json:"remote"`
-	RemoteStore    string   `json:"remote-store"`
-	Schedule       string   `json:"schedule"`
-	NamespaceRE    string   `json:"ns,omitempty"`
-	MaxDepth       *int     `json:"max-depth,omitempty"`
-	GroupFilter    []string `json:"group-filter,omitempty"`
-	RemoveVanished *bool    `json:"remove-vanished,omitempty"`
-	Comment        string   `json:"comment,omitempty"`
-	// Disable field removed in PBS 4.0
-	Owner       string `json:"owner,omitempty"`
-	RateLimitIn string `json:"rate-in,omitempty"` // PBS 4.0 expects byte size string format (e.g., "10M", "1G")
+	ID              string   `json:"id"`
+	Store           string   `json:"store"`
+	Remote          string   `json:"remote"`
+	RemoteStore     string   `json:"remote-store"`
+	RemoteNamespace string   `json:"remote-ns,omitempty"`
+	Schedule        string   `json:"schedule"`
+	Namespace       string   `json:"ns,omitempty"`
+	MaxDepth        *int     `json:"max-depth,omitempty"`
+	GroupFilter     []string `json:"group-filter,omitempty"`
+	RemoveVanished  *bool    `json:"remove-vanished,omitempty"`
+	ResyncCorrupt   *bool    `json:"resync-corrupt,omitempty"`
+	EncryptedOnly   *bool    `json:"encrypted-only,omitempty"`
+	VerifiedOnly    *bool    `json:"verified-only,omitempty"`
+	RunOnMount      *bool    `json:"run-on-mount,omitempty"`
+	TransferLast    *int     `json:"transfer-last,omitempty"`
+	SyncDirection   string   `json:"sync-direction,omitempty"`
+	Comment         string   `json:"comment,omitempty"`
+	Owner           string   `json:"owner,omitempty"`
+	Disable         *bool    `json:"disable,omitempty"`
+	RateIn          string   `json:"rate-in,omitempty"`
+	RateOut         string   `json:"rate-out,omitempty"`
+	BurstIn         string   `json:"burst-in,omitempty"`
+	BurstOut        string   `json:"burst-out,omitempty"`
+	Digest          string   `json:"digest,omitempty"`
+	Delete          []string `json:"delete,omitempty"`
 }
 
 // ListSyncJobs lists all sync job configurations
@@ -288,27 +293,50 @@ func (c *Client) CreateSyncJob(ctx context.Context, job *SyncJob) error {
 		"schedule":     job.Schedule,
 	}
 
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
+
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
+
+	setString := func(key, value string) {
+		if value != "" {
+			body[key] = value
+		}
+	}
+
+	setString("remote-ns", job.RemoteNamespace)
+	setString("ns", job.Namespace)
+	setInt("max-depth", job.MaxDepth)
+
 	if len(job.GroupFilter) > 0 {
 		body["group-filter"] = job.GroupFilter
 	}
-	if job.RemoveVanished != nil {
-		body["remove-vanished"] = *job.RemoveVanished
-	}
-	if job.Comment != "" {
-		body["comment"] = job.Comment
-	}
-	// Disable field removed in PBS 4.0
-	if job.Owner != "" {
-		body["owner"] = job.Owner
-	}
-	if job.RateLimitIn != "" {
-		body["rate-in"] = job.RateLimitIn
+
+	setBool("remove-vanished", job.RemoveVanished)
+	setBool("resync-corrupt", job.ResyncCorrupt)
+	setBool("encrypted-only", job.EncryptedOnly)
+	setBool("verified-only", job.VerifiedOnly)
+	setBool("run-on-mount", job.RunOnMount)
+
+	setInt("transfer-last", job.TransferLast)
+
+	setString("sync-direction", job.SyncDirection)
+	setString("comment", job.Comment)
+	setString("owner", job.Owner)
+	setString("rate-in", job.RateIn)
+	setString("rate-out", job.RateOut)
+	setString("burst-in", job.BurstIn)
+	setString("burst-out", job.BurstOut)
+
+	if job.Disable != nil {
+		body["disable"] = *job.Disable
 	}
 
 	_, err := c.api.Post(ctx, "/config/sync", body)
@@ -327,39 +355,57 @@ func (c *Client) UpdateSyncJob(ctx context.Context, id string, job *SyncJob) err
 
 	body := map[string]interface{}{}
 
-	if job.Store != "" {
-		body["store"] = job.Store
+	setString := func(key, value string) {
+		if value != "" {
+			body[key] = value
+		}
 	}
-	if job.Remote != "" {
-		body["remote"] = job.Remote
+
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.RemoteStore != "" {
-		body["remote-store"] = job.RemoteStore
+
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.Schedule != "" {
-		body["schedule"] = job.Schedule
-	}
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
-	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
-	}
+
+	setString("store", job.Store)
+	setString("remote", job.Remote)
+	setString("remote-store", job.RemoteStore)
+	setString("remote-ns", job.RemoteNamespace)
+	setString("schedule", job.Schedule)
+	setString("ns", job.Namespace)
+	setString("comment", job.Comment)
+	setString("owner", job.Owner)
+	setString("sync-direction", job.SyncDirection)
+	setString("rate-in", job.RateIn)
+	setString("rate-out", job.RateOut)
+	setString("burst-in", job.BurstIn)
+	setString("burst-out", job.BurstOut)
+
+	setInt("max-depth", job.MaxDepth)
+	setInt("transfer-last", job.TransferLast)
+
 	if len(job.GroupFilter) > 0 {
 		body["group-filter"] = job.GroupFilter
 	}
-	if job.RemoveVanished != nil {
-		body["remove-vanished"] = *job.RemoveVanished
+
+	setBool("remove-vanished", job.RemoveVanished)
+	setBool("resync-corrupt", job.ResyncCorrupt)
+	setBool("encrypted-only", job.EncryptedOnly)
+	setBool("verified-only", job.VerifiedOnly)
+	setBool("run-on-mount", job.RunOnMount)
+	setBool("disable", job.Disable)
+
+	if len(job.Delete) > 0 {
+		body["delete"] = job.Delete
 	}
-	if job.Comment != "" {
-		body["comment"] = job.Comment
-	}
-	// Disable field removed in PBS 4.0
-	if job.Owner != "" {
-		body["owner"] = job.Owner
-	}
-	if job.RateLimitIn != "" {
-		body["rate-in"] = job.RateLimitIn
+	if job.Digest != "" {
+		body["digest"] = job.Digest
 	}
 
 	path := fmt.Sprintf("/config/sync/%s", url.PathEscape(id))
@@ -372,12 +418,16 @@ func (c *Client) UpdateSyncJob(ctx context.Context, id string, job *SyncJob) err
 }
 
 // DeleteSyncJob deletes a sync job
-func (c *Client) DeleteSyncJob(ctx context.Context, id string) error {
+func (c *Client) DeleteSyncJob(ctx context.Context, id, digest string) error {
 	if id == "" {
 		return fmt.Errorf("job ID is required")
 	}
 
 	path := fmt.Sprintf("/config/sync/%s", url.PathEscape(id))
+	if digest != "" {
+		path = fmt.Sprintf("%s?digest=%s", path, url.QueryEscape(digest))
+	}
+
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete sync job %s: %w", id, err)
@@ -390,15 +440,17 @@ func (c *Client) DeleteSyncJob(ctx context.Context, id string) error {
 
 // VerifyJob represents a verification job configuration
 type VerifyJob struct {
-	ID             string `json:"id"`
-	Store          string `json:"store"`
-	Schedule       string `json:"schedule"`
-	IgnoreVerified *bool  `json:"ignore-verified,omitempty"`
-	OutdatedAfter  *int   `json:"outdated-after,omitempty"` // days
-	NamespaceRE    string `json:"ns,omitempty"`
-	MaxDepth       *int   `json:"max-depth,omitempty"`
-	Comment        string `json:"comment,omitempty"`
-	// Disable field removed in PBS 4.0
+	ID             string   `json:"id"`
+	Store          string   `json:"store"`
+	Schedule       string   `json:"schedule"`
+	IgnoreVerified *bool    `json:"ignore-verified,omitempty"`
+	OutdatedAfter  *int     `json:"outdated-after,omitempty"`
+	Namespace      string   `json:"ns,omitempty"`
+	MaxDepth       *int     `json:"max-depth,omitempty"`
+	Comment        string   `json:"comment,omitempty"`
+	Disable        *bool    `json:"disable,omitempty"`
+	Digest         string   `json:"digest,omitempty"`
+	Delete         []string `json:"delete,omitempty"`
 }
 
 // ListVerifyJobs lists all verify job configurations
@@ -450,22 +502,30 @@ func (c *Client) CreateVerifyJob(ctx context.Context, job *VerifyJob) error {
 		"schedule": job.Schedule,
 	}
 
-	if job.IgnoreVerified != nil {
-		body["ignore-verified"] = *job.IgnoreVerified
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.OutdatedAfter != nil {
-		body["outdated-after"] = *job.OutdatedAfter
+
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
+
+	if job.Namespace != "" {
+		body["ns"] = job.Namespace
 	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
-	}
+
+	setBool("ignore-verified", job.IgnoreVerified)
+	setBool("disable", job.Disable)
+	setInt("outdated-after", job.OutdatedAfter)
+	setInt("max-depth", job.MaxDepth)
+
 	if job.Comment != "" {
 		body["comment"] = job.Comment
 	}
-	// Disable field removed in PBS 4.0
 
 	_, err := c.api.Post(ctx, "/config/verify", body)
 	if err != nil {
@@ -483,28 +543,41 @@ func (c *Client) UpdateVerifyJob(ctx context.Context, id string, job *VerifyJob)
 
 	body := map[string]interface{}{}
 
-	if job.Store != "" {
-		body["store"] = job.Store
+	setString := func(key, value string) {
+		if value != "" {
+			body[key] = value
+		}
 	}
-	if job.Schedule != "" {
-		body["schedule"] = job.Schedule
+
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.IgnoreVerified != nil {
-		body["ignore-verified"] = *job.IgnoreVerified
+
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
 	}
-	if job.OutdatedAfter != nil {
-		body["outdated-after"] = *job.OutdatedAfter
+
+	setString("store", job.Store)
+	setString("schedule", job.Schedule)
+	setString("ns", job.Namespace)
+	setString("comment", job.Comment)
+
+	setBool("ignore-verified", job.IgnoreVerified)
+	setBool("disable", job.Disable)
+
+	setInt("outdated-after", job.OutdatedAfter)
+	setInt("max-depth", job.MaxDepth)
+
+	if len(job.Delete) > 0 {
+		body["delete"] = job.Delete
 	}
-	if job.NamespaceRE != "" {
-		body["ns"] = job.NamespaceRE
+	if job.Digest != "" {
+		body["digest"] = job.Digest
 	}
-	if job.MaxDepth != nil {
-		body["max-depth"] = *job.MaxDepth
-	}
-	if job.Comment != "" {
-		body["comment"] = job.Comment
-	}
-	// Disable field removed in PBS 4.0
 
 	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
 	_, err := c.api.Put(ctx, path, body)
@@ -516,12 +589,16 @@ func (c *Client) UpdateVerifyJob(ctx context.Context, id string, job *VerifyJob)
 }
 
 // DeleteVerifyJob deletes a verify job
-func (c *Client) DeleteVerifyJob(ctx context.Context, id string) error {
+func (c *Client) DeleteVerifyJob(ctx context.Context, id, digest string) error {
 	if id == "" {
 		return fmt.Errorf("job ID is required")
 	}
 
 	path := fmt.Sprintf("/config/verify/%s", url.PathEscape(id))
+	if digest != "" {
+		path = fmt.Sprintf("%s?digest=%s", path, url.QueryEscape(digest))
+	}
+
 	_, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete verify job %s: %w", id, err)

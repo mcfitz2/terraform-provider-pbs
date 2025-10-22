@@ -47,6 +47,7 @@ type gotifyNotificationResourceModel struct {
 	Token   types.String `tfsdk:"token"`
 	Comment types.String `tfsdk:"comment"`
 	Disable types.Bool   `tfsdk:"disable"`
+	Origin  types.String `tfsdk:"origin"`
 }
 
 // Metadata returns the resource type name.
@@ -93,6 +94,11 @@ verification tasks, and system events.`,
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+			},
+			"origin": schema.StringAttribute{
+				Description:         "Origin of this configuration as reported by PBS.",
+				MarkdownDescription: "Origin of this configuration as reported by PBS (e.g., `user`, `builtin`).",
+				Computed:            true,
 			},
 		},
 	}
@@ -148,6 +154,35 @@ func (r *gotifyNotificationResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
+	created, err := r.client.Notifications.GetGotifyTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading created Gotify notification target",
+			fmt.Sprintf("Created Gotify notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.Server = types.StringValue(created.Server)
+
+	if created.Comment != "" {
+		plan.Comment = types.StringValue(created.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if created.Disable != nil {
+		plan.Disable = types.BoolValue(*created.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+
+	if created.Origin != "" {
+		plan.Origin = types.StringValue(created.Origin)
+	} else {
+		plan.Origin = types.StringNull()
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -173,9 +208,19 @@ func (r *gotifyNotificationResource) Read(ctx context.Context, req resource.Read
 	// Don't update token from API (sensitive field)
 	if target.Comment != "" {
 		state.Comment = types.StringValue(target.Comment)
+	} else {
+		state.Comment = types.StringNull()
 	}
 	if target.Disable != nil {
 		state.Disable = types.BoolValue(*target.Disable)
+	} else {
+		state.Disable = types.BoolNull()
+	}
+
+	if target.Origin != "" {
+		state.Origin = types.StringValue(target.Origin)
+	} else {
+		state.Origin = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -211,6 +256,35 @@ func (r *gotifyNotificationResource) Update(ctx context.Context, req resource.Up
 			fmt.Sprintf("Could not update Gotify notification target %s: %s", plan.Name.ValueString(), err.Error()),
 		)
 		return
+	}
+
+	updated, err := r.client.Notifications.GetGotifyTarget(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading updated Gotify notification target",
+			fmt.Sprintf("Updated Gotify notification target %s but could not read it back: %s", plan.Name.ValueString(), err.Error()),
+		)
+		return
+	}
+
+	plan.Server = types.StringValue(updated.Server)
+
+	if updated.Comment != "" {
+		plan.Comment = types.StringValue(updated.Comment)
+	} else {
+		plan.Comment = types.StringNull()
+	}
+
+	if updated.Disable != nil {
+		plan.Disable = types.BoolValue(*updated.Disable)
+	} else {
+		plan.Disable = types.BoolNull()
+	}
+
+	if updated.Origin != "" {
+		plan.Origin = types.StringValue(updated.Origin)
+	} else {
+		plan.Origin = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)

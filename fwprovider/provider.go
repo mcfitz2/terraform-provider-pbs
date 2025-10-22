@@ -251,6 +251,7 @@ func (p *pbsProvider) Resources(_ context.Context) []func() resource.Resource {
 		notifications.NewGotifyNotificationResource,
 		notifications.NewSendmailNotificationResource,
 		notifications.NewWebhookNotificationResource,
+		notifications.NewNotificationEndpointResource,
 		// Notifications - Routing
 		notifications.NewNotificationMatcherResource,
 		// Jobs
