@@ -16,15 +16,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -56,10 +52,7 @@ type datastoreResource struct {
 // datastoreResourceModel maps the resource schema data.
 type datastoreResourceModel struct {
 	Name          types.String `tfsdk:"name"`
-	Type          types.String `tfsdk:"type"`
 	Path          types.String `tfsdk:"path"`
-	Content       types.List   `tfsdk:"content"`
-	MaxBackups    types.Int64  `tfsdk:"max_backups"`
 	Comment       types.String `tfsdk:"comment"`
 	Disabled      types.Bool   `tfsdk:"disabled"`
 	GCSchedule    types.String `tfsdk:"gc_schedule"`
@@ -156,40 +149,10 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					),
 				},
 			},
-			"type": schema.StringAttribute{
-				Description:         "Type of datastore backend (dir, zfs, lvm, cifs, nfs, s3).",
-				MarkdownDescription: "Type of datastore backend. Valid values: `dir`, `zfs`, `lvm`, `cifs`, `nfs`, `s3`.",
-				Required:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.OneOf("dir", "zfs", "lvm", "cifs", "nfs", "s3"),
-				},
-			},
 			"path": schema.StringAttribute{
 				Description:         "Path to the datastore (required for dir, optional for others).",
 				MarkdownDescription: "Path to the datastore. Required for directory datastores, optional for others.",
 				Optional:            true,
-			},
-			"content": schema.ListAttribute{
-				Description:         "Content types allowed on this datastore.",
-				MarkdownDescription: "Content types allowed on this datastore. Valid values: `backup`, `ct`, `iso`, `vztmpl`.",
-				ElementType:         types.StringType,
-				Optional:            true,
-				Computed:            true,
-				Default:             listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{types.StringValue("backup")})),
-				Validators: []validator.List{
-					listvalidator.ValueStringsAre(stringvalidator.OneOf("backup", "ct", "iso", "vztmpl")),
-				},
-			},
-			"max_backups": schema.Int64Attribute{
-				Description:         "Maximum number of backups per guest (0 = unlimited).",
-				MarkdownDescription: "Maximum number of backups per guest. Set to 0 for unlimited backups.",
-				Optional:            true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
 			},
 			"comment": schema.StringAttribute{
 				Description:         "Description for the datastore.",
@@ -732,47 +695,63 @@ func (r *datastoreResource) ImportState(ctx context.Context, req resource.Import
 
 // Helper functions
 
-// validateDatastoreConfig validates type-specific configuration requirements
+// validateDatastoreConfig validates configuration requirements that span backend types
 func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel) error {
-	dsType := plan.Type.ValueString()
+	s3ClientSet := !plan.S3Client.IsNull() && !plan.S3Client.IsUnknown() && strings.TrimSpace(plan.S3Client.ValueString()) != ""
+	s3BucketSet := !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() && strings.TrimSpace(plan.S3Bucket.ValueString()) != ""
 
-	switch dsType {
-	case "dir":
-		if plan.Path.IsNull() || plan.Path.ValueString() == "" {
-			return fmt.Errorf("path is required for directory datastores")
-		}
-	case "zfs":
-		if plan.ZFSPool.IsNull() || plan.ZFSPool.ValueString() == "" {
-			return fmt.Errorf("zfs_pool is required for ZFS datastores")
-		}
-	case "lvm":
-		if plan.VolumeGroup.IsNull() || plan.VolumeGroup.ValueString() == "" {
-			return fmt.Errorf("volume_group is required for LVM datastores")
-		}
-	case "cifs":
-		if plan.Server.IsNull() || plan.Server.ValueString() == "" {
-			return fmt.Errorf("server is required for CIFS datastores")
-		}
-		if plan.Share.IsNull() || plan.Share.ValueString() == "" {
-			return fmt.Errorf("share is required for CIFS datastores")
-		}
-	case "nfs":
-		if plan.Server.IsNull() || plan.Server.ValueString() == "" {
-			return fmt.Errorf("server is required for NFS datastores")
-		}
-		if plan.Export.IsNull() || plan.Export.ValueString() == "" {
-			return fmt.Errorf("export is required for NFS datastores")
-		}
-	case "s3":
-		if plan.Path.IsNull() || plan.Path.ValueString() == "" {
+	if s3ClientSet != s3BucketSet {
+		return fmt.Errorf("s3_client and s3_bucket must be provided together")
+	}
+
+	if s3ClientSet {
+		if plan.Path.IsNull() || plan.Path.IsUnknown() || strings.TrimSpace(plan.Path.ValueString()) == "" {
 			return fmt.Errorf("path is required for S3 datastores (local cache directory)")
 		}
-		if plan.S3Client.IsNull() || plan.S3Client.ValueString() == "" {
-			return fmt.Errorf("s3_client is required for S3 datastores")
+		return nil
+	}
+
+	isZFS := !plan.ZFSPool.IsNull() && !plan.ZFSPool.IsUnknown()
+	isLVM := !plan.VolumeGroup.IsNull() && !plan.VolumeGroup.IsUnknown()
+	isCIFS := !plan.Share.IsNull() && !plan.Share.IsUnknown()
+	isNFS := !plan.Export.IsNull() && !plan.Export.IsUnknown()
+
+	if isZFS {
+		if strings.TrimSpace(plan.ZFSPool.ValueString()) == "" {
+			return fmt.Errorf("zfs_pool is required when configuring ZFS-backed datastores")
 		}
-		if plan.S3Bucket.IsNull() || plan.S3Bucket.ValueString() == "" {
-			return fmt.Errorf("s3_bucket is required for S3 datastores")
+		return nil
+	}
+
+	if isLVM {
+		if strings.TrimSpace(plan.VolumeGroup.ValueString()) == "" {
+			return fmt.Errorf("volume_group is required when configuring LVM-backed datastores")
 		}
+		return nil
+	}
+
+	if isCIFS {
+		if plan.Server.IsNull() || plan.Server.IsUnknown() || strings.TrimSpace(plan.Server.ValueString()) == "" {
+			return fmt.Errorf("server is required when configuring CIFS-backed datastores")
+		}
+		if strings.TrimSpace(plan.Share.ValueString()) == "" {
+			return fmt.Errorf("share is required when configuring CIFS-backed datastores")
+		}
+		return nil
+	}
+
+	if isNFS {
+		if plan.Server.IsNull() || plan.Server.IsUnknown() || strings.TrimSpace(plan.Server.ValueString()) == "" {
+			return fmt.Errorf("server is required when configuring NFS-backed datastores")
+		}
+		if strings.TrimSpace(plan.Export.ValueString()) == "" {
+			return fmt.Errorf("export is required when configuring NFS-backed datastores")
+		}
+		return nil
+	}
+
+	if plan.Path.IsNull() || plan.Path.IsUnknown() || strings.TrimSpace(plan.Path.ValueString()) == "" {
+		return fmt.Errorf("path is required for directory-backed datastores")
 	}
 
 	return nil
@@ -782,29 +761,11 @@ func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel
 func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state *datastoreResourceModel) (*datastores.Datastore, error) {
 	ds := &datastores.Datastore{
 		Name: plan.Name.ValueString(),
-		Type: datastores.DatastoreType(plan.Type.ValueString()),
 	}
 
 	// Common fields
 	if !plan.Path.IsNull() && !plan.Path.IsUnknown() {
 		ds.Path = plan.Path.ValueString()
-	}
-	if !plan.Content.IsNull() && !plan.Content.IsUnknown() {
-		elements := plan.Content.Elements()
-		content := make([]string, 0, len(elements))
-		for _, item := range elements {
-			strVal := item.(types.String)
-			if strVal.IsNull() || strVal.IsUnknown() {
-				continue
-			}
-			content = append(content, strVal.ValueString())
-		}
-		if len(content) > 0 {
-			ds.Content = content
-		}
-	}
-	if ptr := optionalInt64Pointer(plan.MaxBackups); ptr != nil {
-		ds.MaxBackups = ptr
 	}
 	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
 		ds.Comment = plan.Comment.ValueString()
@@ -991,6 +952,9 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state 
 	if !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() {
 		ds.S3Bucket = plan.S3Bucket.ValueString()
 	}
+	if ds.S3Client != "" && ds.S3Bucket != "" {
+		ds.Backend = fmt.Sprintf("type=s3,client=%s,bucket=%s", ds.S3Client, ds.S3Bucket)
+	}
 
 	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
 		ds.Digest = plan.Digest.ValueString()
@@ -1121,20 +1085,9 @@ func boolValueOrNull(ptr *bool) types.Bool {
 // datastoreToState converts a datastore struct to Terraform state
 func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *datastoreResourceModel) error {
 	state.Name = types.StringValue(ds.Name)
-	state.Type = types.StringValue(string(ds.Type))
 
 	// Common fields
 	state.Path = stringValueOrNull(ds.Path)
-	if len(ds.Content) > 0 {
-		contentValues := make([]attr.Value, len(ds.Content))
-		for i, content := range ds.Content {
-			contentValues[i] = types.StringValue(content)
-		}
-		state.Content = types.ListValueMust(types.StringType, contentValues)
-	} else {
-		state.Content = types.ListNull(types.StringType)
-	}
-	state.MaxBackups = intValueOrNull(ds.MaxBackups)
 	state.Comment = stringValueOrNull(ds.Comment)
 	state.Disabled = boolValueOrNull(ds.Disabled)
 	state.GCSchedule = stringValueOrNull(ds.GCSchedule)

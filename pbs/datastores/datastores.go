@@ -28,18 +28,6 @@ func NewClient(apiClient *api.Client) *Client {
 	return &Client{api: apiClient}
 }
 
-// DatastoreType represents the type of datastore backend
-type DatastoreType string
-
-const (
-	DatastoreTypeDirectory DatastoreType = "dir"
-	DatastoreTypeZFS       DatastoreType = "zfs"
-	DatastoreTypeLVM       DatastoreType = "lvm"
-	DatastoreTypeCIFS      DatastoreType = "cifs"
-	DatastoreTypeNFS       DatastoreType = "nfs"
-	DatastoreTypeS3        DatastoreType = "s3"
-)
-
 // datastoreListItem represents a datastore in list responses (minimal info)
 type datastoreListItem struct {
 	Name            string `json:"name"`
@@ -49,15 +37,12 @@ type datastoreListItem struct {
 
 // Datastore represents a PBS datastore configuration
 type Datastore struct {
-	Name          string        `json:"name"`
-	Type          DatastoreType `json:"type"`
-	Path          string        `json:"path,omitempty"`
-	Content       []string      `json:"content,omitempty"`
-	MaxBackups    *int          `json:"max-backups,omitempty"`
-	Comment       string        `json:"comment,omitempty"`
-	Disabled      *bool         `json:"disable,omitempty"`
-	GCSchedule    string        `json:"gc-schedule,omitempty"`
-	PruneSchedule string        `json:"prune-schedule,omitempty"`
+	Name          string `json:"name"`
+	Path          string `json:"path,omitempty"`
+	Comment       string `json:"comment,omitempty"`
+	Disabled      *bool  `json:"disable,omitempty"`
+	GCSchedule    string `json:"gc-schedule,omitempty"`
+	PruneSchedule string `json:"prune-schedule,omitempty"`
 
 	// Retention windows
 	KeepLast    *int `json:"keep-last,omitempty"`
@@ -135,12 +120,9 @@ func (c *Client) ListDatastores(ctx context.Context) ([]Datastore, error) {
 	// If detailed info is needed, GetDatastore should be called for individual items
 	datastores := make([]Datastore, len(listItems))
 	for i, item := range listItems {
-		// Try to infer type from path or use directory as default
-		datastoreType := c.inferDatastoreType(item.Path)
 		datastores[i] = Datastore{
 			Name: item.Name,
 			Path: item.Path,
-			Type: datastoreType,
 		}
 	}
 
@@ -182,10 +164,6 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 				ds.TuningRaw = formatTuning(ds.Tuning)
 			}
 
-			// If type is not set, infer it
-			if ds.Type == "" {
-				ds.Type = c.inferDatastoreType(ds.Path)
-			}
 			return &ds, nil
 		}
 	}
@@ -198,10 +176,6 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 
 	for _, ds := range datastores {
 		if ds.Name == name {
-			// Ensure type is set properly
-			if ds.Type == "" {
-				ds.Type = c.inferDatastoreType(ds.Path)
-			}
 			return &ds, nil
 		}
 	}
@@ -305,8 +279,8 @@ func (c *Client) datastoreToMap(ds *Datastore) map[string]interface{} {
 		"name": ds.Name,
 	}
 
-	if ds.Type != "" {
-		body["type"] = string(ds.Type)
+	if dsType := determineDatastoreType(ds); dsType != "" {
+		body["type"] = dsType
 	}
 
 	if ds.Path != "" {
@@ -355,11 +329,6 @@ func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds 
 		}
 	}
 
-	if len(ds.Content) > 0 {
-		body["content"] = ds.Content
-	}
-
-	setInt("max-backups", ds.MaxBackups)
 	setString("comment", ds.Comment)
 	setBool("disable", ds.Disabled)
 	setString("gc-schedule", ds.GCSchedule)
@@ -417,7 +386,8 @@ func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds 
 	setString("subdir", ds.SubDir)
 	setString("options", ds.Options)
 
-	if ds.Type == DatastoreTypeS3 || strings.HasPrefix(ds.Backend, "type=s3") {
+	backendIsS3 := strings.HasPrefix(ds.Backend, "type=s3") || (ds.S3Client != "" && ds.S3Bucket != "")
+	if backendIsS3 {
 		if ds.Backend != "" {
 			body["backend"] = ds.Backend
 		} else if ds.S3Client != "" && ds.S3Bucket != "" {
@@ -428,13 +398,37 @@ func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds 
 	}
 }
 
-// inferDatastoreType attempts to determine datastore type from available information
-func (c *Client) inferDatastoreType(path string) DatastoreType {
-	// For now, assume all datastores are directory type since that's what we support
-	// In the future, this could be enhanced to detect ZFS paths, LVM paths, etc.
-	// based on path patterns or additional API calls
-	// Note: S3 type should be determined by parseS3Backend when backend field is present
-	return DatastoreTypeDirectory
+// determineDatastoreType infers the datastore type from available configuration
+func determineDatastoreType(ds *Datastore) string {
+	if ds == nil {
+		return ""
+	}
+
+	if strings.HasPrefix(ds.Backend, "type=s3") || (ds.S3Client != "" && ds.S3Bucket != "") {
+		return "s3"
+	}
+
+	if ds.ZFSPool != "" || ds.ZFSDataset != "" {
+		return "zfs"
+	}
+
+	if ds.VolumeGroup != "" || ds.ThinPool != "" {
+		return "lvm"
+	}
+
+	if ds.Share != "" || ds.Username != "" || ds.Domain != "" || ds.SubDir != "" {
+		return "cifs"
+	}
+
+	if ds.Export != "" {
+		return "nfs"
+	}
+
+	if ds.Path != "" {
+		return "dir"
+	}
+
+	return ""
 }
 
 // getNodeForTask determines the node name for a given task
@@ -479,10 +473,6 @@ func (c *Client) parseS3Backend(ds *Datastore) {
 		value := strings.TrimSpace(keyValue[1])
 
 		switch key {
-		case "type":
-			if value == "s3" {
-				ds.Type = DatastoreTypeS3
-			}
 		case "client":
 			ds.S3Client = value
 		case "bucket":

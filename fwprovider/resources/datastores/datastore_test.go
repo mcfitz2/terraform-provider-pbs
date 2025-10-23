@@ -14,7 +14,6 @@ func TestPlanToDatastoreAdvancedFields(t *testing.T) {
 
 	plan := datastoreResourceModel{
 		Name:             types.StringValue("test-datastore"),
-		Type:             types.StringValue("dir"),
 		Path:             types.StringValue("/datastore/test"),
 		NotifyUser:       types.StringValue("root@pam"),
 		NotifyLevel:      types.StringValue("warning"),
@@ -85,7 +84,6 @@ func TestPlanToDatastoreDeleteSections(t *testing.T) {
 
 	plan := datastoreResourceModel{
 		Name:             types.StringValue("test"),
-		Type:             types.StringValue("dir"),
 		Path:             types.StringValue("/datastore/test"),
 		NotifyUser:       types.StringNull(),
 		NotifyLevel:      types.StringNull(),
@@ -134,7 +132,6 @@ func TestPlanToDatastoreDeleteSections(t *testing.T) {
 func TestDatastoreToStateRoundTrip(t *testing.T) {
 	resource := &datastoreResource{}
 
-	maxBackups := 5
 	gcAtimeCutoff := 7200
 	gcCacheCapacity := 256
 	verifyNew := true
@@ -143,15 +140,14 @@ func TestDatastoreToStateRoundTrip(t *testing.T) {
 
 	ds := &pbssdk.Datastore{
 		Name:          "example",
-		Type:          pbssdk.DatastoreTypeDirectory,
 		Path:          "/datastore/example",
-		Content:       []string{"backup", "iso"},
-		MaxBackups:    &maxBackups,
 		Comment:       "round-trip",
 		Disabled:      boolPtr(false),
 		GCSchedule:    "daily",
 		PruneSchedule: "weekly",
 		KeepDaily:     intPtr(3),
+		S3Client:      "endpoint-1",
+		S3Bucket:      "bucket-1",
 		Notify: &pbssdk.DatastoreNotify{
 			GC:     "always",
 			Verify: "error",
@@ -182,7 +178,6 @@ func TestDatastoreToStateRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, types.StringValue("example"), state.Name)
-	assert.Equal(t, types.StringValue("dir"), state.Type)
 	assert.Equal(t, types.StringValue("/datastore/example"), state.Path)
 	assert.Equal(t, "round-trip", state.Comment.ValueString())
 	assert.Equal(t, "daily", state.GCSchedule.ValueString())
@@ -190,13 +185,8 @@ func TestDatastoreToStateRoundTrip(t *testing.T) {
 	assert.Equal(t, int64(3), state.KeepDaily.ValueInt64())
 	assert.Equal(t, "ff:ee", state.Fingerprint.ValueString())
 	assert.Equal(t, "digest-value", state.Digest.ValueString())
-
-	// Content list should be populated with both entries
-	require.False(t, state.Content.IsNull())
-	elems := state.Content.Elements()
-	require.Len(t, elems, 2)
-	assert.Equal(t, "backup", elems[0].(types.String).ValueString())
-	assert.Equal(t, "iso", elems[1].(types.String).ValueString())
+	assert.Equal(t, "endpoint-1", state.S3Client.ValueString())
+	assert.Equal(t, "bucket-1", state.S3Bucket.ValueString())
 
 	// Notify block populated
 	require.NotNil(t, state.Notify)

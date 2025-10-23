@@ -439,7 +439,6 @@ resource "pbs_datastore" "test_%s" {
 	}
 	require.NoError(t, err, "Failed to get S3 datastore via PBS API after %d retries", maxRetries)
 	assert.Equal(t, datastoreName, pbsDatastore.Name)
-	assert.Equal(t, datastores.DatastoreTypeS3, pbsDatastore.Type)
 	assert.Equal(t, fmt.Sprintf("/datastore/%s-cache", datastoreName), pbsDatastore.Path)
 	assert.Equal(t, pbsConfig["id"], pbsDatastore.S3Client)
 	assert.Equal(t, provider.BucketName, pbsDatastore.S3Bucket)

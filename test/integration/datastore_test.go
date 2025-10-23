@@ -30,9 +30,7 @@ func TestDatastoreDirectoryIntegration(t *testing.T) {
 	config := fmt.Sprintf(`
 resource "pbs_datastore" "test_directory" {
   name             = "%s"
-  type             = "dir"
   path             = "/datastore/%s"
-  content          = ["backup"]
   comment          = "Test directory datastore"
   gc_schedule      = "daily"
   prune_schedule   = "weekly"
@@ -48,7 +46,6 @@ resource "pbs_datastore" "test_directory" {
 	// Verify resource was created via Terraform state
 	resource := tc.GetResourceFromState(t, "pbs_datastore.test_directory")
 	assert.Equal(t, datastoreName, resource.AttributeValues["name"])
-	assert.Equal(t, "dir", resource.AttributeValues["type"])
 	assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), resource.AttributeValues["path"])
 	assert.Equal(t, "Test directory datastore", resource.AttributeValues["comment"])
 	assert.Equal(t, "daily", resource.AttributeValues["gc_schedule"])
@@ -61,8 +58,6 @@ resource "pbs_datastore" "test_directory" {
 	if err != nil {
 		t.Logf("INFO: Datastore %s not yet visible in PBS (may still be processing async): %v", datastoreName, err)
 	} else {
-		assert.Equal(t, datastoreName, datastore.Name)
-		assert.Equal(t, datastores.DatastoreTypeDirectory, datastore.Type)
 		assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), datastore.Path)
 		t.Logf("SUCCESS: Datastore %s found via API", datastoreName)
 	}
@@ -71,13 +66,10 @@ resource "pbs_datastore" "test_directory" {
 	updatedConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_directory" {
   name             = "%s"
-  type             = "dir"
   path             = "/datastore/%s"
-  content          = ["backup"]
   comment          = "Updated test directory datastore"
   gc_schedule      = "weekly"
   prune_schedule   = "daily"
-  max_backups      = 20
 }
 `, datastoreName, datastoreName)
 
@@ -113,15 +105,12 @@ func TestDatastoreZFSIntegration(t *testing.T) {
 	testConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_zfs" {
   name        = "%s"
-  type        = "zfs"
   path        = "/mnt/datastore/%s"
   zfs_pool    = "%s"
   zfs_dataset = "backup/%s"
-  content     = ["backup"]
   comment     = "Test ZFS datastore"
   compression = "lz4"
   block_size  = "8K"
-  max_backups = 15
 }
 `, datastoreName, datastoreName, zfsPool, datastoreName)
 
@@ -144,12 +133,10 @@ resource "pbs_datastore" "test_zfs" {
 	require.NoError(t, err)
 
 	// ZFS datastores are reported as "dir" type by PBS (they're directory datastores on ZFS mounts)
-	assert.Equal(t, datastores.DatastoreTypeDirectory, datastore.Type)
 
 	// Verify resource was created via Terraform state
 	resource := tc.GetResourceFromState(t, "pbs_datastore.test_zfs")
 	assert.Equal(t, datastoreName, resource.AttributeValues["name"])
-	assert.Equal(t, "zfs", resource.AttributeValues["type"])
 	assert.Equal(t, zfsPool, resource.AttributeValues["zfs_pool"])
 	assert.Equal(t, fmt.Sprintf("backup/%s", datastoreName), resource.AttributeValues["zfs_dataset"])
 
@@ -168,45 +155,44 @@ func TestDatastoreValidation(t *testing.T) {
 	defer tc.DestroyTerraform(t)
 
 	// Test missing required path for directory datastore
-	invalidConfig := `
+	invalidDirConfig := `
 resource "pbs_datastore" "invalid_dir" {
   name = "invalid-dir"
-  type = "dir"
   # missing required path
-  content = ["backup"]
 }
 `
 
-	tc.WriteMainTF(t, invalidConfig)
+	tc.WriteMainTF(t, invalidDirConfig)
 	err := tc.ApplyTerraformWithError(t)
 	assert.Error(t, err, "Should fail validation for directory datastore without path")
 
-	// Test invalid datastore type
-	invalidTypeConfig := `
-resource "pbs_datastore" "invalid_type" {
-  name = "invalid-type"
-  type = "invalid"
-  path = "/tmp/test"
+	// Test missing S3 bucket when client is provided
+	invalidS3Config := `
+resource "pbs_datastore" "invalid_s3" {
+  name      = "invalid-s3"
+  s3_client = "endpoint-1"
+  path      = "/datastore/invalid-s3"
 }
 `
 
-	tc.WriteMainTF(t, invalidTypeConfig)
+	tc.WriteMainTF(t, invalidS3Config)
 	err = tc.ApplyTerraformWithError(t)
-	assert.Error(t, err, "Should fail validation for invalid datastore type")
+	assert.Error(t, err, "Should fail validation when only one S3 attribute is provided")
 
-	// Test missing ZFS pool for ZFS datastore
-	invalidZFSConfig := `
-resource "pbs_datastore" "invalid_zfs" {
-  name = "invalid-zfs"
-  type = "zfs"
-  # missing required zfs_pool
-  content = ["backup"]
+	// Test missing server for CIFS datastore
+	invalidCIFSConfig := `
+resource "pbs_datastore" "invalid_cifs" {
+  name     = "invalid-cifs"
+  path     = "/mnt/datastore/invalid-cifs"
+  share    = "testshare"
+  username = "user"
+  password = "pass"
 }
 `
 
-	tc.WriteMainTF(t, invalidZFSConfig)
+	tc.WriteMainTF(t, invalidCIFSConfig)
 	err = tc.ApplyTerraformWithError(t)
-	assert.Error(t, err, "Should fail validation for ZFS datastore without pool")
+	assert.Error(t, err, "Should fail validation for CIFS datastore without server")
 }
 
 // Concurrency tests removed - not required for PBS datastore operations
@@ -246,14 +232,12 @@ func TestDatastoreNetworkStorage(t *testing.T) {
 	cifsConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_cifs" {
   name     = "%s"
-  type     = "cifs"
   path     = "/mnt/datastore/%s"
   server   = "%s"
   share    = "%s"
   username = "%s"
   password = "%s"
   sub_dir  = "pbs"
-  content  = ["backup"]
   comment  = "Test CIFS datastore"
   options  = "vers=3.0"
 }
@@ -265,7 +249,6 @@ resource "pbs_datastore" "test_cifs" {
 	// Verify the configuration
 	resource := tc.GetResourceFromState(t, "pbs_datastore.test_cifs")
 	assert.Equal(t, cifsDatastore, resource.AttributeValues["name"])
-	assert.Equal(t, "cifs", resource.AttributeValues["type"])
 	assert.Equal(t, cifsHost, resource.AttributeValues["server"])
 	assert.Equal(t, cifsShare, resource.AttributeValues["share"])
 
@@ -281,12 +264,10 @@ resource "pbs_datastore" "test_cifs" {
 	nfsConfig := fmt.Sprintf(`
 resource "pbs_datastore" "test_nfs" {
   name    = "%s"
-  type    = "nfs"
   path    = "/mnt/datastore/%s"
   server  = "%s"
   export  = "%s"
   sub_dir = "pbs"
-  content = ["backup"]
   comment = "Test NFS datastore"
   options = "vers=4,soft"
 }
@@ -300,7 +281,6 @@ resource "pbs_datastore" "test_nfs" {
 	// Verify the configuration
 	resource = tc.GetResourceFromState(t, "pbs_datastore.test_nfs")
 	assert.Equal(t, nfsDatastore, resource.AttributeValues["name"])
-	assert.Equal(t, "nfs", resource.AttributeValues["type"])
 	assert.Equal(t, nfsHost, resource.AttributeValues["server"])
 	assert.Equal(t, nfsExport, resource.AttributeValues["export"])
 }
@@ -324,7 +304,6 @@ func TestDatastoreImport(t *testing.T) {
 	datastoreClient := datastores.NewClient(tc.APIClient)
 	testDatastore := &datastores.Datastore{
 		Name: datastoreName,
-		Type: datastores.DatastoreTypeDirectory,
 		Path: datastorePath,
 	}
 
@@ -353,7 +332,6 @@ func TestDatastoreImport(t *testing.T) {
 	importConfig := fmt.Sprintf(`
 resource "pbs_datastore" "imported" {
   name = "%s"
-  type = "dir"
   path = "%s"
 }
 `, datastoreName, datastorePath)
@@ -366,7 +344,6 @@ resource "pbs_datastore" "imported" {
 	// Verify the import was successful
 	resource := tc.GetResourceFromState(t, "pbs_datastore.imported")
 	assert.Equal(t, datastoreName, resource.AttributeValues["name"])
-	assert.Equal(t, "dir", resource.AttributeValues["type"])
 
 	// Apply to ensure configuration matches
 	tc.ApplyTerraform(t)
