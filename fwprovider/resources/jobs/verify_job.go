@@ -170,6 +170,10 @@ func (r *verifyJobResource) Create(ctx context.Context, req resource.CreateReque
 
 	job := buildVerifyJobFromPlan(&plan)
 
+	if job.Disable != nil && !*job.Disable {
+		job.Disable = nil
+	}
+
 	if err := r.client.Jobs.CreateVerifyJob(ctx, job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating verify job",

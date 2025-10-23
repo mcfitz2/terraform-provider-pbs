@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -444,16 +445,16 @@ func buildSyncJobFromPlan(ctx context.Context, plan *syncJobResourceModel) (*job
 		job.Owner = plan.Owner.ValueString()
 	}
 	if !plan.RateIn.IsNull() && !plan.RateIn.IsUnknown() {
-		job.RateIn = plan.RateIn.ValueString()
+		job.RateIn = normalizeRateString(plan.RateIn.ValueString())
 	}
 	if !plan.RateOut.IsNull() && !plan.RateOut.IsUnknown() {
-		job.RateOut = plan.RateOut.ValueString()
+		job.RateOut = normalizeRateString(plan.RateOut.ValueString())
 	}
 	if !plan.BurstIn.IsNull() && !plan.BurstIn.IsUnknown() {
-		job.BurstIn = plan.BurstIn.ValueString()
+		job.BurstIn = normalizeRateString(plan.BurstIn.ValueString())
 	}
 	if !plan.BurstOut.IsNull() && !plan.BurstOut.IsUnknown() {
-		job.BurstOut = plan.BurstOut.ValueString()
+		job.BurstOut = normalizeRateString(plan.BurstOut.ValueString())
 	}
 	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
 		job.Comment = plan.Comment.ValueString()
@@ -540,6 +541,29 @@ func computeSyncDeletes(plan, state *syncJobResourceModel) []string {
 	return deletes
 }
 
+func normalizeRateString(value string) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return ""
+	}
+
+	v = strings.ReplaceAll(v, " ", "")
+	v = strings.ToUpper(v)
+
+	if strings.HasSuffix(v, "IB") && len(v) > 2 {
+		v = v[:len(v)-2]
+	}
+
+	if len(v) > 1 && strings.HasSuffix(v, "B") {
+		prev := v[len(v)-2]
+		if (prev >= 'A' && prev <= 'Z') || prev == 'I' {
+			v = v[:len(v)-1]
+		}
+	}
+
+	return v
+}
+
 func setSyncStateFromAPI(ctx context.Context, job *jobs.SyncJob, state *syncJobResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -591,10 +615,10 @@ func setSyncStateFromAPI(ctx context.Context, job *jobs.SyncJob, state *syncJobR
 	state.TransferLast = int64ValueOrNull(job.TransferLast)
 	state.SyncDirection = stringValueOrNull(job.SyncDirection)
 	state.Owner = stringValueOrNull(job.Owner)
-	state.RateIn = stringValueOrNull(job.RateIn)
-	state.RateOut = stringValueOrNull(job.RateOut)
-	state.BurstIn = stringValueOrNull(job.BurstIn)
-	state.BurstOut = stringValueOrNull(job.BurstOut)
+	state.RateIn = stringValueOrNull(normalizeRateString(job.RateIn))
+	state.RateOut = stringValueOrNull(normalizeRateString(job.RateOut))
+	state.BurstIn = stringValueOrNull(normalizeRateString(job.BurstIn))
+	state.BurstOut = stringValueOrNull(normalizeRateString(job.BurstOut))
 	state.Comment = stringValueOrNull(job.Comment)
 	if job.Disable != nil {
 		state.Disable = types.BoolValue(*job.Disable)
