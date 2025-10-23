@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -294,7 +295,7 @@ func TestWebhookNotificationIntegration(t *testing.T) {
 resource "pbs_webhook_notification" "test_webhook" {
   name    = "%s"
   url     = "https://webhook.example.com/notify"
-  method  = "POST"
+	method  = "post"
   comment = "Test Webhook notification"
   disable = false
 }
@@ -308,7 +309,7 @@ resource "pbs_webhook_notification" "test_webhook" {
 	assert.Equal(t, "https://webhook.example.com/notify", resource.AttributeValues["url"])
 	// Method is normalized to lowercase in our provider
 	method := resource.AttributeValues["method"].(string)
-	assert.True(t, method == "post" || method == "POST", "method should be 'post' or 'POST', got: %s", method)
+	assert.Equal(t, "post", method)
 
 	// Verify via API
 	notifClient := notifications.NewClient(tc.APIClient)
@@ -317,7 +318,7 @@ resource "pbs_webhook_notification" "test_webhook" {
 	assert.Equal(t, targetName, target.Name)
 	assert.Equal(t, "https://webhook.example.com/notify", target.URL)
 	// API may return uppercase or lowercase
-	assert.True(t, target.Method == "post" || target.Method == "POST", "method should be 'post' or 'POST', got: %s", target.Method)
+	assert.True(t, strings.EqualFold(target.Method, "post"), "method should be 'post' (any case), got: %s", target.Method)
 }
 
 // TestNotificationMatcherIntegration tests notification matcher lifecycle

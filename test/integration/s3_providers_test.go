@@ -367,7 +367,6 @@ resource "pbs_s3_endpoint" "test_%s" {
 	terraformConfig += fmt.Sprintf(`
 resource "pbs_datastore" "test_%s" {
   name       = "%s"
-  type       = "s3"
   path       = "/datastore/%s-cache"
   s3_client  = "%s"
   s3_bucket  = "%s"
@@ -404,7 +403,6 @@ resource "pbs_datastore" "test_%s" {
 	datastoreResource := tc.GetResourceFromState(t, fmt.Sprintf("pbs_datastore.test_%s", provider.Name))
 	if datastoreResource != nil {
 		assert.Equal(t, datastoreName, datastoreResource.AttributeValues["name"])
-		assert.Equal(t, "s3", datastoreResource.AttributeValues["type"])
 		assert.Equal(t, fmt.Sprintf("/datastore/%s-cache", datastoreName), datastoreResource.AttributeValues["path"])
 		assert.Equal(t, pbsConfig["id"], datastoreResource.AttributeValues["s3_client"])
 		assert.Equal(t, provider.BucketName, datastoreResource.AttributeValues["s3_bucket"])
