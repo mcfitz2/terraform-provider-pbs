@@ -278,6 +278,10 @@ func (r *syncJobResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	if job.Disable != nil && !*job.Disable {
+		job.Disable = nil
+	}
+
 	if err := r.client.Jobs.CreateSyncJob(ctx, job); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating sync job",

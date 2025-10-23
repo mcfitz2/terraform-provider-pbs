@@ -125,7 +125,6 @@ func TestQuickSmoke(t *testing.T) {
 	testConfig := `
 resource "pbs_datastore" "smoke" {
   name = "` + datastoreName + `"
-  type = "dir"
   path = "/datastore/` + datastoreName + `"
 }
 `
