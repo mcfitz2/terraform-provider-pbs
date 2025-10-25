@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
@@ -672,6 +673,20 @@ func (c *Client) CreateNotificationEndpoint(ctx context.Context, endpoint *Notif
 	return nil
 }
 
+// SupportsNotificationEndpoints returns true when the PBS API exposes notification endpoint operations.
+func (c *Client) SupportsNotificationEndpoints(ctx context.Context) (bool, error) {
+	_, err := c.api.Get(ctx, "/config/notifications/endpoints")
+	if err == nil {
+		return true, nil
+	}
+
+	if isAPINotFoundError(err, "/config/notifications/endpoints") {
+		return false, nil
+	}
+
+	return false, err
+}
+
 // UpdateNotificationEndpoint updates an existing notification endpoint
 func (c *Client) UpdateNotificationEndpoint(ctx context.Context, name string, endpoint *NotificationEndpoint) error {
 	if name == "" {
@@ -712,6 +727,26 @@ func (c *Client) DeleteNotificationEndpoint(ctx context.Context, name string) er
 	}
 
 	return nil
+}
+
+func isAPINotFoundError(err error, apiPath string) bool {
+	if err == nil {
+		return false
+	}
+
+	message := err.Error()
+	if strings.Contains(message, "status 404") {
+		return true
+	}
+
+	lower := strings.ToLower(message)
+	if strings.Contains(lower, "not found") {
+		if apiPath == "" || strings.Contains(message, apiPath) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Notification Matchers

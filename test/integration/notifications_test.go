@@ -185,6 +185,13 @@ func TestNotificationEndpointIntegration(t *testing.T) {
 	tc := SetupTest(t)
 	defer tc.DestroyTerraform(t)
 
+	notifClient := notifications.NewClient(tc.APIClient)
+	supported, err := notifClient.SupportsNotificationEndpoints(context.Background())
+	require.NoError(t, err, "failed to detect notification endpoint support")
+	if !supported {
+		t.Skip("PBS instance does not expose notification endpoints; skipping integration test")
+	}
+
 	endpointName := GenerateTestName("endpoint")
 	smtpTarget := GenerateTestName("smtp")
 	sendmailTarget := GenerateTestName("sendmail")
@@ -226,7 +233,6 @@ resource "pbs_notification_endpoint" "test_endpoint" {
 	require.True(t, ok, "expected targets to be a list in state")
 	assert.ElementsMatch(t, []interface{}{smtpTarget, sendmailTarget}, targetsState)
 
-	notifClient := notifications.NewClient(tc.APIClient)
 	endpoint, err := notifClient.GetNotificationEndpoint(context.Background(), endpointName)
 	require.NoError(t, err)
 	assert.Equal(t, endpointName, endpoint.Name)

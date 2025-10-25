@@ -119,6 +119,22 @@ func (r *notificationEndpointResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	supported, err := r.client.Notifications.SupportsNotificationEndpoints(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error checking notification endpoint support",
+			fmt.Sprintf("Failed to verify notification endpoint capability: %s", err.Error()),
+		)
+		return
+	}
+	if !supported {
+		resp.Diagnostics.AddError(
+			"Notification endpoints not supported",
+			"Notification endpoints require Proxmox Backup Server 4.0 or later. The connected PBS instance does not expose the /config/notifications/endpoints API. Please upgrade PBS before using this resource.",
+		)
+		return
+	}
+
 	endpoint := &notifications.NotificationEndpoint{
 		Name: plan.Name.ValueString(),
 	}
@@ -195,6 +211,22 @@ func (r *notificationEndpointResource) Update(ctx context.Context, req resource.
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	supported, err := r.client.Notifications.SupportsNotificationEndpoints(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error checking notification endpoint support",
+			fmt.Sprintf("Failed to verify notification endpoint capability: %s", err.Error()),
+		)
+		return
+	}
+	if !supported {
+		resp.Diagnostics.AddError(
+			"Notification endpoints not supported",
+			"Notification endpoints require Proxmox Backup Server 4.0 or later. The connected PBS instance no longer exposes the /config/notifications/endpoints API. Please upgrade PBS before updating this resource.",
+		)
 		return
 	}
 
