@@ -53,6 +53,8 @@ type datastoreResource struct {
 type datastoreResourceModel struct {
 	Name          types.String `tfsdk:"name"`
 	Path          types.String `tfsdk:"path"`
+	Removable     types.Bool   `tfsdk:"removable"`
+	BackingDevice types.String `tfsdk:"backing_device"`
 	Comment       types.String `tfsdk:"comment"`
 	Disabled      types.Bool   `tfsdk:"disabled"`
 	GCSchedule    types.String `tfsdk:"gc_schedule"`
@@ -63,26 +65,6 @@ type datastoreResourceModel struct {
 	KeepWeekly    types.Int64  `tfsdk:"keep_weekly"`
 	KeepMonthly   types.Int64  `tfsdk:"keep_monthly"`
 	KeepYearly    types.Int64  `tfsdk:"keep_yearly"`
-
-	// ZFS-specific options
-	ZFSPool     types.String `tfsdk:"zfs_pool"`
-	ZFSDataset  types.String `tfsdk:"zfs_dataset"`
-	BlockSize   types.String `tfsdk:"block_size"`
-	Compression types.String `tfsdk:"compression"`
-
-	// LVM-specific options
-	VolumeGroup types.String `tfsdk:"volume_group"`
-	ThinPool    types.String `tfsdk:"thin_pool"`
-
-	// Network storage options (CIFS/NFS)
-	Server   types.String `tfsdk:"server"`
-	Export   types.String `tfsdk:"export"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
-	Domain   types.String `tfsdk:"domain"`
-	Share    types.String `tfsdk:"share"`
-	SubDir   types.String `tfsdk:"sub_dir"`
-	Options  types.String `tfsdk:"options"`
 
 	// Advanced options
 	NotifyUser       types.String          `tfsdk:"notify_user"`
@@ -132,7 +114,7 @@ func (r *datastoreResource) Metadata(_ context.Context, req resource.MetadataReq
 func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Manages a PBS datastore configuration.",
-		MarkdownDescription: "Manages a Proxmox Backup Server datastore configuration supporting directory, ZFS, LVM, CIFS, NFS, and S3 backends.",
+		MarkdownDescription: "Manages a Proxmox Backup Server datastore configuration supporting directory, removable, and S3 backends.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Description:         "Unique identifier for the datastore.",
@@ -150,9 +132,27 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"path": schema.StringAttribute{
-				Description:         "Path to the datastore (required for dir, optional for others).",
-				MarkdownDescription: "Path to the datastore. Required for directory datastores, optional for others.",
+				Description:         "Filesystem path to the datastore data (required for directory datastores and S3 cache).",
+				MarkdownDescription: "Filesystem path to the datastore data. Required for directory datastores and used as the local cache directory for S3 datastores.",
 				Optional:            true,
+			},
+			"removable": schema.BoolAttribute{
+				Description:         "Whether the datastore is backed by a removable device.",
+				MarkdownDescription: "Set to `true` to manage a removable datastore backed by a device UUID.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"backing_device": schema.StringAttribute{
+				Description:         "UUID of the filesystem partition for a removable datastore.",
+				MarkdownDescription: "UUID of the filesystem partition for a removable datastore (e.g., `01234567-89ab-cdef-0123-456789abcdef`).",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$`),
+						"Backing device must be a valid lowercase UUID (e.g., 01234567-89ab-cdef-0123-456789abcdef).",
+					),
+				},
 			},
 			"comment": schema.StringAttribute{
 				Description:         "Description for the datastore.",
@@ -224,86 +224,6 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
-			},
-
-			// ZFS-specific attributes
-			"zfs_pool": schema.StringAttribute{
-				Description:         "ZFS pool name (zfs type only).",
-				MarkdownDescription: "ZFS pool name. Required for ZFS datastores.",
-				Optional:            true,
-			},
-			"zfs_dataset": schema.StringAttribute{
-				Description:         "ZFS dataset name (zfs type only).",
-				MarkdownDescription: "ZFS dataset name. Optional for ZFS datastores.",
-				Optional:            true,
-			},
-			"block_size": schema.StringAttribute{
-				Description:         "Block size for ZFS (zfs type only).",
-				MarkdownDescription: "Block size for ZFS datasets (e.g., `4K`, `8K`, `16K`).",
-				Optional:            true,
-			},
-			"compression": schema.StringAttribute{
-				Description:         "Compression algorithm for ZFS (zfs type only).",
-				MarkdownDescription: "Compression algorithm for ZFS. Valid values: `on`, `off`, `lz4`, `zstd`, `gzip`.",
-				Optional:            true,
-				Validators: []validator.String{
-					stringvalidator.OneOf("on", "off", "lz4", "zstd", "gzip"),
-				},
-			},
-
-			// LVM-specific attributes
-			"volume_group": schema.StringAttribute{
-				Description:         "LVM volume group name (lvm type only).",
-				MarkdownDescription: "LVM volume group name. Required for LVM datastores.",
-				Optional:            true,
-			},
-			"thin_pool": schema.StringAttribute{
-				Description:         "LVM thin pool name (lvm type only).",
-				MarkdownDescription: "LVM thin pool name. Optional for LVM datastores.",
-				Optional:            true,
-			},
-
-			// Network storage attributes
-			"server": schema.StringAttribute{
-				Description:         "Server hostname or IP address (cifs/nfs type only).",
-				MarkdownDescription: "Server hostname or IP address. Required for CIFS/NFS datastores.",
-				Optional:            true,
-			},
-			"export": schema.StringAttribute{
-				Description:         "NFS export path (nfs type only).",
-				MarkdownDescription: "NFS export path. Required for NFS datastores.",
-				Optional:            true,
-			},
-			"username": schema.StringAttribute{
-				Description:         "Username for CIFS authentication (cifs type only).",
-				MarkdownDescription: "Username for CIFS authentication. Optional for CIFS datastores.",
-				Optional:            true,
-			},
-			"password": schema.StringAttribute{
-				Description:         "Password for CIFS authentication (cifs type only).",
-				MarkdownDescription: "Password for CIFS authentication. Optional for CIFS datastores.",
-				Optional:            true,
-				Sensitive:           true,
-			},
-			"domain": schema.StringAttribute{
-				Description:         "Domain for CIFS authentication (cifs type only).",
-				MarkdownDescription: "Domain for CIFS authentication. Optional for CIFS datastores.",
-				Optional:            true,
-			},
-			"share": schema.StringAttribute{
-				Description:         "CIFS share name (cifs type only).",
-				MarkdownDescription: "CIFS share name. Required for CIFS datastores.",
-				Optional:            true,
-			},
-			"sub_dir": schema.StringAttribute{
-				Description:         "Subdirectory on the remote share.",
-				MarkdownDescription: "Subdirectory on the remote share. Optional for network datastores.",
-				Optional:            true,
-			},
-			"options": schema.StringAttribute{
-				Description:         "Mount options for network storage.",
-				MarkdownDescription: "Mount options for network storage (e.g., `vers=3,soft`).",
-				Optional:            true,
 			},
 
 			// Advanced attributes
@@ -457,7 +377,7 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"fingerprint": schema.StringAttribute{
 				Description:         "Certificate fingerprint for secure connections.",
-				MarkdownDescription: "Certificate fingerprint for secure connections (network datastores).",
+				MarkdownDescription: "Certificate fingerprint for secure connections (S3 datastores).",
 				Optional:            true,
 			},
 			"digest": schema.StringAttribute{
@@ -569,8 +489,9 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		state.Disabled = types.BoolValue(false)
 	}
 
-	// Preserve sensitive or plan-only fields not returned by the API
-	state.Password = plan.Password
+	// Preserve plan-only fields not returned by the API
+	state.Removable = plan.Removable
+	state.BackingDevice = plan.BackingDevice
 	state.PruneSchedule = plan.PruneSchedule
 	state.Path = plan.Path
 	state.Comment = plan.Comment
@@ -756,6 +677,22 @@ func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel
 
 	s3ClientSet := !plan.S3Client.IsNull() && !plan.S3Client.IsUnknown() && strings.TrimSpace(plan.S3Client.ValueString()) != ""
 	s3BucketSet := !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() && strings.TrimSpace(plan.S3Bucket.ValueString()) != ""
+	removableSet := !plan.Removable.IsNull() && !plan.Removable.IsUnknown() && plan.Removable.ValueBool()
+	backingDeviceSet := !plan.BackingDevice.IsNull() && !plan.BackingDevice.IsUnknown() && strings.TrimSpace(plan.BackingDevice.ValueString()) != ""
+
+	if removableSet && s3ClientSet {
+		return fmt.Errorf("removable datastores cannot use an S3 backend")
+	}
+
+	if removableSet {
+		if plan.Path.IsNull() || plan.Path.IsUnknown() || strings.TrimSpace(plan.Path.ValueString()) == "" {
+			return fmt.Errorf("path is required for removable datastores")
+		}
+		if !backingDeviceSet {
+			return fmt.Errorf("backing_device is required when removable is true")
+		}
+		return nil
+	}
 
 	if s3ClientSet != s3BucketSet {
 		return fmt.Errorf("s3_client and s3_bucket must be provided together")
@@ -768,43 +705,8 @@ func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel
 		return nil
 	}
 
-	isZFS := !plan.ZFSPool.IsNull() && !plan.ZFSPool.IsUnknown()
-	isLVM := !plan.VolumeGroup.IsNull() && !plan.VolumeGroup.IsUnknown()
-	isCIFS := !plan.Share.IsNull() && !plan.Share.IsUnknown()
-	isNFS := !plan.Export.IsNull() && !plan.Export.IsUnknown()
-
-	if isZFS {
-		if strings.TrimSpace(plan.ZFSPool.ValueString()) == "" {
-			return fmt.Errorf("zfs_pool is required when configuring ZFS-backed datastores")
-		}
-		return nil
-	}
-
-	if isLVM {
-		if strings.TrimSpace(plan.VolumeGroup.ValueString()) == "" {
-			return fmt.Errorf("volume_group is required when configuring LVM-backed datastores")
-		}
-		return nil
-	}
-
-	if isCIFS {
-		if plan.Server.IsNull() || plan.Server.IsUnknown() || strings.TrimSpace(plan.Server.ValueString()) == "" {
-			return fmt.Errorf("server is required when configuring CIFS-backed datastores")
-		}
-		if strings.TrimSpace(plan.Share.ValueString()) == "" {
-			return fmt.Errorf("share is required when configuring CIFS-backed datastores")
-		}
-		return nil
-	}
-
-	if isNFS {
-		if plan.Server.IsNull() || plan.Server.IsUnknown() || strings.TrimSpace(plan.Server.ValueString()) == "" {
-			return fmt.Errorf("server is required when configuring NFS-backed datastores")
-		}
-		if strings.TrimSpace(plan.Export.ValueString()) == "" {
-			return fmt.Errorf("export is required when configuring NFS-backed datastores")
-		}
-		return nil
+	if backingDeviceSet {
+		return fmt.Errorf("backing_device can only be set for removable datastores")
 	}
 
 	if plan.Path.IsNull() || plan.Path.IsUnknown() || strings.TrimSpace(plan.Path.ValueString()) == "" {
@@ -853,54 +755,6 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state 
 	}
 	if ptr := optionalInt64Pointer(plan.KeepYearly); ptr != nil {
 		ds.KeepYearly = ptr
-	}
-
-	// ZFS-specific
-	if !plan.ZFSPool.IsNull() && !plan.ZFSPool.IsUnknown() {
-		ds.ZFSPool = plan.ZFSPool.ValueString()
-	}
-	if !plan.ZFSDataset.IsNull() && !plan.ZFSDataset.IsUnknown() {
-		ds.ZFSDataset = plan.ZFSDataset.ValueString()
-	}
-	if !plan.BlockSize.IsNull() && !plan.BlockSize.IsUnknown() {
-		ds.BlockSize = plan.BlockSize.ValueString()
-	}
-	if !plan.Compression.IsNull() && !plan.Compression.IsUnknown() {
-		ds.Compression = plan.Compression.ValueString()
-	}
-
-	// LVM-specific
-	if !plan.VolumeGroup.IsNull() && !plan.VolumeGroup.IsUnknown() {
-		ds.VolumeGroup = plan.VolumeGroup.ValueString()
-	}
-	if !plan.ThinPool.IsNull() && !plan.ThinPool.IsUnknown() {
-		ds.ThinPool = plan.ThinPool.ValueString()
-	}
-
-	// Network storage
-	if !plan.Server.IsNull() && !plan.Server.IsUnknown() {
-		ds.Server = plan.Server.ValueString()
-	}
-	if !plan.Export.IsNull() && !plan.Export.IsUnknown() {
-		ds.Export = plan.Export.ValueString()
-	}
-	if !plan.Username.IsNull() && !plan.Username.IsUnknown() {
-		ds.Username = plan.Username.ValueString()
-	}
-	if !plan.Password.IsNull() && !plan.Password.IsUnknown() {
-		ds.Password = plan.Password.ValueString()
-	}
-	if !plan.Domain.IsNull() && !plan.Domain.IsUnknown() {
-		ds.Domain = plan.Domain.ValueString()
-	}
-	if !plan.Share.IsNull() && !plan.Share.IsUnknown() {
-		ds.Share = plan.Share.ValueString()
-	}
-	if !plan.SubDir.IsNull() && !plan.SubDir.IsUnknown() {
-		ds.SubDir = plan.SubDir.ValueString()
-	}
-	if !plan.Options.IsNull() && !plan.Options.IsUnknown() {
-		ds.Options = plan.Options.ValueString()
 	}
 
 	// Advanced options & toggles
@@ -1003,14 +857,25 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state 
 		ds.Fingerprint = plan.Fingerprint.ValueString()
 	}
 
+	if !plan.BackingDevice.IsNull() && !plan.BackingDevice.IsUnknown() {
+		ds.BackingDevice = plan.BackingDevice.ValueString()
+	}
+
 	if !plan.S3Client.IsNull() && !plan.S3Client.IsUnknown() {
 		ds.S3Client = plan.S3Client.ValueString()
 	}
 	if !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() {
 		ds.S3Bucket = plan.S3Bucket.ValueString()
 	}
-	if ds.S3Client != "" && ds.S3Bucket != "" {
-		ds.Backend = fmt.Sprintf("type=s3,client=%s,bucket=%s", ds.S3Client, ds.S3Bucket)
+
+	isRemovable := boolValueIsTrue(plan.Removable)
+	if isRemovable {
+		ds.Backend = datastores.FormatBackendString("removable", map[string]string{})
+	} else if ds.S3Client != "" && ds.S3Bucket != "" {
+		ds.Backend = datastores.FormatBackendString("s3", map[string]string{
+			"client": ds.S3Client,
+			"bucket": ds.S3Bucket,
+		})
 	}
 
 	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
@@ -1019,33 +884,62 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state 
 
 	if state != nil {
 		var deletes []string
+		addDelete := func(key string) {
+			for _, existing := range deletes {
+				if existing == key {
+					return
+				}
+			}
+			deletes = append(deletes, key)
+		}
+
+		planDefinesBackend := strings.TrimSpace(ds.Backend) != ""
+		if !planDefinesBackend {
+			stateHasS3 := !state.S3Client.IsNull() && !state.S3Client.IsUnknown() && strings.TrimSpace(state.S3Client.ValueString()) != "" &&
+				!state.S3Bucket.IsNull() && !state.S3Bucket.IsUnknown() && strings.TrimSpace(state.S3Bucket.ValueString()) != ""
+
+			if stateHasS3 {
+				addDelete("backend")
+			}
+		}
+
+		planRemovable := boolValueIsTrue(plan.Removable)
+		stateRemovable := boolValueIsTrue(state.Removable)
+		if !planRemovable && stateRemovable {
+			addDelete("backend")
+			addDelete("backing-device")
+		}
+
+		if shouldDeleteStringAttr(plan.BackingDevice, state.BackingDevice) {
+			addDelete("backing-device")
+		}
 
 		if shouldDeleteStringAttr(plan.NotifyUser, state.NotifyUser) {
-			deletes = append(deletes, "notify-user")
+			addDelete("notify-user")
 		}
 		if shouldDeleteStringAttr(plan.NotifyLevel, state.NotifyLevel) {
-			deletes = append(deletes, "notify-level")
+			addDelete("notify-level")
 		}
 		if shouldDeleteStringAttr(plan.NotificationMode, state.NotificationMode) {
-			deletes = append(deletes, "notification-mode")
+			addDelete("notification-mode")
 		}
 		if (plan.Notify == nil && state.Notify != nil) || (notifyBlockDefined && !notifyHasValues && state.Notify != nil) {
-			deletes = append(deletes, "notify")
+			addDelete("notify")
 		}
 		if plan.MaintenanceMode == nil && state.MaintenanceMode != nil {
-			deletes = append(deletes, "maintenance-mode")
+			addDelete("maintenance-mode")
 		}
 		if ((plan.Tuning == nil && plan.TuneLevel.IsNull()) || (tuningBlockDefined && !tuningHasValues && plan.TuneLevel.IsNull())) && state.Tuning != nil {
-			deletes = append(deletes, "tuning")
+			addDelete("tuning")
 		}
 		if plan.VerifyNew.IsNull() && hasBoolValue(state.VerifyNew) {
-			deletes = append(deletes, "verify-new")
+			addDelete("verify-new")
 		}
 		if plan.ReuseDatastore.IsNull() && hasBoolValue(state.ReuseDatastore) {
-			deletes = append(deletes, "reuse-datastore")
+			addDelete("reuse-datastore")
 		}
 		if plan.OverwriteInUse.IsNull() && hasBoolValue(state.OverwriteInUse) {
-			deletes = append(deletes, "overwrite-in-use")
+			addDelete("overwrite-in-use")
 		}
 		if len(deletes) > 0 {
 			ds.Delete = deletes
@@ -1090,6 +984,10 @@ func shouldDeleteStringAttr(plan types.String, state types.String) bool {
 		return state.ValueString() != ""
 	}
 	return false
+}
+
+func boolValueIsTrue(value types.Bool) bool {
+	return !value.IsNull() && !value.IsUnknown() && value.ValueBool()
 }
 
 func tuneLevelToSyncLevel(level int) (string, error) {
@@ -1145,6 +1043,7 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 
 	// Common fields
 	state.Path = stringValueOrNull(ds.Path)
+	state.BackingDevice = stringValueOrNull(ds.BackingDevice)
 	state.Comment = stringValueOrNull(ds.Comment)
 	state.Disabled = boolValueOrNull(ds.Disabled)
 	state.GCSchedule = stringValueOrNull(ds.GCSchedule)
@@ -1156,26 +1055,6 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 	state.KeepMonthly = intValueOrNull(ds.KeepMonthly)
 	state.KeepYearly = intValueOrNull(ds.KeepYearly)
 
-	// ZFS-specific
-	state.ZFSPool = stringValueOrNull(ds.ZFSPool)
-	state.ZFSDataset = stringValueOrNull(ds.ZFSDataset)
-	state.BlockSize = stringValueOrNull(ds.BlockSize)
-	state.Compression = stringValueOrNull(ds.Compression)
-
-	// LVM-specific
-	state.VolumeGroup = stringValueOrNull(ds.VolumeGroup)
-	state.ThinPool = stringValueOrNull(ds.ThinPool)
-
-	// Network storage
-	state.Server = stringValueOrNull(ds.Server)
-	state.Export = stringValueOrNull(ds.Export)
-	state.Username = stringValueOrNull(ds.Username)
-	// Password is not returned by API; keep whatever is currently in state
-	state.Domain = stringValueOrNull(ds.Domain)
-	state.Share = stringValueOrNull(ds.Share)
-	state.SubDir = stringValueOrNull(ds.SubDir)
-	state.Options = stringValueOrNull(ds.Options)
-
 	// Advanced options
 	state.NotifyUser = stringValueOrNull(ds.NotifyUser)
 	state.NotifyLevel = stringValueOrNull(ds.NotifyLevel)
@@ -1185,6 +1064,9 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 	state.OverwriteInUse = boolValueOrNull(ds.OverwriteInUse)
 	state.Fingerprint = stringValueOrNull(ds.Fingerprint)
 	state.Digest = types.StringValue(ds.Digest)
+
+	isRemovable := strings.EqualFold(ds.BackendType, "removable") || strings.TrimSpace(ds.BackingDevice) != ""
+	state.Removable = types.BoolValue(isRemovable)
 
 	if ds.Notify != nil {
 		notify := &notifyModel{

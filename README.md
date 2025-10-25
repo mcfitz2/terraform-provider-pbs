@@ -7,7 +7,7 @@ A Terraform provider for managing [Proxmox Backup Server](https://www.proxmox.co
 
 ## Features
 
-- **Datastore Management**: Create and manage PBS datastores (directory, ZFS, CIFS)
+- **Datastore Management**: Create and manage PBS datastores (directory, removable, and S3)
 - **PBS 4.0 Parity**: Configure maintenance windows, notification routing, tuning profiles, reuse flags, and sync levels introduced in PBS 4.0
 - **S3 Provider Support**: Configure S3-compatible storage backends (AWS, Backblaze B2, Scaleway)
 - **S3 Endpoints**: Manage S3 storage endpoints
@@ -67,6 +67,18 @@ resource "pbs_datastore" "backup" {
 }
 ```
 
+### Create a Removable Datastore
+
+```hcl
+resource "pbs_datastore" "removable" {
+  name           = "removable-backups"
+  path           = "/mnt/removable/removable-backups"
+  removable      = true
+  backing_device = "7d6fe83c-4c01-4a33-9ad0-9bc0216fb3e3" # UUID reported by PBS for the device
+  comment        = "Rotated removable media"
+}
+```
+
 ### Create an S3 Datastore with AWS
 
 ```hcl
@@ -87,15 +99,6 @@ resource "pbs_datastore" "s3_backup" {
   depends_on = [pbs_s3_endpoint.aws]
 }
 ```
-
-### Create a ZFS Datastore
-
-```hcl
-resource "pbs_datastore" "zfs_backup" {
-  name    = "zfs-backup"
-  path    = "rpool/backup"
-  comment = "ZFS-backed datastore"
-}
 
 ### Configure PBS 4.0 Advanced Options
 

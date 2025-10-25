@@ -1,12 +1,8 @@
 name: VM Integration Tests
 
 # This workflow runs the FULL integration test suite on a self-hosted VM runner.
-# It includes ALL test suites, including hardware-dependent tests.
-#
-# Test Suites:
-#   1. Core Integration Tests - Datastore (including ZFS), Metrics, Jobs, Notifications
-#   2. S3 Integration Tests - AWS, Backblaze B2, Scaleway (if credentials provided)
-#   3. Hardware-Dependent Tests - ZFS (requires VM with kernel modules)
+# It covers core datastore (directory/removable), metrics, jobs, notifications, and
+# S3 integration tests when cloud credentials are available.
 #
 # Code coverage is collected during test runs and reported via Codecov.
 # Coverage annotations will appear on pull requests showing which lines are covered.
@@ -81,31 +77,6 @@ jobs:
         env:
           LISTEN_ADDR: 0.0.0.0
           LISTEN_PORT: 8080
-      
-      nfs-server:
-        image: erichough/nfs-server:latest
-        ports:
-          - 2049:2049
-        env:
-          NFS_EXPORT_0: '/export *(rw,sync,no_subtree_check,no_root_squash,fsid=0)'
-        options: >-
-          --privileged
-          --cap-add SYS_ADMIN
-        volumes:
-          - nfs-export:/export
-      
-      samba-server:
-        image: dperson/samba:latest
-        ports:
-          - 445:445
-        env:
-          SHARE: 'backup;/backup;yes;no;no;testuser'
-          USER: 'testuser;testpass'
-          PERMISSIONS: 'yes'
-        options: >-
-          --cap-add SYS_ADMIN
-        volumes:
-          - samba-share:/backup
     
     steps:
     - name: Checkout code
@@ -149,7 +120,6 @@ jobs:
         PBS_USERNAME: "root@pam"
         PBS_PASSWORD: "pbspbs123"
         PBS_INSECURE_TLS: "true"
-        PBS_TESTPOOL: "testpool"
         TF_ACC: "1"
         # Test service endpoints - use runner's IP so PBS can reach them
         TEST_INFLUXDB_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
@@ -164,13 +134,6 @@ jobs:
         TEST_GOTIFY_TOKEN: "AqQR.Oq8ZqYJ4"
         TEST_WEBHOOK_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TEST_WEBHOOK_PORT: "8081"
-        # Network storage test endpoints
-        TEST_NFS_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
-        TEST_NFS_EXPORT: "/export"
-        TEST_CIFS_HOST: ${{ steps.get_ip.outputs.RUNNER_IP }}
-        TEST_CIFS_SHARE: "backup"
-        TEST_CIFS_USERNAME: "testuser"
-        TEST_CIFS_PASSWORD: "testpass"
         # S3 provider credentials from secrets (optional for S3 tests)
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -191,16 +154,13 @@ jobs:
         echo "  - InfluxDB 1.8 (UDP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8089"
         echo "  - Gotify: ${{ steps.get_ip.outputs.RUNNER_IP }}:8080"
         echo "  - Webhook: ${{ steps.get_ip.outputs.RUNNER_IP }}:8081"
-        echo "  - NFS Server: ${{ steps.get_ip.outputs.RUNNER_IP }}:2049"
-        echo "  - CIFS/Samba: ${{ steps.get_ip.outputs.RUNNER_IP }}:445"
         echo ""
         echo "Test Suites:"
-        echo "  ✓ Core Integration Tests (Datastore, Metrics, Jobs, Notifications)"
+        echo "  ✓ Core Integration Tests (Directory & Removable Datastores, Metrics, Jobs, Notifications)"
         echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway - if credentials provided)"
-        echo "  ✓ Hardware-Dependent Tests (ZFS)"
         echo ""
         
-        # Run ALL tests including hardware-dependent (ZFS)
+        # Run ALL integration tests
         go test -v -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
 
     - name: Upload coverage

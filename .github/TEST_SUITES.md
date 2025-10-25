@@ -4,15 +4,14 @@ The integration tests are organized into three distinct suites based on their re
 
 ## Test Suite Overview
 
-### 1. Core Integration Tests (Non-S3, Non-Hardware)
+### 1. Core Integration Tests (Directory & Removable)
 
 **Location**: Runs in Docker workflow  
-**Coverage**: All core PBS features except S3 and hardware-dependent tests
+**Coverage**: Core PBS features excluding S3-specific flows
 
 **Includes:**
 - ✅ Quick smoke tests (`TestQuickSmoke`)
-- ✅ Datastore tests - Directory, Network Storage (NFS/CIFS), Validation, Import
-  - ❌ **Excludes**: `TestDatastoreZFS` (hardware-dependent)
+- ✅ Datastore tests - Directory, Removable, Validation, Import
 - ✅ Metrics server tests - HTTP, UDP, MTU, Verify Certificate, Disabled state, Max body size, Type changes
 - ✅ Job management tests - Prune, Sync, Verify, GC jobs with filters
 - ✅ Notification tests - SMTP, Gotify, Sendmail, Webhook, Endpoints, Matchers
@@ -23,14 +22,12 @@ The integration tests are organized into three distinct suites based on their re
 - InfluxDB 1.8 (UDP) container
 - Gotify container (for notification tests)
 - Webhook receiver container (for notification tests)
-- NFS server container (for network storage tests)
-- CIFS/Samba server container (for network storage tests)
 
 **Run Pattern:**
 ```bash
 go test ./test/integration \
   -run "TestQuickSmoke|TestDatastore|TestMetrics|Test.*Job|Test.*Notification" \
-  -skip "TestDatastoreZFS|TestS3|TestCleanup"
+  -skip "TestS3|TestCleanup"
 ```
 
 ---
@@ -75,28 +72,9 @@ go test ./test/integration -run "TestCleanup"
 
 ---
 
-### 3. Hardware-Dependent Tests
+### 3. Reserved Hardware-Dependent Tests
 
-**Location**: Runs ONLY in VM workflow  
-**Coverage**: Tests that require specific hardware or kernel features
-
-**Includes:**
-- ✅ ZFS datastore tests (`TestDatastoreZFSIntegration`)
-  - Requires ZFS kernel modules
-  - Needs actual block devices or ZFS pools
-  - Cannot run in standard Docker containers
-
-**Requirements:**
-- Self-hosted VM runner
-- ZFS kernel modules installed
-- ZFS pool or disk available
-- All containers from Core suite
-
-**Run Pattern:**
-```bash
-# Run ALL tests including ZFS
-go test ./test/integration
-```
+No hardware-only datastore tests are currently active. This slot remains available if future resources require kernel modules or dedicated hardware.
 
 ---
 
@@ -108,9 +86,8 @@ go test ./test/integration
 
 **Runs:**
 1. ✅ Unit tests (all platforms)
-2. ✅ Core integration tests (Non-S3, Non-Hardware)
+2. ✅ Core integration tests (Directory & Removable)
 3. ✅ S3 integration tests (if credentials available)
-4. ❌ Hardware-dependent tests (EXCLUDED)
 
 **Trigger:**
 - On push to `main` or `develop`
@@ -126,7 +103,6 @@ go test ./test/integration
 **Runs:**
 1. ✅ ALL Core integration tests
 2. ✅ ALL S3 integration tests (if credentials available)
-3. ✅ ALL Hardware-dependent tests (ZFS)
 
 **Trigger:**
 - On push to `main` or `develop`
@@ -134,7 +110,7 @@ go test ./test/integration
 - Manual workflow dispatch
 - Weekly schedule (Sunday 2 AM UTC)
 
-**Runner:** Self-hosted VM with ZFS support
+**Runner:** Self-hosted VM
 
 ---
 
@@ -145,7 +121,7 @@ go test ./test/integration
 | Unit Tests | ✅ | ✅ |
 | Core Integration (Non-ZFS) | ✅ | ✅ |
 | S3 Integration | ✅ | ✅ |
-| Hardware (ZFS) | ❌ | ✅ |
+| Hardware (reserved) | ❌ | ✅ |
 
 ---
 
@@ -160,7 +136,7 @@ docker-compose up -d
 
 # Run core tests
 PBS_ADDRESS="https://localhost:8007" \
-PBS_USERNAME="admin@pbs" \
+PBS_USERNAME="root@pam" \
 PBS_PASSWORD="pbspbs" \
 PBS_INSECURE_TLS="true" \
 TEST_INFLUXDB_HOST="localhost" \
@@ -169,7 +145,7 @@ TEST_INFLUXDB_UDP_HOST="localhost" \
 TEST_INFLUXDB_UDP_PORT="8089" \
 TF_ACC=1 go test -v ./test/integration \
   -run "TestQuickSmoke|TestDatastore|TestMetrics|Test.*Job|Test.*Notification" \
-  -skip "TestDatastoreZFS|TestS3|TestCleanup"
+  -skip "TestS3|TestCleanup"
 ```
 
 ### S3 Integration Tests
@@ -187,24 +163,6 @@ PBS_PASSWORD="pbspbs" \
 PBS_INSECURE_TLS="true" \
 TF_ACC=1 go test -v ./test/integration -run "AWS"
 ```
-
-### Hardware-Dependent Tests (ZFS)
-
-```bash
-# Requires VM with ZFS kernel modules and pool
-# Ensure ZFS pool is available first
-zpool list
-
-# Run all tests including ZFS
-PBS_ADDRESS="https://192.168.1.108:8007" \
-PBS_USERNAME="root@pam" \
-PBS_PASSWORD="pbspbs123" \
-PBS_INSECURE_TLS="true" \
-PBS_TESTPOOL="testpool" \
-TF_ACC=1 go test -v -timeout 40m ./test/integration
-```
-
----
 
 ## Coverage Reporting
 
@@ -239,11 +197,9 @@ When adding new tests, consider which suite they belong to:
 - Requires cloud provider credentials
 - Tests provider-specific S3 features
 
-**Add to Hardware Suite** if:
-- Requires ZFS kernel modules
-- Needs real hardware resources
-- Cannot run in standard containers
-- Requires specific kernel features
+**Add to Hardware Suite** if in the future:
+- Tests require kernel modules or dedicated hardware resources
+- Scenarios cannot run in standard containers
 
 ---
 

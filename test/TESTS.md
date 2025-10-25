@@ -8,7 +8,7 @@ The test suite is organized into several categories, each testing different reso
 
 ### 1. Datastore Tests (`datastore_test.go`)
 - **TestDatastoreDirectoryIntegration**: Tests directory datastore lifecycle (create, read, update, delete)
-- **TestDatastoreZFSIntegration**: Tests ZFS datastore functionality
+- Validation scenarios covering directory, removable, and S3 datastore requirements
 - Tests datastore-specific features like gc_schedule
 
 ### 2. S3 Provider Tests (`s3_providers_test.go`)
@@ -151,7 +151,7 @@ go test -short -v
 ## Test Coverage
 
 ### Resources Tested
-- ✅ `pbs_datastore` (directory and S3)
+- ✅ `pbs_datastore` (directory, removable, and S3)
 - ✅ `pbs_s3_endpoint`
 - ✅ `pbs_prune_job`
 - ✅ `pbs_sync_job`

@@ -306,6 +306,34 @@ func formatPropertyString(entries map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
+// FormatBackendString builds a backend configuration string with the provided type and key/value pairs.
+func FormatBackendString(backendType string, params map[string]string) string {
+	entries := make(map[string]string, len(params)+1)
+	entries["type"] = strings.ToLower(strings.TrimSpace(backendType))
+	for k, v := range params {
+		value := strings.TrimSpace(v)
+		if value == "" {
+			continue
+		}
+		entries[strings.ToLower(strings.TrimSpace(k))] = value
+	}
+
+	return formatPropertyString(entries)
+}
+
+// ParseBackendString parses a backend configuration string and returns the backend type and remaining parameters.
+func ParseBackendString(raw string) (string, map[string]string) {
+	props := parsePropertyString(raw)
+	if len(props) == 0 {
+		return "", map[string]string{}
+	}
+
+	typeValue := props["type"]
+	delete(props, "type")
+
+	return typeValue, props
+}
+
 func escapeQuotes(in string) string {
 	return strings.ReplaceAll(in, "\"", "\\\"")
 }

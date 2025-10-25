@@ -74,30 +74,11 @@ type Datastore struct {
 	Fingerprint   string `json:"fingerprint,omitempty"`
 	BackingDevice string `json:"backing-device,omitempty"`
 
-	// ZFS-specific options
-	ZFSPool     string `json:"pool,omitempty"`
-	ZFSDataset  string `json:"dataset,omitempty"`
-	BlockSize   string `json:"blocksize,omitempty"`
-	Compression string `json:"compression,omitempty"`
-
-	// LVM-specific options
-	VolumeGroup string `json:"vg,omitempty"`
-	ThinPool    string `json:"thinpool,omitempty"`
-
-	// Network storage options (CIFS/NFS)
-	Server   string `json:"server,omitempty"`
-	Export   string `json:"export,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Domain   string `json:"domain,omitempty"`
-	Share    string `json:"share,omitempty"`
-	SubDir   string `json:"subdir,omitempty"`
-	Options  string `json:"options,omitempty"`
-
 	// S3 backend options (stored as backend configuration)
-	Backend  string `json:"backend,omitempty"` // e.g. "type=s3,client=endpoint_id,bucket=bucket_name"
-	S3Client string `json:"-"`                 // S3 endpoint ID (for easier access in Go code)
-	S3Bucket string `json:"-"`
+	Backend     string `json:"backend,omitempty"` // e.g. "type=s3,client=endpoint_id,bucket=bucket_name"
+	BackendType string `json:"-"`
+	S3Client    string `json:"-"` // S3 endpoint ID (for easier access in Go code)
+	S3Bucket    string `json:"-"`
 
 	Digest string   `json:"digest,omitempty"`
 	Delete []string `json:"delete,omitempty"`
@@ -143,10 +124,8 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
 
-			// Parse S3 backend configuration if present
-			if ds.Backend != "" {
-				c.parseS3Backend(&ds)
-			}
+			// Parse backend configuration if present
+			c.parseBackendConfig(&ds)
 
 			// Parse property string fields into typed structs
 			ds.MaintenanceMode = parseMaintenanceMode(ds.MaintenanceModeRaw)
@@ -365,23 +344,6 @@ func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds 
 	setString("fingerprint", ds.Fingerprint)
 	setString("backing-device", ds.BackingDevice)
 
-	setString("pool", ds.ZFSPool)
-	setString("dataset", ds.ZFSDataset)
-	setString("blocksize", ds.BlockSize)
-	setString("compression", ds.Compression)
-
-	setString("vg", ds.VolumeGroup)
-	setString("thinpool", ds.ThinPool)
-
-	setString("server", ds.Server)
-	setString("export", ds.Export)
-	setString("username", ds.Username)
-	setString("password", ds.Password)
-	setString("domain", ds.Domain)
-	setString("share", ds.Share)
-	setString("subdir", ds.SubDir)
-	setString("options", ds.Options)
-
 	backendIsS3 := strings.HasPrefix(ds.Backend, "type=s3") || (ds.S3Client != "" && ds.S3Bucket != "")
 	if backendIsS3 {
 		if ds.Backend != "" {
@@ -417,29 +379,23 @@ func (c *Client) getNodeForTask(ctx context.Context, upid string) (string, error
 	return nodes[0].Node, nil
 }
 
-// parseS3Backend parses the S3 backend configuration string and populates the datastore fields
-// Backend format: "type=s3,client=endpoint_id,bucket=bucket_name"
-func (c *Client) parseS3Backend(ds *Datastore) {
-	if ds.Backend == "" {
+// parseBackendConfig parses backend configuration strings for supported backend types.
+func (c *Client) parseBackendConfig(ds *Datastore) {
+	if strings.TrimSpace(ds.Backend) == "" {
 		return
 	}
 
-	// Parse the backend configuration string
-	parts := strings.Split(ds.Backend, ",")
-	for _, part := range parts {
-		keyValue := strings.SplitN(part, "=", 2)
-		if len(keyValue) != 2 {
-			continue
+	backendType, params := ParseBackendString(ds.Backend)
+	ds.BackendType = strings.ToLower(strings.TrimSpace(backendType))
+	switch ds.BackendType {
+	case "s3":
+		if client, ok := params["client"]; ok {
+			ds.S3Client = client
 		}
-
-		key := strings.TrimSpace(keyValue[0])
-		value := strings.TrimSpace(keyValue[1])
-
-		switch key {
-		case "client":
-			ds.S3Client = value
-		case "bucket":
-			ds.S3Bucket = value
+		if bucket, ok := params["bucket"]; ok {
+			ds.S3Bucket = bucket
 		}
+	case "removable":
+		// No additional parameters to capture beyond backing-device field
 	}
 }

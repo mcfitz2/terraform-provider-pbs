@@ -79,6 +79,47 @@ func TestPlanToDatastoreAdvancedFields(t *testing.T) {
 	assert.Nil(t, ds.Delete, "no deletes should be requested when plan supplies values")
 }
 
+func TestPlanToDatastoreRemovable(t *testing.T) {
+	resource := &datastoreResource{}
+	uuid := "01234567-89ab-cdef-0123-456789abcdef"
+
+	plan := datastoreResourceModel{
+		Name:          types.StringValue("removable-ds"),
+		Path:          types.StringValue("/datastore/removable"),
+		Removable:     types.BoolValue(true),
+		BackingDevice: types.StringValue(uuid),
+	}
+
+	ds, err := resource.planToDatastore(&plan, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "type=removable", ds.Backend)
+	assert.Equal(t, uuid, ds.BackingDevice)
+	assert.Empty(t, ds.S3Client)
+	assert.Empty(t, ds.S3Bucket)
+}
+
+func TestPlanToDatastoreRemovableDeletesBackend(t *testing.T) {
+	resource := &datastoreResource{}
+
+	plan := datastoreResourceModel{
+		Name: types.StringValue("removable-ds"),
+		Path: types.StringValue("/datastore/removable"),
+	}
+
+	state := datastoreResourceModel{
+		Removable:     types.BoolValue(true),
+		BackingDevice: types.StringValue("01234567-89ab-cdef-0123-456789abcdef"),
+	}
+
+	ds, err := resource.planToDatastore(&plan, &state)
+	require.NoError(t, err)
+
+	require.NotNil(t, ds.Delete)
+	assert.Contains(t, ds.Delete, "backend")
+	assert.Contains(t, ds.Delete, "backing-device")
+}
+
 func TestPlanToDatastoreDeleteSections(t *testing.T) {
 	resource := &datastoreResource{}
 
@@ -170,9 +211,7 @@ func TestDatastoreToStateRoundTrip(t *testing.T) {
 		Digest:      "digest-value",
 	}
 
-	state := datastoreResourceModel{
-		Password: types.StringValue("keepme"),
-	}
+	var state datastoreResourceModel
 
 	err := resource.datastoreToState(ds, &state)
 	require.NoError(t, err)
@@ -211,9 +250,29 @@ func TestDatastoreToStateRoundTrip(t *testing.T) {
 	assert.True(t, state.VerifyNew.ValueBool())
 	assert.True(t, state.ReuseDatastore.ValueBool())
 	assert.False(t, state.OverwriteInUse.ValueBool())
+	assert.False(t, state.Removable.ValueBool())
+	assert.True(t, state.BackingDevice.IsNull())
+}
 
-	// Password should remain untouched (not overwritten by API payload)
-	assert.Equal(t, "keepme", state.Password.ValueString())
+func TestDatastoreToStateRemovable(t *testing.T) {
+	resource := &datastoreResource{}
+
+	uuid := "01234567-89ab-cdef-0123-456789abcdef"
+	ds := &pbssdk.Datastore{
+		Name:          "usb-backups",
+		Path:          "/mnt/datastore/usb-backups",
+		Backend:       "type=removable",
+		BackingDevice: uuid,
+	}
+
+	var state datastoreResourceModel
+
+	err := resource.datastoreToState(ds, &state)
+	require.NoError(t, err)
+
+	assert.True(t, state.Removable.ValueBool())
+	assert.Equal(t, uuid, state.BackingDevice.ValueString())
+	assert.Equal(t, types.StringValue("/mnt/datastore/usb-backups"), state.Path)
 }
 
 func boolPtr(v bool) *bool {
