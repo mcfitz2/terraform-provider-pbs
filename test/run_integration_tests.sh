@@ -78,16 +78,16 @@ MULTI-PROVIDER S3 TESTING VARIABLES (Optional):
 
 EXAMPLES:
     # Run all integration tests
-    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=admin PBS_PASSWORD=secret $0
+    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=root@pam PBS_PASSWORD=secret $0
 
     # Run specific test with verbose output
-    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=admin PBS_PASSWORD=secret $0 -v -p TestS3Endpoint
+    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=root@pam PBS_PASSWORD=secret $0 -v -p TestS3Endpoint
 
     # Run with coverage
-    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=admin PBS_PASSWORD=secret $0 -c
+    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=root@pam PBS_PASSWORD=secret $0 -c
     
     # Run multi-provider S3 tests with AWS and Backblaze
-    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=admin PBS_PASSWORD=secret \\
+    PBS_ADDRESS=https://pbs.local:8007 PBS_USERNAME=root@pam PBS_PASSWORD=secret \
     AWS_ACCESS_KEY_ID=your-key AWS_SECRET_ACCESS_KEY=your-secret \\
     B2_ACCESS_KEY_ID=your-b2-key B2_SECRET_ACCESS_KEY=your-b2-secret \\
     $0 -v -p TestS3EndpointMultiProvider
@@ -190,7 +190,7 @@ check_env_vars() {
     
     if [ -z "$PBS_USERNAME" ]; then
         log_error "PBS_USERNAME environment variable is required"
-        echo "Example: export PBS_USERNAME=admin"
+        echo "Example: export PBS_USERNAME=root@pam"
         exit 1
     fi
     
