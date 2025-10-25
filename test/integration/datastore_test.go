@@ -33,7 +33,6 @@ resource "pbs_datastore" "test_directory" {
   path             = "/datastore/%s"
   comment          = "Test directory datastore"
   gc_schedule      = "daily"
-  prune_schedule   = "weekly"
 }
 `, datastoreName, datastoreName)
 
@@ -49,7 +48,6 @@ resource "pbs_datastore" "test_directory" {
 	assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), resource.AttributeValues["path"])
 	assert.Equal(t, "Test directory datastore", resource.AttributeValues["comment"])
 	assert.Equal(t, "daily", resource.AttributeValues["gc_schedule"])
-	assert.Equal(t, "weekly", resource.AttributeValues["prune_schedule"])
 
 	// Try to verify datastore exists via direct API call
 	// Note: PBS datastore operations are asynchronous, so this may not be immediately available
@@ -69,7 +67,6 @@ resource "pbs_datastore" "test_directory" {
   path             = "/datastore/%s"
   comment          = "Updated test directory datastore"
   gc_schedule      = "weekly"
-  prune_schedule   = "daily"
 }
 `, datastoreName, datastoreName)
 

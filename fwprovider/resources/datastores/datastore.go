@@ -175,6 +175,7 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description:         "Prune schedule in cron format.",
 				MarkdownDescription: "Prune schedule in cron format (e.g., `daily`, `weekly`, or `0 2 * * *`).",
 				Optional:            true,
+				DeprecationMessage:  "Removed in PBS 4.0+. Configure prune jobs with the pbs_prune_job resource instead.",
 			},
 			"keep_last": schema.Int64Attribute{
 				Description:         "Number of latest backups to keep.",
@@ -463,6 +464,10 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description:         "Opaque digest returned by PBS for optimistic locking.",
 				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
 				Computed:            true,
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"s3_client": schema.StringAttribute{
 				Description:         "S3 endpoint ID for S3 datastores.",
@@ -541,8 +546,56 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	// Log that the resource was created
 	tflog.Trace(ctx, "created datastore resource", map[string]any{"name": plan.Name.ValueString()})
 
-	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	createdDatastore, err := r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Datastore",
+			"Could not read datastore "+plan.Name.ValueString()+" after creation: "+err.Error(),
+		)
+		return
+	}
+
+	state := plan
+
+	if err := r.datastoreToState(createdDatastore, &state); err != nil {
+		resp.Diagnostics.AddError(
+			"Error Converting Datastore",
+			"Could not convert datastore to state after creation: "+err.Error(),
+		)
+		return
+	}
+
+	if createdDatastore.Disabled == nil && state.Disabled.IsNull() {
+		state.Disabled = types.BoolValue(false)
+	}
+
+	// Preserve sensitive or plan-only fields not returned by the API
+	state.Password = plan.Password
+	state.PruneSchedule = plan.PruneSchedule
+	state.Path = plan.Path
+	state.Comment = plan.Comment
+	state.GCSchedule = plan.GCSchedule
+	state.KeepLast = plan.KeepLast
+	state.KeepHourly = plan.KeepHourly
+	state.KeepDaily = plan.KeepDaily
+	state.KeepWeekly = plan.KeepWeekly
+	state.KeepMonthly = plan.KeepMonthly
+	state.KeepYearly = plan.KeepYearly
+	state.NotifyUser = plan.NotifyUser
+	state.NotifyLevel = plan.NotifyLevel
+	state.NotificationMode = plan.NotificationMode
+	state.Notify = plan.Notify
+	state.MaintenanceMode = plan.MaintenanceMode
+	state.VerifyNew = plan.VerifyNew
+	state.ReuseDatastore = plan.ReuseDatastore
+	state.OverwriteInUse = plan.OverwriteInUse
+	state.Tuning = plan.Tuning
+	state.TuneLevel = plan.TuneLevel
+	state.Fingerprint = plan.Fingerprint
+	state.S3Client = plan.S3Client
+	state.S3Bucket = plan.S3Bucket
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -697,6 +750,10 @@ func (r *datastoreResource) ImportState(ctx context.Context, req resource.Import
 
 // validateDatastoreConfig validates configuration requirements that span backend types
 func (r *datastoreResource) validateDatastoreConfig(plan *datastoreResourceModel) error {
+	if !plan.PruneSchedule.IsNull() && !plan.PruneSchedule.IsUnknown() && strings.TrimSpace(plan.PruneSchedule.ValueString()) != "" {
+		return fmt.Errorf("prune_schedule was removed in PBS 4.0. Configure pruning with the pbs_prune_job resource instead")
+	}
+
 	s3ClientSet := !plan.S3Client.IsNull() && !plan.S3Client.IsUnknown() && strings.TrimSpace(plan.S3Client.ValueString()) != ""
 	s3BucketSet := !plan.S3Bucket.IsNull() && !plan.S3Bucket.IsUnknown() && strings.TrimSpace(plan.S3Bucket.ValueString()) != ""
 
@@ -772,12 +829,12 @@ func (r *datastoreResource) planToDatastore(plan *datastoreResourceModel, state 
 	}
 	if ptr := optionalBoolPointer(plan.Disabled); ptr != nil {
 		ds.Disabled = ptr
+		if ds.Disabled != nil && !*ds.Disabled {
+			ds.Disabled = nil
+		}
 	}
 	if !plan.GCSchedule.IsNull() && !plan.GCSchedule.IsUnknown() {
 		ds.GCSchedule = plan.GCSchedule.ValueString()
-	}
-	if !plan.PruneSchedule.IsNull() && !plan.PruneSchedule.IsUnknown() {
-		ds.PruneSchedule = plan.PruneSchedule.ValueString()
 	}
 	if ptr := optionalInt64Pointer(plan.KeepLast); ptr != nil {
 		ds.KeepLast = ptr
@@ -1127,7 +1184,7 @@ func (r *datastoreResource) datastoreToState(ds *datastores.Datastore, state *da
 	state.ReuseDatastore = boolValueOrNull(ds.ReuseDatastore)
 	state.OverwriteInUse = boolValueOrNull(ds.OverwriteInUse)
 	state.Fingerprint = stringValueOrNull(ds.Fingerprint)
-	state.Digest = stringValueOrNull(ds.Digest)
+	state.Digest = types.StringValue(ds.Digest)
 
 	if ds.Notify != nil {
 		notify := &notifyModel{

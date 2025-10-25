@@ -52,7 +52,6 @@ type verifyJobResourceModel struct {
 	Namespace      types.String `tfsdk:"namespace"`
 	MaxDepth       types.Int64  `tfsdk:"max_depth"`
 	Comment        types.String `tfsdk:"comment"`
-	Disable        types.Bool   `tfsdk:"disable"`
 	Digest         types.String `tfsdk:"digest"`
 }
 
@@ -123,13 +122,6 @@ determines how many days until a backup is considered due for re-verification.`,
 				MarkdownDescription: "A comment describing this verification job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this verify job without deleting it.",
-				MarkdownDescription: "Disable this verify job without deleting it.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
 			"digest": schema.StringAttribute{
 				Description:         "Opaque digest returned by PBS for optimistic locking.",
 				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
@@ -169,10 +161,6 @@ func (r *verifyJobResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	job := buildVerifyJobFromPlan(&plan)
-
-	if job.Disable != nil && !*job.Disable {
-		job.Disable = nil
-	}
 
 	if err := r.client.Jobs.CreateVerifyJob(ctx, job); err != nil {
 		resp.Diagnostics.AddError(
@@ -305,7 +293,6 @@ func buildVerifyJobFromPlan(plan *verifyJobResourceModel) *jobs.VerifyJob {
 	}
 
 	job.IgnoreVerified = boolPointerFromAttr(plan.IgnoreVerified)
-	job.Disable = boolPointerFromAttr(plan.Disable)
 	job.OutdatedAfter = intPointerFromAttr(plan.OutdatedAfter)
 	job.MaxDepth = intPointerFromAttr(plan.MaxDepth)
 
@@ -334,9 +321,6 @@ func computeVerifyDeletes(plan, state *verifyJobResourceModel) []string {
 	if shouldDeleteStringAttr(plan.Comment, state.Comment) {
 		deletes = append(deletes, "comment")
 	}
-	if shouldDeleteBoolAttr(plan.Disable, state.Disable) {
-		deletes = append(deletes, "disable")
-	}
 
 	return deletes
 }
@@ -355,10 +339,5 @@ func setVerifyStateFromAPI(job *jobs.VerifyJob, state *verifyJobResourceModel) {
 		state.IgnoreVerified = types.BoolValue(*job.IgnoreVerified)
 	} else {
 		state.IgnoreVerified = types.BoolValue(false)
-	}
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
 	}
 }

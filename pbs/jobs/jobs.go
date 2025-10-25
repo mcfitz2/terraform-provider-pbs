@@ -227,7 +227,6 @@ type SyncJob struct {
 	SyncDirection   string   `json:"sync-direction,omitempty"`
 	Comment         string   `json:"comment,omitempty"`
 	Owner           string   `json:"owner,omitempty"`
-	Disable         *bool    `json:"disable,omitempty"`
 	RateIn          string   `json:"rate-in,omitempty"`
 	RateOut         string   `json:"rate-out,omitempty"`
 	BurstIn         string   `json:"burst-in,omitempty"`
@@ -335,10 +334,6 @@ func (c *Client) CreateSyncJob(ctx context.Context, job *SyncJob) error {
 	setString("burst-in", job.BurstIn)
 	setString("burst-out", job.BurstOut)
 
-	if job.Disable != nil {
-		body["disable"] = *job.Disable
-	}
-
 	_, err := c.api.Post(ctx, "/config/sync", body)
 	if err != nil {
 		return fmt.Errorf("failed to create sync job %s: %w", job.ID, err)
@@ -399,7 +394,6 @@ func (c *Client) UpdateSyncJob(ctx context.Context, id string, job *SyncJob) err
 	setBool("encrypted-only", job.EncryptedOnly)
 	setBool("verified-only", job.VerifiedOnly)
 	setBool("run-on-mount", job.RunOnMount)
-	setBool("disable", job.Disable)
 
 	if len(job.Delete) > 0 {
 		body["delete"] = job.Delete
@@ -448,7 +442,6 @@ type VerifyJob struct {
 	Namespace      string   `json:"ns,omitempty"`
 	MaxDepth       *int     `json:"max-depth,omitempty"`
 	Comment        string   `json:"comment,omitempty"`
-	Disable        *bool    `json:"disable,omitempty"`
 	Digest         string   `json:"digest,omitempty"`
 	Delete         []string `json:"delete,omitempty"`
 }
@@ -519,7 +512,6 @@ func (c *Client) CreateVerifyJob(ctx context.Context, job *VerifyJob) error {
 	}
 
 	setBool("ignore-verified", job.IgnoreVerified)
-	setBool("disable", job.Disable)
 	setInt("outdated-after", job.OutdatedAfter)
 	setInt("max-depth", job.MaxDepth)
 
@@ -567,7 +559,6 @@ func (c *Client) UpdateVerifyJob(ctx context.Context, id string, job *VerifyJob)
 	setString("comment", job.Comment)
 
 	setBool("ignore-verified", job.IgnoreVerified)
-	setBool("disable", job.Disable)
 
 	setInt("outdated-after", job.OutdatedAfter)
 	setInt("max-depth", job.MaxDepth)

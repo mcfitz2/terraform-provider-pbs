@@ -36,7 +36,7 @@ var (
 	_ resource.ResourceWithImportState = &syncJobResource{}
 )
 
-var groupFilterRegex = regexp.MustCompile(`^[^/\s]+/[^/\s]+(?:/[^/\s]+)?$`)
+var groupFilterRegex = regexp.MustCompile(`^(?:group:[^\s]+|type:(?:vm|ct|host)|regex:.+)$`)
 
 // NewSyncJobResource is a helper function to simplify the provider implementation.
 func NewSyncJobResource() resource.Resource {
@@ -72,7 +72,6 @@ type syncJobResourceModel struct {
 	BurstIn         types.String `tfsdk:"burst_in"`
 	BurstOut        types.String `tfsdk:"burst_out"`
 	Comment         types.String `tfsdk:"comment"`
-	Disable         types.Bool   `tfsdk:"disable"`
 	Digest          types.String `tfsdk:"digest"`
 }
 
@@ -139,8 +138,8 @@ by removing backups that no longer exist on the remote.`,
 				},
 			},
 			"group_filter": schema.ListAttribute{
-				Description:         "List of backup group selectors using `<type>/<id>[/<namespace>]` syntax.",
-				MarkdownDescription: "List of backup group selectors using `<type>/<id>[/<namespace>]` syntax. Only matching groups will be synced.",
+				Description:         "List of backup group selectors using `group:<name>`, `type:<vm|ct|host>`, or `regex:<pattern>` syntax.",
+				MarkdownDescription: "List of backup group selectors using `group:<name>`, `type:<vm|ct|host>`, or `regex:<pattern>` syntax. Only matching groups will be synced.",
 				ElementType:         types.StringType,
 				Optional:            true,
 				Validators: []validator.List{
@@ -228,13 +227,6 @@ by removing backups that no longer exist on the remote.`,
 				MarkdownDescription: "A comment describing this sync job.",
 				Optional:            true,
 			},
-			"disable": schema.BoolAttribute{
-				Description:         "Disable this sync job without deleting it.",
-				MarkdownDescription: "Disable this sync job without deleting it.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
 			"digest": schema.StringAttribute{
 				Description:         "Opaque digest returned by PBS for optimistic locking.",
 				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
@@ -277,10 +269,6 @@ func (r *syncJobResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	if job.Disable != nil && !*job.Disable {
-		job.Disable = nil
 	}
 
 	if err := r.client.Jobs.CreateSyncJob(ctx, job); err != nil {
@@ -436,7 +424,6 @@ func buildSyncJobFromPlan(ctx context.Context, plan *syncJobResourceModel) (*job
 	job.EncryptedOnly = boolPointerFromAttr(plan.EncryptedOnly)
 	job.VerifiedOnly = boolPointerFromAttr(plan.VerifiedOnly)
 	job.RunOnMount = boolPointerFromAttr(plan.RunOnMount)
-	job.Disable = boolPointerFromAttr(plan.Disable)
 
 	if !plan.SyncDirection.IsNull() && !plan.SyncDirection.IsUnknown() {
 		job.SyncDirection = plan.SyncDirection.ValueString()
@@ -534,9 +521,6 @@ func computeSyncDeletes(plan, state *syncJobResourceModel) []string {
 	if shouldDeleteStringAttr(plan.Comment, state.Comment) {
 		deletes = append(deletes, "comment")
 	}
-	if shouldDeleteBoolAttr(plan.Disable, state.Disable) {
-		deletes = append(deletes, "disable")
-	}
 
 	return deletes
 }
@@ -620,11 +604,6 @@ func setSyncStateFromAPI(ctx context.Context, job *jobs.SyncJob, state *syncJobR
 	state.BurstIn = stringValueOrNull(normalizeRateString(job.BurstIn))
 	state.BurstOut = stringValueOrNull(normalizeRateString(job.BurstOut))
 	state.Comment = stringValueOrNull(job.Comment)
-	if job.Disable != nil {
-		state.Disable = types.BoolValue(*job.Disable)
-	} else {
-		state.Disable = types.BoolValue(false)
-	}
 	state.Digest = stringValueOrNull(job.Digest)
 
 	return diags

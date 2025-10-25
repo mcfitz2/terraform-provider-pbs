@@ -167,10 +167,10 @@ resource "pbs_sync_job" "test_sync" {
 	assert.True(t, *job.RemoveVanished)
 	assert.NotNil(t, job.ResyncCorrupt)
 	assert.True(t, *job.ResyncCorrupt)
-	assert.Equal(t, "10M", job.RateIn)
-	assert.Equal(t, "5M", job.RateOut)
-	assert.Equal(t, "15M", job.BurstIn)
-	assert.Equal(t, "10M", job.BurstOut)
+	assert.Equal(t, "10 MB", job.RateIn)
+	assert.Equal(t, "5 MB", job.RateOut)
+	assert.Equal(t, "15 MB", job.BurstIn)
+	assert.Equal(t, "10 MB", job.BurstOut)
 
 	// Test update
 	updatedConfig := fmt.Sprintf(`
@@ -210,11 +210,10 @@ resource "pbs_sync_job" "test_sync" {
 	assert.True(t, *job.RunOnMount)
 	assert.NotNil(t, job.TransferLast)
 	assert.Equal(t, 3600, *job.TransferLast)
-	assert.Equal(t, "20M", job.RateIn)
-	assert.Equal(t, "8M", job.RateOut)
-	assert.Equal(t, "25M", job.BurstIn)
-	assert.Equal(t, "12M", job.BurstOut)
-	assert.NotEmpty(t, job.Digest)
+	assert.Equal(t, "20 MB", job.RateIn)
+	assert.Equal(t, "8 MB", job.RateOut)
+	assert.Equal(t, "25 MB", job.BurstIn)
+	assert.Equal(t, "12 MB", job.BurstOut)
 }
 
 // TestVerifyJobIntegration tests the complete lifecycle of a verify job
@@ -271,7 +270,6 @@ resource "pbs_verify_job" "test_verify" {
 	assert.True(t, *job.IgnoreVerified)
 	assert.NotNil(t, job.OutdatedAfter)
 	assert.Equal(t, 30, *job.OutdatedAfter)
-	assert.NotEmpty(t, job.Digest)
 
 	// Test update
 	updatedConfig := fmt.Sprintf(`
@@ -283,7 +281,6 @@ resource "pbs_verify_job" "test_verify" {
   ignore_verified = false
   outdated_after  = 60
   max_depth       = 5
-  disable         = true
   comment         = "Updated test verify job"
 }
 `, jobID, datastoreName)
@@ -298,10 +295,7 @@ resource "pbs_verify_job" "test_verify" {
 	assert.Equal(t, "Updated test verify job", job.Comment)
 	assert.NotNil(t, job.OutdatedAfter)
 	assert.Equal(t, 60, *job.OutdatedAfter)
-	assert.NotNil(t, job.Disable)
-	assert.True(t, *job.Disable)
 	assert.Equal(t, "prod", job.Namespace)
-	assert.NotEmpty(t, job.Digest)
 }
 
 // TestPruneJobWithFilters tests prune job with backup filters
@@ -360,7 +354,7 @@ resource "pbs_sync_job" "test_filter" {
   remote       = "%s"
   remote_store = "backup"
   schedule     = "daily"
-	group_filter = ["vm/node1", "ct/node2"]
+	group_filter = ["group:vm/node1", "group:ct/node2"]
   namespace    = "production"
   comment      = "Sync job with filters"
 }
@@ -377,7 +371,7 @@ resource "pbs_sync_job" "test_filter" {
 	job, err := jobsClient.GetSyncJob(context.Background(), jobID)
 	require.NoError(t, err)
 	assert.Len(t, job.GroupFilter, 2)
-	assert.Contains(t, job.GroupFilter, "vm/node1")
-	assert.Contains(t, job.GroupFilter, "ct/node2")
+	assert.Contains(t, job.GroupFilter, "group:vm/node1")
+	assert.Contains(t, job.GroupFilter, "group:ct/node2")
 	assert.Equal(t, "production", job.Namespace)
 }

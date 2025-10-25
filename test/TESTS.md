@@ -9,7 +9,7 @@ The test suite is organized into several categories, each testing different reso
 ### 1. Datastore Tests (`datastore_test.go`)
 - **TestDatastoreDirectoryIntegration**: Tests directory datastore lifecycle (create, read, update, delete)
 - **TestDatastoreZFSIntegration**: Tests ZFS datastore functionality
-- Tests datastore-specific features like gc_schedule and prune_schedule
+- Tests datastore-specific features like gc_schedule
 
 ### 2. S3 Provider Tests (`s3_providers_test.go`)
 - **TestS3DatastoreMultiProvider**: Tests S3 datastore with multiple cloud providers (AWS, B2, Scaleway)

@@ -279,10 +279,6 @@ func (c *Client) datastoreToMap(ds *Datastore) map[string]interface{} {
 		"name": ds.Name,
 	}
 
-	if dsType := determineDatastoreType(ds); dsType != "" {
-		body["type"] = dsType
-	}
-
 	if ds.Path != "" {
 		body["path"] = ds.Path
 	}
@@ -396,39 +392,6 @@ func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds 
 	} else if ds.Backend != "" {
 		body["backend"] = ds.Backend
 	}
-}
-
-// determineDatastoreType infers the datastore type from available configuration
-func determineDatastoreType(ds *Datastore) string {
-	if ds == nil {
-		return ""
-	}
-
-	if strings.HasPrefix(ds.Backend, "type=s3") || (ds.S3Client != "" && ds.S3Bucket != "") {
-		return "s3"
-	}
-
-	if ds.ZFSPool != "" || ds.ZFSDataset != "" {
-		return "zfs"
-	}
-
-	if ds.VolumeGroup != "" || ds.ThinPool != "" {
-		return "lvm"
-	}
-
-	if ds.Share != "" || ds.Username != "" || ds.Domain != "" || ds.SubDir != "" {
-		return "cifs"
-	}
-
-	if ds.Export != "" {
-		return "nfs"
-	}
-
-	if ds.Path != "" {
-		return "dir"
-	}
-
-	return ""
 }
 
 // getNodeForTask determines the node name for a given task
