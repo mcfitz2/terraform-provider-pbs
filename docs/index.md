@@ -66,6 +66,13 @@ export PBS_API_TOKEN="your-api-token"
 export PBS_INSECURE_TLS="false"
 ```
 
+## Notifications (PBS 4.0)
+
+- SMTP and Sendmail targets now require `mailto` to be declared as a list, for example `mailto = ["alerts@example.com", "oncall@example.com"]`.
+- Webhook targets normalize the HTTP method to lowercase to match the PBS 4.0 API.
+- A new `pbs_notification_endpoint` resource manages notification endpoint groups that aggregate multiple targets.
+- All notification resources now surface the `origin` reported by PBS so you can identify auto-generated versus user-managed entries.
+
 ## Schema
 
 ### Required

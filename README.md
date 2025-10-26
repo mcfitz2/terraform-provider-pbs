@@ -7,7 +7,8 @@ A Terraform provider for managing [Proxmox Backup Server](https://www.proxmox.co
 
 ## Features
 
-- **Datastore Management**: Create and manage PBS datastores (directory, ZFS, CIFS)
+- **Datastore Management**: Create and manage PBS datastores (directory, removable, and S3)
+- **PBS 4.0 Parity**: Configure maintenance windows, notification routing, tuning profiles, reuse flags, and sync levels introduced in PBS 4.0
 - **S3 Provider Support**: Configure S3-compatible storage backends (AWS, Backblaze B2, Scaleway)
 - **S3 Endpoints**: Manage S3 storage endpoints
 - **Full Terraform Lifecycle**: Complete support for create, read, update, delete, and import operations
@@ -66,6 +67,18 @@ resource "pbs_datastore" "backup" {
 }
 ```
 
+### Create a Removable Datastore
+
+```hcl
+resource "pbs_datastore" "removable" {
+  name           = "removable-backups"
+  path           = "/mnt/removable/removable-backups"
+  removable      = true
+  backing_device = "7d6fe83c-4c01-4a33-9ad0-9bc0216fb3e3" # UUID reported by PBS for the device
+  comment        = "Rotated removable media"
+}
+```
+
 ### Create an S3 Datastore with AWS
 
 ```hcl
@@ -87,14 +100,44 @@ resource "pbs_datastore" "s3_backup" {
 }
 ```
 
-### Create a ZFS Datastore
+### Configure PBS 4.0 Advanced Options
 
 ```hcl
-resource "pbs_datastore" "zfs_backup" {
-  name    = "zfs-backup"
-  path    = "rpool/backup"
-  comment = "ZFS-backed datastore"
+resource "pbs_datastore" "advanced" {
+  name = "pbs-advanced"
+  path = "/mnt/datastore/pbs-advanced"
+
+  # Notification routing and delivery
+  notification_mode = "notification-system"
+  notify_user       = "root@pam"
+  notify_level      = "warning"
+  notify {
+    gc    = "always"
+    prune = "error"
+    sync  = "never"
+  }
+
+  # Maintenance window advertised to PBS clients
+  maintenance_mode {
+    type    = "read-only"
+    message = "Scheduled maintenance window"
+  }
+
+  # Reuse/verification toggles
+  verify_new      = true
+  reuse_datastore = true
+  overwrite_in_use = false
+
+  # Fine-grained tuning controls
+  tuning {
+    chunk_order          = "inode"
+    gc_atime_cutoff      = 3600
+    gc_atime_safety_check = true
+    gc_cache_capacity    = 512
+    sync_level           = "file"
+  }
 }
+```
 ```
 
 ## Available Resources

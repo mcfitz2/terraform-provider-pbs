@@ -4,8 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// Package resources provides Terraform resources for the PBS provider
-package resources
+// Package endpoints provides Terraform resources for PBS endpoints
+package endpoints
 
 import (
 	"context"

@@ -28,18 +28,6 @@ func NewClient(apiClient *api.Client) *Client {
 	return &Client{api: apiClient}
 }
 
-// DatastoreType represents the type of datastore backend
-type DatastoreType string
-
-const (
-	DatastoreTypeDirectory DatastoreType = "dir"
-	DatastoreTypeZFS       DatastoreType = "zfs"
-	DatastoreTypeLVM       DatastoreType = "lvm"
-	DatastoreTypeCIFS      DatastoreType = "cifs"
-	DatastoreTypeNFS       DatastoreType = "nfs"
-	DatastoreTypeS3        DatastoreType = "s3"
-)
-
 // datastoreListItem represents a datastore in list responses (minimal info)
 type datastoreListItem struct {
 	Name            string `json:"name"`
@@ -49,49 +37,51 @@ type datastoreListItem struct {
 
 // Datastore represents a PBS datastore configuration
 type Datastore struct {
-	Name          string        `json:"name"`
-	Type          DatastoreType `json:"type"`
-	Path          string        `json:"path,omitempty"`
-	Content       []string      `json:"content,omitempty"`
-	MaxBackups    *int          `json:"max-backups,omitempty"`
-	Comment       string        `json:"comment,omitempty"`
-	Disabled      *bool         `json:"disable,omitempty"`
-	GCSchedule    string        `json:"gc-schedule,omitempty"`
-	PruneSchedule string        `json:"prune-schedule,omitempty"`
+	Name          string `json:"name"`
+	Path          string `json:"path,omitempty"`
+	Comment       string `json:"comment,omitempty"`
+	Disabled      *bool  `json:"disable,omitempty"`
+	GCSchedule    string `json:"gc-schedule,omitempty"`
+	PruneSchedule string `json:"prune-schedule,omitempty"`
 
-	// Directory-specific options
-	CreateBasePath *bool `json:"create-base-path,omitempty"`
+	// Retention windows
+	KeepLast    *int `json:"keep-last,omitempty"`
+	KeepHourly  *int `json:"keep-hourly,omitempty"`
+	KeepDaily   *int `json:"keep-daily,omitempty"`
+	KeepWeekly  *int `json:"keep-weekly,omitempty"`
+	KeepMonthly *int `json:"keep-monthly,omitempty"`
+	KeepYearly  *int `json:"keep-yearly,omitempty"`
 
-	// ZFS-specific options
-	ZFSPool     string `json:"pool,omitempty"`
-	ZFSDataset  string `json:"dataset,omitempty"`
-	BlockSize   string `json:"blocksize,omitempty"`
-	Compression string `json:"compression,omitempty"`
+	// Maintenance and notification fields
+	MaintenanceModeRaw string           `json:"maintenance-mode,omitempty"`
+	MaintenanceMode    *MaintenanceMode `json:"-"`
+	NotifyRaw          string           `json:"notify,omitempty"`
+	Notify             *DatastoreNotify `json:"-"`
+	NotifyUser         string           `json:"notify-user,omitempty"`
+	NotificationMode   string           `json:"notification-mode,omitempty"`
+	NotifyLevel        string           `json:"notify-level,omitempty"`
 
-	// LVM-specific options
-	VolumeGroup string `json:"vg,omitempty"`
-	ThinPool    string `json:"thinpool,omitempty"`
+	// Verification and reuse toggles
+	VerifyNew      *bool `json:"verify-new,omitempty"`
+	ReuseDatastore *bool `json:"reuse-datastore,omitempty"`
+	OverwriteInUse *bool `json:"overwrite-in-use,omitempty"`
 
-	// Network storage options (CIFS/NFS)
-	Server   string `json:"server,omitempty"`
-	Export   string `json:"export,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Domain   string `json:"domain,omitempty"`
-	Share    string `json:"share,omitempty"`
-	SubDir   string `json:"subdir,omitempty"`
-	Options  string `json:"options,omitempty"`
+	// Tuning options
+	TuningRaw string           `json:"tuning,omitempty"`
+	Tuning    *DatastoreTuning `json:"-"`
 
 	// Advanced options
-	NotifyUser  string `json:"notify-user,omitempty"`
-	NotifyLevel string `json:"notify-level,omitempty"`
-	TuneLevel   *int   `json:"tuning,omitempty"`
-	Fingerprint string `json:"fingerprint,omitempty"`
+	Fingerprint   string `json:"fingerprint,omitempty"`
+	BackingDevice string `json:"backing-device,omitempty"`
 
 	// S3 backend options (stored as backend configuration)
-	Backend  string `json:"backend,omitempty"` // e.g. "type=s3,client=endpoint_id,bucket=bucket_name"
-	S3Client string `json:"-"`                 // S3 endpoint ID (for easier access in Go code)
-	S3Bucket string `json:"-"`                 // S3 bucket name (for easier access in Go code)
+	Backend     string `json:"backend,omitempty"` // e.g. "type=s3,client=endpoint_id,bucket=bucket_name"
+	BackendType string `json:"-"`
+	S3Client    string `json:"-"` // S3 endpoint ID (for easier access in Go code)
+	S3Bucket    string `json:"-"`
+
+	Digest string   `json:"digest,omitempty"`
+	Delete []string `json:"delete,omitempty"`
 }
 
 // ListDatastores lists all datastore configurations
@@ -111,12 +101,9 @@ func (c *Client) ListDatastores(ctx context.Context) ([]Datastore, error) {
 	// If detailed info is needed, GetDatastore should be called for individual items
 	datastores := make([]Datastore, len(listItems))
 	for i, item := range listItems {
-		// Try to infer type from path or use directory as default
-		datastoreType := c.inferDatastoreType(item.Path)
 		datastores[i] = Datastore{
 			Name: item.Name,
 			Path: item.Path,
-			Type: datastoreType,
 		}
 	}
 
@@ -137,15 +124,25 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
 
-			// Parse S3 backend configuration if present
-			if ds.Backend != "" {
-				c.parseS3Backend(&ds)
+			// Parse backend configuration if present
+			c.parseBackendConfig(&ds)
+
+			// Parse property string fields into typed structs
+			ds.MaintenanceMode = parseMaintenanceMode(ds.MaintenanceModeRaw)
+			if ds.MaintenanceMode != nil {
+				ds.MaintenanceModeRaw = formatMaintenanceMode(ds.MaintenanceMode)
 			}
 
-			// If type is not set, infer it
-			if ds.Type == "" {
-				ds.Type = c.inferDatastoreType(ds.Path)
+			ds.Notify = parseNotify(ds.NotifyRaw)
+			if ds.Notify != nil {
+				ds.NotifyRaw = formatNotify(ds.Notify)
 			}
+
+			ds.Tuning = parseTuning(ds.TuningRaw)
+			if ds.Tuning != nil {
+				ds.TuningRaw = formatTuning(ds.Tuning)
+			}
+
 			return &ds, nil
 		}
 	}
@@ -158,10 +155,6 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 
 	for _, ds := range datastores {
 		if ds.Name == name {
-			// Ensure type is set properly
-			if ds.Type == "" {
-				ds.Type = c.inferDatastoreType(ds.Path)
-			}
 			return &ds, nil
 		}
 	}
@@ -261,30 +254,15 @@ func (c *Client) DeleteDatastoreWithOptions(ctx context.Context, name string, de
 
 // datastoreToMap converts a Datastore struct to a map for API requests
 func (c *Client) datastoreToMap(ds *Datastore) map[string]interface{} {
-	// Start with absolutely minimal required fields based on API errors
 	body := map[string]interface{}{
 		"name": ds.Name,
 	}
 
-	// Path appears to be required for all datastore types (local cache for S3)
 	if ds.Path != "" {
 		body["path"] = ds.Path
 	}
 
-	// Handle S3 backend configuration
-	if ds.Type == DatastoreTypeS3 {
-		if ds.Backend != "" {
-			// Use the pre-built backend string
-			body["backend"] = ds.Backend
-		} else if ds.S3Client != "" && ds.S3Bucket != "" {
-			// Build backend string from components: type=s3,client=endpoint_id,bucket=bucket_name
-			body["backend"] = fmt.Sprintf("type=s3,client=%s,bucket=%s", ds.S3Client, ds.S3Bucket)
-		}
-	}
-
-	// Only add fields that we know are accepted by the PBS API
-	// Based on the errors, even "content" and "create-base-path" are rejected
-	// So for now, stick to just name, path, and backend (for S3)
+	c.populateDatastoreMutableFields(body, ds)
 
 	return body
 }
@@ -293,36 +271,89 @@ func (c *Client) datastoreToMap(ds *Datastore) map[string]interface{} {
 // Excludes fields that cannot be updated (like path, name, type)
 func (c *Client) datastoreToMapForUpdate(ds *Datastore) map[string]interface{} {
 	body := map[string]interface{}{}
+	c.populateDatastoreMutableFields(body, ds)
 
-	// Include fields that can be updated
-	if ds.Comment != "" {
-		body["comment"] = ds.Comment
+	// Include digest for optimistic locking if present
+	if ds.Digest != "" {
+		body["digest"] = ds.Digest
 	}
 
-	if ds.GCSchedule != "" {
-		body["gc-schedule"] = ds.GCSchedule
+	if len(ds.Delete) > 0 {
+		body["delete"] = ds.Delete
 	}
-
-	// prune-schedule is not supported - replaced by prune jobs according to PBS API
-	// if ds.PruneSchedule != "" {
-	//     body["prune-schedule"] = ds.PruneSchedule
-	// }
-
-	// max-backups is not supported for updates according to PBS API
-	// if ds.MaxBackups != nil {
-	//     body["max-backups"] = *ds.MaxBackups
-	// }
 
 	return body
 }
 
-// inferDatastoreType attempts to determine datastore type from available information
-func (c *Client) inferDatastoreType(path string) DatastoreType {
-	// For now, assume all datastores are directory type since that's what we support
-	// In the future, this could be enhanced to detect ZFS paths, LVM paths, etc.
-	// based on path patterns or additional API calls
-	// Note: S3 type should be determined by parseS3Backend when backend field is present
-	return DatastoreTypeDirectory
+func (c *Client) populateDatastoreMutableFields(body map[string]interface{}, ds *Datastore) {
+	setString := func(key, value string) {
+		if value != "" {
+			body[key] = value
+		}
+	}
+
+	setInt := func(key string, value *int) {
+		if value != nil {
+			body[key] = *value
+		}
+	}
+
+	setBool := func(key string, value *bool) {
+		if value != nil {
+			body[key] = *value
+		}
+	}
+
+	setString("comment", ds.Comment)
+	setBool("disable", ds.Disabled)
+	setString("gc-schedule", ds.GCSchedule)
+	setString("prune-schedule", ds.PruneSchedule)
+
+	setInt("keep-last", ds.KeepLast)
+	setInt("keep-hourly", ds.KeepHourly)
+	setInt("keep-daily", ds.KeepDaily)
+	setInt("keep-weekly", ds.KeepWeekly)
+	setInt("keep-monthly", ds.KeepMonthly)
+	setInt("keep-yearly", ds.KeepYearly)
+
+	if ds.MaintenanceMode != nil {
+		body["maintenance-mode"] = formatMaintenanceMode(ds.MaintenanceMode)
+	} else if ds.MaintenanceModeRaw != "" {
+		body["maintenance-mode"] = ds.MaintenanceModeRaw
+	}
+
+	if ds.Notify != nil {
+		body["notify"] = formatNotify(ds.Notify)
+	} else if ds.NotifyRaw != "" {
+		body["notify"] = ds.NotifyRaw
+	}
+
+	setString("notify-user", ds.NotifyUser)
+	setString("notify-level", ds.NotifyLevel)
+	setString("notification-mode", ds.NotificationMode)
+	setBool("verify-new", ds.VerifyNew)
+	setBool("reuse-datastore", ds.ReuseDatastore)
+	setBool("overwrite-in-use", ds.OverwriteInUse)
+
+	if ds.Tuning != nil {
+		body["tuning"] = formatTuning(ds.Tuning)
+	} else if ds.TuningRaw != "" {
+		body["tuning"] = ds.TuningRaw
+	}
+
+	setString("fingerprint", ds.Fingerprint)
+	setString("backing-device", ds.BackingDevice)
+
+	backendIsS3 := strings.HasPrefix(ds.Backend, "type=s3") || (ds.S3Client != "" && ds.S3Bucket != "")
+	if backendIsS3 {
+		if ds.Backend != "" {
+			body["backend"] = ds.Backend
+		} else if ds.S3Client != "" && ds.S3Bucket != "" {
+			body["backend"] = fmt.Sprintf("type=s3,client=%s,bucket=%s", ds.S3Client, ds.S3Bucket)
+		}
+	} else if ds.Backend != "" {
+		body["backend"] = ds.Backend
+	}
 }
 
 // getNodeForTask determines the node name for a given task
@@ -348,33 +379,23 @@ func (c *Client) getNodeForTask(ctx context.Context, upid string) (string, error
 	return nodes[0].Node, nil
 }
 
-// parseS3Backend parses the S3 backend configuration string and populates the datastore fields
-// Backend format: "type=s3,client=endpoint_id,bucket=bucket_name"
-func (c *Client) parseS3Backend(ds *Datastore) {
-	if ds.Backend == "" {
+// parseBackendConfig parses backend configuration strings for supported backend types.
+func (c *Client) parseBackendConfig(ds *Datastore) {
+	if strings.TrimSpace(ds.Backend) == "" {
 		return
 	}
 
-	// Parse the backend configuration string
-	parts := strings.Split(ds.Backend, ",")
-	for _, part := range parts {
-		keyValue := strings.SplitN(part, "=", 2)
-		if len(keyValue) != 2 {
-			continue
+	backendType, params := ParseBackendString(ds.Backend)
+	ds.BackendType = strings.ToLower(strings.TrimSpace(backendType))
+	switch ds.BackendType {
+	case "s3":
+		if client, ok := params["client"]; ok {
+			ds.S3Client = client
 		}
-
-		key := strings.TrimSpace(keyValue[0])
-		value := strings.TrimSpace(keyValue[1])
-
-		switch key {
-		case "type":
-			if value == "s3" {
-				ds.Type = DatastoreTypeS3
-			}
-		case "client":
-			ds.S3Client = value
-		case "bucket":
-			ds.S3Bucket = value
+		if bucket, ok := params["bucket"]; ok {
+			ds.S3Bucket = bucket
 		}
+	case "removable":
+		// No additional parameters to capture beyond backing-device field
 	}
 }

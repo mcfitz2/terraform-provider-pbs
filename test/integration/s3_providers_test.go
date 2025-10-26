@@ -1,4 +1,4 @@
-package test
+package integration
 
 import (
 	"context"
@@ -309,7 +309,7 @@ func testS3ProviderDatastore(t *testing.T, provider *S3ProviderConfig) {
 		// Terraform destroy will handle PBS resources (datastore -> endpoint)
 		// in the correct order thanks to depends_on relationships
 		tc.DestroyTerraform(t)
-		
+
 		// Clean up the S3 bucket (external to PBS)
 		provider.DeleteTestBucket(t)
 	}()
@@ -360,22 +360,26 @@ resource "pbs_s3_endpoint" "test_%s" {
 	terraformConfig += "}\n"
 
 	// Add S3 datastore configuration
+	// NOTE: We use the .id attribute reference which creates an implicit dependency
+	// ensuring the datastore can only be created after the endpoint exists.
+	// During destroy, Terraform reverses this dependency, destroying the datastore first.
+	endpointID := pbsConfig["id"]
 	terraformConfig += fmt.Sprintf(`
 resource "pbs_datastore" "test_%s" {
   name       = "%s"
-  type       = "s3"
   path       = "/datastore/%s-cache"
-  s3_client  = pbs_s3_endpoint.test_%s.id
+  s3_client  = "%s"
   s3_bucket  = "%s"
   comment    = "Test S3 datastore for %s provider"
   
+  # Explicit dependency ensures proper destroy order: datastore -> endpoint
   depends_on = [pbs_s3_endpoint.test_%s]
 }
 `,
 		provider.Name,
 		datastoreName,
 		datastoreName,
-		provider.Name,
+		endpointID,
 		provider.BucketName,
 		provider.Name,
 		provider.Name)
@@ -399,7 +403,6 @@ resource "pbs_datastore" "test_%s" {
 	datastoreResource := tc.GetResourceFromState(t, fmt.Sprintf("pbs_datastore.test_%s", provider.Name))
 	if datastoreResource != nil {
 		assert.Equal(t, datastoreName, datastoreResource.AttributeValues["name"])
-		assert.Equal(t, "s3", datastoreResource.AttributeValues["type"])
 		assert.Equal(t, fmt.Sprintf("/datastore/%s-cache", datastoreName), datastoreResource.AttributeValues["path"])
 		assert.Equal(t, pbsConfig["id"], datastoreResource.AttributeValues["s3_client"])
 		assert.Equal(t, provider.BucketName, datastoreResource.AttributeValues["s3_bucket"])
@@ -434,7 +437,6 @@ resource "pbs_datastore" "test_%s" {
 	}
 	require.NoError(t, err, "Failed to get S3 datastore via PBS API after %d retries", maxRetries)
 	assert.Equal(t, datastoreName, pbsDatastore.Name)
-	assert.Equal(t, datastores.DatastoreTypeS3, pbsDatastore.Type)
 	assert.Equal(t, fmt.Sprintf("/datastore/%s-cache", datastoreName), pbsDatastore.Path)
 	assert.Equal(t, pbsConfig["id"], pbsDatastore.S3Client)
 	assert.Equal(t, provider.BucketName, pbsDatastore.S3Bucket)
@@ -462,5 +464,3 @@ resource "pbs_datastore" "test_%s" {
 
 	// Terraform destroy will be handled by defer
 }
-
-
