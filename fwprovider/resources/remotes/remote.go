@@ -73,7 +73,7 @@ func (r *remoteResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 Remote configurations allow PBS to connect to other PBS servers for pulling or pushing backups. 
 Remotes are referenced by sync jobs to replicate data between PBS instances.
 
-**Note:** The password is write-only and will not be stored in Terraform state after the initial creation. 
+**Note:** The password is stored in Terraform state, but is write-only from the API perspective (the API does not return the password on GET requests). 
 Updates to the password will always be sent to the API but cannot be verified by reading back the configuration.`,
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
