@@ -14,6 +14,7 @@ description = "Allowlist for safe patterns"
 # Files to ignore (documentation about secrets, not actual new secrets)
 paths = [
     '''.gitleaks\.toml''',
+    '''examples/.*\.tf''',        # Example Terraform files with dummy credentials
 ]
 
 # Content patterns to ignore (known safe values)
