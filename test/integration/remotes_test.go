@@ -332,7 +332,7 @@ resource "pbs_remote" "imported" {
 	assert.Equal(t, remoteName, resource.AttributeValues["name"])
 	assert.Equal(t, "import.example.com", resource.AttributeValues["host"])
 	assert.Equal(t, "sync@pbs!import-token", resource.AttributeValues["auth_id"])
-	// Password won't be imported, but should match config after refresh
+	// Password will be null after import (per ImportState), and populated from config on first apply/refresh
 	assert.Equal(t, "Test remote for import", resource.AttributeValues["comment"])
 
 	t.Log("SUCCESS: Remote imported successfully")
