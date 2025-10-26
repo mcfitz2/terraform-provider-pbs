@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
@@ -603,150 +602,32 @@ func (c *Client) DeleteWebhookTarget(ctx context.Context, name string) error {
 	return nil
 }
 
-// Notification Endpoints (Groups)
+// Notification Targets (Unified Listing)
 
-// NotificationEndpoint represents a notification endpoint (group of targets)
-type NotificationEndpoint struct {
-	Name    string   `json:"name"`
-	Targets []string `json:"target,omitempty"`
-	Comment string   `json:"comment,omitempty"`
-	Disable *bool    `json:"disable,omitempty"`
-	Origin  string   `json:"origin,omitempty"`
+// NotificationTarget represents any type of notification target (unified view from /config/notifications/targets)
+type NotificationTarget struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"` // smtp, gotify, sendmail, webhook
+	Comment string `json:"comment,omitempty"`
+	Disable bool   `json:"disable,omitempty"`
+	Origin  string `json:"origin,omitempty"`
 }
 
-// ListNotificationEndpoints lists all notification endpoints
-func (c *Client) ListNotificationEndpoints(ctx context.Context) ([]NotificationEndpoint, error) {
-	resp, err := c.api.Get(ctx, "/config/notifications/endpoints")
+// ListNotificationTargets lists all notification targets across all types.
+// This uses the GET /config/notifications/targets API which returns a unified view
+// of all targets (smtp, gotify, sendmail, webhook) configured in PBS.
+func (c *Client) ListNotificationTargets(ctx context.Context) ([]NotificationTarget, error) {
+	resp, err := c.api.Get(ctx, "/config/notifications/targets")
 	if err != nil {
-		return nil, fmt.Errorf("failed to list notification endpoints: %w", err)
+		return nil, fmt.Errorf("failed to list notification targets: %w", err)
 	}
 
-	var endpoints []NotificationEndpoint
-	if err := json.Unmarshal(resp.Data, &endpoints); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal notification endpoints: %w", err)
+	var targets []NotificationTarget
+	if err := json.Unmarshal(resp.Data, &targets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal notification targets: %w", err)
 	}
 
-	return endpoints, nil
-}
-
-// GetNotificationEndpoint gets a specific notification endpoint by name
-func (c *Client) GetNotificationEndpoint(ctx context.Context, name string) (*NotificationEndpoint, error) {
-	path := fmt.Sprintf("/config/notifications/endpoints/%s", url.PathEscape(name))
-	resp, err := c.api.Get(ctx, path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get notification endpoint %s: %w", name, err)
-	}
-
-	var endpoint NotificationEndpoint
-	if err := json.Unmarshal(resp.Data, &endpoint); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal notification endpoint %s: %w", name, err)
-	}
-
-	return &endpoint, nil
-}
-
-// CreateNotificationEndpoint creates a new notification endpoint
-func (c *Client) CreateNotificationEndpoint(ctx context.Context, endpoint *NotificationEndpoint) error {
-	if endpoint.Name == "" {
-		return fmt.Errorf("endpoint name is required")
-	}
-
-	body := map[string]interface{}{
-		"name": endpoint.Name,
-	}
-
-	if endpoint.Targets != nil {
-		body["target"] = endpoint.Targets
-	}
-	if endpoint.Comment != "" {
-		body["comment"] = endpoint.Comment
-	}
-	if endpoint.Disable != nil {
-		body["disable"] = *endpoint.Disable
-	}
-
-	_, err := c.api.Post(ctx, "/config/notifications/endpoints", body)
-	if err != nil {
-		return fmt.Errorf("failed to create notification endpoint %s: %w", endpoint.Name, err)
-	}
-
-	return nil
-}
-
-// SupportsNotificationEndpoints returns true when the PBS API exposes notification endpoint operations.
-func (c *Client) SupportsNotificationEndpoints(ctx context.Context) (bool, error) {
-	_, err := c.api.Get(ctx, "/config/notifications/endpoints")
-	if err == nil {
-		return true, nil
-	}
-
-	if isAPINotFoundError(err, "/config/notifications/endpoints") {
-		return false, nil
-	}
-
-	return false, err
-}
-
-// UpdateNotificationEndpoint updates an existing notification endpoint
-func (c *Client) UpdateNotificationEndpoint(ctx context.Context, name string, endpoint *NotificationEndpoint) error {
-	if name == "" {
-		return fmt.Errorf("endpoint name is required")
-	}
-
-	body := map[string]interface{}{}
-
-	if endpoint.Targets != nil {
-		body["target"] = endpoint.Targets
-	}
-	if endpoint.Comment != "" {
-		body["comment"] = endpoint.Comment
-	}
-	if endpoint.Disable != nil {
-		body["disable"] = *endpoint.Disable
-	}
-
-	path := fmt.Sprintf("/config/notifications/endpoints/%s", url.PathEscape(name))
-	_, err := c.api.Put(ctx, path, body)
-	if err != nil {
-		return fmt.Errorf("failed to update notification endpoint %s: %w", name, err)
-	}
-
-	return nil
-}
-
-// DeleteNotificationEndpoint deletes a notification endpoint
-func (c *Client) DeleteNotificationEndpoint(ctx context.Context, name string) error {
-	if name == "" {
-		return fmt.Errorf("endpoint name is required")
-	}
-
-	path := fmt.Sprintf("/config/notifications/endpoints/%s", url.PathEscape(name))
-	_, err := c.api.Delete(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to delete notification endpoint %s: %w", name, err)
-	}
-
-	return nil
-}
-
-func isAPINotFoundError(err error, apiPath string) bool {
-	if err == nil {
-		return false
-	}
-
-	message := err.Error()
-	if strings.Contains(message, "status 404") {
-		return true
-	}
-
-	lower := strings.ToLower(message)
-	if strings.Contains(lower, "not found") {
-		if apiPath == "" || strings.Contains(message, apiPath) {
-			return true
-		}
-	}
-
-	return false
+	return targets, nil
 }
 
 // Notification Matchers
