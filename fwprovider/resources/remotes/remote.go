@@ -378,7 +378,7 @@ func setRemoteState(remote *remotes.Remote, state *remoteResourceModel, plan *re
 		state.Password = plan.Password
 	} else {
 		// On import or if not in plan, set to unknown to trigger update
-		state.Password = types.StringValue("")
+		state.Password = types.StringNull()
 	}
 }
 
