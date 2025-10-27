@@ -160,7 +160,6 @@ func (c *Client) UpdateRemote(ctx context.Context, name string, remote *Remote) 
 	if remote.Password != "" {
 		body["password"] = remote.Password
 	}
-	
 	// Optional fields
 	if remote.Port != nil {
 		body["port"] = *remote.Port
