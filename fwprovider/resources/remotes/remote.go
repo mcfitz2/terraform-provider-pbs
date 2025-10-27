@@ -150,9 +150,6 @@ Updates to the password will always be sent to the API but cannot be verified by
 				Description:         "Opaque digest returned by PBS for optimistic locking.",
 				MarkdownDescription: "Opaque digest returned by PBS for optimistic locking.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
