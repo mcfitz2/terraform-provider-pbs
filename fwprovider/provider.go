@@ -25,11 +25,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/micah/terraform-provider-pbs/fwprovider/config"
+	"github.com/micah/terraform-provider-pbs/fwprovider/datasources/remotes"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/datastores"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/endpoints"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/jobs"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/metrics"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/notifications"
+	remotesresources "github.com/micah/terraform-provider-pbs/fwprovider/resources/remotes"
 	"github.com/micah/terraform-provider-pbs/pbs"
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
@@ -233,7 +235,10 @@ func (p *pbsProvider) Configure(ctx context.Context, req provider.ConfigureReque
 // DataSources defines the data sources implemented in the provider.
 func (p *pbsProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		// Add data sources here as they are implemented
+		// Remotes
+		remotes.NewRemoteStoresDataSource,
+		remotes.NewRemoteNamespacesDataSource,
+		remotes.NewRemoteGroupsDataSource,
 	}
 }
 
@@ -242,6 +247,8 @@ func (p *pbsProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		// Endpoints
 		endpoints.NewS3EndpointResource,
+		// Remotes
+		remotesresources.NewRemoteResource,
 		// Datastores
 		datastores.NewDatastoreResource,
 		// Metrics
