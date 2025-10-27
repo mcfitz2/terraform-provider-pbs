@@ -119,7 +119,7 @@ Updates to the password will always be sent to the API but cannot be verified by
 			"password": schema.StringAttribute{
 				Description: "Password or authentication token for the remote server.",
 				MarkdownDescription: "Password or authentication token for the remote server. " +
-					"This value is write-only and will not be stored in state after creation.",
+					"This value is write-only from the API perspective (not returned on GET), but will be stored in Terraform state as a sensitive value.",
 				Required:  true,
 				Sensitive: true,
 				Validators: []validator.String{
