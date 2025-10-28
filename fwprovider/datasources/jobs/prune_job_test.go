@@ -27,8 +27,8 @@ func TestPruneJobDataSourceSchema(t *testing.T) {
 	require.True(t, idAttr.IsRequired(), "id should be required")
 
 	// Verify computed attributes
-	computedAttrs := []string{"store", "schedule", "keep_last", "keep_hourly", 
-		"keep_daily", "keep_weekly", "keep_monthly", "keep_yearly", 
+	computedAttrs := []string{"store", "schedule", "keep_last", "keep_hourly",
+		"keep_daily", "keep_weekly", "keep_monthly", "keep_yearly",
 		"max_depth", "namespace", "comment", "disable", "digest"}
 
 	for _, attrName := range computedAttrs {
@@ -45,16 +45,16 @@ func TestPruneJobToState(t *testing.T) {
 	disabled := false
 
 	job := &pbsjobs.PruneJob{
-		ID:          "prune-job-1",
-		Store:       "datastore1",
-		Schedule:    "daily",
-		KeepLast:    &keepLast,
-		KeepDaily:   &keepDaily,
-		MaxDepth:    &maxDepth,
-		Namespace:   "ns1",
-		Comment:     "Test prune job",
-		Disable:     &disabled,
-		Digest:      "test-digest",
+		ID:        "prune-job-1",
+		Store:     "datastore1",
+		Schedule:  "daily",
+		KeepLast:  &keepLast,
+		KeepDaily: &keepDaily,
+		MaxDepth:  &maxDepth,
+		Namespace: "ns1",
+		Comment:   "Test prune job",
+		Disable:   &disabled,
+		Digest:    "test-digest",
 	}
 
 	var state pruneJobDataSourceModel
@@ -93,7 +93,7 @@ func TestPruneJobToStateMinimal(t *testing.T) {
 	assert.True(t, state.Namespace.IsNull())
 	assert.True(t, state.Comment.IsNull())
 	assert.True(t, state.Disable.IsNull())
-	
+
 	// Digest will be empty string (not null) when omitted
 	assert.Equal(t, "", state.Digest.ValueString())
 }

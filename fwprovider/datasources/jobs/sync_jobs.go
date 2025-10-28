@@ -35,8 +35,8 @@ type syncJobsDataSource struct {
 
 // syncJobsDataSourceModel maps the data source schema data.
 type syncJobsDataSourceModel struct {
-	Store  types.String                 `tfsdk:"store"`
-	Remote types.String                 `tfsdk:"remote"`
+	Store  types.String             `tfsdk:"store"`
+	Remote types.String             `tfsdk:"remote"`
 	Jobs   []syncJobDataSourceModel `tfsdk:"jobs"`
 }
 
@@ -166,7 +166,7 @@ func (d *syncJobsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		if remoteFilter != "" && job.Remote != remoteFilter {
 			continue
 		}
-		
+
 		var jobModel syncJobDataSourceModel
 		jobModel.ID = types.StringValue(job.ID)
 		jobModel.Store = types.StringValue(job.Store)

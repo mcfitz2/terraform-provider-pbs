@@ -434,11 +434,11 @@ func (r *metricsServerResource) Delete(ctx context.Context, req resource.DeleteR
 
 	// Delete metrics server via API
 	serverType := metrics.MetricsServerType(state.Type.ValueString())
-	
+
 	// Acquire mutex to prevent concurrent metrics server operations
 	metricsServerMutex.Lock()
 	defer metricsServerMutex.Unlock()
-	
+
 	err := r.client.Metrics.DeleteMetricsServer(ctx, serverType, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(

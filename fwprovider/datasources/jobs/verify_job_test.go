@@ -27,7 +27,7 @@ func TestVerifyJobDataSourceSchema(t *testing.T) {
 	require.True(t, idAttr.IsRequired(), "id should be required")
 
 	// Verify computed attributes
-	computedAttrs := []string{"store", "schedule", "max_depth", 
+	computedAttrs := []string{"store", "schedule", "max_depth",
 		"namespace", "outdated_after", "comment", "digest"}
 
 	for _, attrName := range computedAttrs {
@@ -84,7 +84,7 @@ func TestVerifyJobToStateMinimal(t *testing.T) {
 	assert.True(t, state.Namespace.IsNull())
 	assert.True(t, state.OutdatedAfter.IsNull())
 	assert.True(t, state.Comment.IsNull())
-	
+
 	// Digest will be empty string (not null) when omitted
 	assert.Equal(t, "", state.Digest.ValueString())
 }

@@ -36,31 +36,31 @@ type datastoreDataSource struct {
 
 // datastoreDataSourceModel maps the data source schema data.
 type datastoreDataSourceModel struct {
-	Name             types.String           `tfsdk:"name"`
-	Path             types.String           `tfsdk:"path"`
-	Removable        types.Bool             `tfsdk:"removable"`
-	BackingDevice    types.String           `tfsdk:"backing_device"`
-	Comment          types.String           `tfsdk:"comment"`
-	Disabled         types.Bool             `tfsdk:"disabled"`
-	GCSchedule       types.String           `tfsdk:"gc_schedule"`
-	PruneSchedule    types.String           `tfsdk:"prune_schedule"`
-	KeepLast         types.Int64            `tfsdk:"keep_last"`
-	KeepHourly       types.Int64            `tfsdk:"keep_hourly"`
-	KeepDaily        types.Int64            `tfsdk:"keep_daily"`
-	KeepWeekly       types.Int64            `tfsdk:"keep_weekly"`
-	KeepMonthly      types.Int64            `tfsdk:"keep_monthly"`
-	KeepYearly       types.Int64            `tfsdk:"keep_yearly"`
-	NotifyUser       types.String           `tfsdk:"notify_user"`
-	NotifyLevel      types.String           `tfsdk:"notify_level"`
-	NotificationMode types.String           `tfsdk:"notification_mode"`
-	Notify           *notifyModel           `tfsdk:"notify"`
-	MaintenanceMode  *maintenanceModeModel  `tfsdk:"maintenance_mode"`
-	VerifyNew        types.Bool             `tfsdk:"verify_new"`
-	Tuning           *tuningModel           `tfsdk:"tuning"`
-	Fingerprint      types.String           `tfsdk:"fingerprint"`
-	Digest           types.String           `tfsdk:"digest"`
-	S3Client         types.String           `tfsdk:"s3_client"`
-	S3Bucket         types.String           `tfsdk:"s3_bucket"`
+	Name             types.String          `tfsdk:"name"`
+	Path             types.String          `tfsdk:"path"`
+	Removable        types.Bool            `tfsdk:"removable"`
+	BackingDevice    types.String          `tfsdk:"backing_device"`
+	Comment          types.String          `tfsdk:"comment"`
+	Disabled         types.Bool            `tfsdk:"disabled"`
+	GCSchedule       types.String          `tfsdk:"gc_schedule"`
+	PruneSchedule    types.String          `tfsdk:"prune_schedule"`
+	KeepLast         types.Int64           `tfsdk:"keep_last"`
+	KeepHourly       types.Int64           `tfsdk:"keep_hourly"`
+	KeepDaily        types.Int64           `tfsdk:"keep_daily"`
+	KeepWeekly       types.Int64           `tfsdk:"keep_weekly"`
+	KeepMonthly      types.Int64           `tfsdk:"keep_monthly"`
+	KeepYearly       types.Int64           `tfsdk:"keep_yearly"`
+	NotifyUser       types.String          `tfsdk:"notify_user"`
+	NotifyLevel      types.String          `tfsdk:"notify_level"`
+	NotificationMode types.String          `tfsdk:"notification_mode"`
+	Notify           *notifyModel          `tfsdk:"notify"`
+	MaintenanceMode  *maintenanceModeModel `tfsdk:"maintenance_mode"`
+	VerifyNew        types.Bool            `tfsdk:"verify_new"`
+	Tuning           *tuningModel          `tfsdk:"tuning"`
+	Fingerprint      types.String          `tfsdk:"fingerprint"`
+	Digest           types.String          `tfsdk:"digest"`
+	S3Client         types.String          `tfsdk:"s3_client"`
+	S3Bucket         types.String          `tfsdk:"s3_bucket"`
 }
 
 type notifyModel struct {

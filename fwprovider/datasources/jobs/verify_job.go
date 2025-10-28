@@ -36,15 +36,15 @@ type verifyJobDataSource struct {
 
 // verifyJobDataSourceModel maps the data source schema data.
 type verifyJobDataSourceModel struct {
-	ID                 types.String `tfsdk:"id"`
-	Store              types.String `tfsdk:"store"`
-	Schedule           types.String `tfsdk:"schedule"`
-	IgnoreVerified     types.Bool   `tfsdk:"ignore_verified"`
-	OutdatedAfter      types.Int64  `tfsdk:"outdated_after"`
-	Namespace          types.String `tfsdk:"namespace"`
-	MaxDepth           types.Int64  `tfsdk:"max_depth"`
-	Comment            types.String `tfsdk:"comment"`
-	Digest             types.String `tfsdk:"digest"`
+	ID             types.String `tfsdk:"id"`
+	Store          types.String `tfsdk:"store"`
+	Schedule       types.String `tfsdk:"schedule"`
+	IgnoreVerified types.Bool   `tfsdk:"ignore_verified"`
+	OutdatedAfter  types.Int64  `tfsdk:"outdated_after"`
+	Namespace      types.String `tfsdk:"namespace"`
+	MaxDepth       types.Int64  `tfsdk:"max_depth"`
+	Comment        types.String `tfsdk:"comment"`
+	Digest         types.String `tfsdk:"digest"`
 }
 
 // Metadata returns the data source type name.

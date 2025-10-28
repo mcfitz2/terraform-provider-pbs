@@ -24,8 +24,8 @@ func TestSyncJobDataSourceSchema(t *testing.T) {
 	require.True(t, idAttr.IsRequired(), "id should be required")
 
 	// Verify computed attributes
-	computedAttrs := []string{"store", "remote", "remote_store", "schedule", 
-		"remote_namespace", "namespace", "comment", "remove_vanished", 
+	computedAttrs := []string{"store", "remote", "remote_store", "schedule",
+		"remote_namespace", "namespace", "comment", "remove_vanished",
 		"max_depth", "group_filter", "digest"}
 
 	for _, attrName := range computedAttrs {

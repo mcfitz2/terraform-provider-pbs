@@ -35,7 +35,7 @@ type verifyJobsDataSource struct {
 
 // verifyJobsDataSourceModel maps the data source schema data.
 type verifyJobsDataSourceModel struct {
-	Store types.String                   `tfsdk:"store"`
+	Store types.String               `tfsdk:"store"`
 	Jobs  []verifyJobDataSourceModel `tfsdk:"jobs"`
 }
 

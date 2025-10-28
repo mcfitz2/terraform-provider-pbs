@@ -293,7 +293,7 @@ func (d *datastoresDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			)
 			continue
 		}
-		
+
 		if err := datastoreToState(fullDs, &storeModel); err != nil {
 			resp.Diagnostics.AddWarning(
 				"Error Converting Datastore",

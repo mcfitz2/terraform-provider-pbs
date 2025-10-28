@@ -35,7 +35,7 @@ type pruneJobsDataSource struct {
 
 // pruneJobsDataSourceModel maps the data source schema data.
 type pruneJobsDataSourceModel struct {
-	Store types.String                  `tfsdk:"store"`
+	Store types.String              `tfsdk:"store"`
 	Jobs  []pruneJobDataSourceModel `tfsdk:"jobs"`
 }
 
