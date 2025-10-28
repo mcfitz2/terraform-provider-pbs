@@ -475,7 +475,30 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	// Log that the resource was created
 	tflog.Trace(ctx, "created datastore resource", map[string]any{"name": plan.Name.ValueString()})
 
-	createdDatastore, err := r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+	// Get the created datastore with retry logic for eventual consistency
+	// PBS may need a moment to make the datastore visible via the API
+	var createdDatastore *datastores.Datastore
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+		if err == nil {
+			break
+		}
+
+		// If it's the last attempt, return the error
+		if i < maxRetries-1 {
+			// Wait with exponential backoff: 1s, 2s, 4s, 8s, but cap at 5s
+			wait := time.Duration(1<<i) * time.Second
+			if wait > 5*time.Second {
+				wait = 5 * time.Second
+			}
+			tflog.Debug(ctx, "Waiting for datastore to be available", map[string]any{
+				"attempt": i + 1,
+				"wait":    wait.String(),
+			})
+			time.Sleep(wait)
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Datastore",
