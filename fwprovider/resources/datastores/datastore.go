@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -37,6 +38,10 @@ var (
 	_ resource.Resource                = &datastoreResource{}
 	_ resource.ResourceWithConfigure   = &datastoreResource{}
 	_ resource.ResourceWithImportState = &datastoreResource{}
+
+	// datastoreMutex prevents concurrent datastore operations that would conflict
+	// with PBS's exclusive lock on /etc/proxmox-backup/.datastore.lck
+	datastoreMutex sync.Mutex
 )
 
 // NewDatastoreResource is a helper function to simplify the provider implementation.
@@ -429,6 +434,10 @@ func (r *datastoreResource) Configure(_ context.Context, req resource.ConfigureR
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *datastoreResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
+	datastoreMutex.Lock()
+	defer datastoreMutex.Unlock()
+
 	var plan datastoreResourceModel
 
 	// Read Terraform plan data into the model
@@ -577,6 +586,10 @@ func (r *datastoreResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
+	datastoreMutex.Lock()
+	defer datastoreMutex.Unlock()
+
 	var plan datastoreResourceModel
 
 	// Read Terraform plan data into the model
@@ -627,6 +640,10 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *datastoreResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
+	datastoreMutex.Lock()
+	defer datastoreMutex.Unlock()
+
 	var state datastoreResourceModel
 
 	// Read Terraform prior state data into the model
