@@ -9,6 +9,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -25,6 +26,12 @@ import (
 	"github.com/micah/terraform-provider-pbs/pbs"
 	"github.com/micah/terraform-provider-pbs/pbs/metrics"
 )
+
+// metricsServerMutex is a global mutex to prevent concurrent PBS metrics server operations.
+// PBS holds an exclusive lock on /etc/proxmox-backup/.metricserver.lck when writing
+// metrics server configurations, which can cause lock contention errors when multiple
+// operations happen simultaneously. This mutex ensures operations are serialized.
+var metricsServerMutex sync.Mutex
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -257,6 +264,11 @@ func (r *metricsServerResource) Create(ctx context.Context, req resource.CreateR
 		// PBS 4.0: Timeout field removed
 	}
 
+	// Acquire mutex to prevent concurrent metrics server operations
+	// PBS holds an exclusive lock on the metrics config file
+	metricsServerMutex.Lock()
+	defer metricsServerMutex.Unlock()
+
 	err := r.client.Metrics.CreateMetricsServer(ctx, server)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -394,6 +406,10 @@ func (r *metricsServerResource) Update(ctx context.Context, req resource.UpdateR
 		// PBS 4.0: Timeout field removed
 	}
 
+	// Acquire mutex to prevent concurrent metrics server operations
+	metricsServerMutex.Lock()
+	defer metricsServerMutex.Unlock()
+
 	err := r.client.Metrics.UpdateMetricsServer(ctx, serverType, plan.Name.ValueString(), server)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -418,6 +434,11 @@ func (r *metricsServerResource) Delete(ctx context.Context, req resource.DeleteR
 
 	// Delete metrics server via API
 	serverType := metrics.MetricsServerType(state.Type.ValueString())
+	
+	// Acquire mutex to prevent concurrent metrics server operations
+	metricsServerMutex.Lock()
+	defer metricsServerMutex.Unlock()
+	
 	err := r.client.Metrics.DeleteMetricsServer(ctx, serverType, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
