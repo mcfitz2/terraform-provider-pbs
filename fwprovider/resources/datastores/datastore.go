@@ -434,10 +434,6 @@ func (r *datastoreResource) Configure(_ context.Context, req resource.ConfigureR
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *datastoreResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
-	datastoreMutex.Lock()
-	defer datastoreMutex.Unlock()
-
 	var plan datastoreResourceModel
 
 	// Read Terraform plan data into the model
@@ -462,8 +458,12 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	// Create the datastore with retry logic for PBS lock contention
+	// Lock only for the create operation to prevent PBS lock contention
+	// Don't hold the lock during the post-create retries
+	datastoreMutex.Lock()
 	err = r.createDatastoreWithRetry(ctx, datastore)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Datastore",
@@ -478,23 +478,33 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	// Get the created datastore with retry logic for eventual consistency
 	// PBS may need a moment to make the datastore visible via the API
 	var createdDatastore *datastores.Datastore
-	maxRetries := 10
+	maxRetries := 20 // Increased from 10 for CI environments
+	var lastErr error
 	for i := 0; i < maxRetries; i++ {
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
 		if err == nil {
+			tflog.Debug(ctx, "Datastore found after creation", map[string]any{
+				"name":     plan.Name.ValueString(),
+				"attempts": i + 1,
+			})
 			break
 		}
+		
+		lastErr = err
 
-		// If it's the last attempt, return the error
+		// If it's the last attempt, don't wait
 		if i < maxRetries-1 {
 			// Wait with exponential backoff: 1s, 2s, 4s, 8s, but cap at 5s
 			wait := time.Duration(1<<i) * time.Second
 			if wait > 5*time.Second {
 				wait = 5 * time.Second
 			}
-			tflog.Debug(ctx, "Waiting for datastore to be available", map[string]any{
+			tflog.Warn(ctx, "Datastore not yet available after creation, retrying", map[string]any{
+				"name":    plan.Name.ValueString(),
 				"attempt": i + 1,
+				"max":     maxRetries,
 				"wait":    wait.String(),
+				"error":   err.Error(),
 			})
 			time.Sleep(wait)
 		}
@@ -502,7 +512,8 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Datastore",
-			"Could not read datastore "+plan.Name.ValueString()+" after creation: "+err.Error(),
+			fmt.Sprintf("Could not read datastore %s after creation (tried %d times over ~%d seconds): %s",
+				plan.Name.ValueString(), maxRetries, (1+2+4+5*16), lastErr.Error()),
 		)
 		return
 	}
@@ -609,10 +620,6 @@ func (r *datastoreResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
-	datastoreMutex.Lock()
-	defer datastoreMutex.Unlock()
-
 	var plan datastoreResourceModel
 
 	// Read Terraform plan data into the model
@@ -644,8 +651,11 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Update the datastore
+	// Lock only for the update operation to prevent PBS lock contention
+	datastoreMutex.Lock()
 	err = r.client.Datastores.UpdateDatastore(ctx, plan.Name.ValueString(), datastore)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Datastore",
@@ -663,10 +673,6 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *datastoreResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Lock to prevent PBS lock contention on /etc/proxmox-backup/.datastore.lck
-	datastoreMutex.Lock()
-	defer datastoreMutex.Unlock()
-
 	var state datastoreResourceModel
 
 	// Read Terraform prior state data into the model
@@ -678,7 +684,12 @@ func (r *datastoreResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Delete existing datastore
 	// Check if we should destroy data (useful for tests)
 	destroyData := os.Getenv("PBS_DESTROY_DATA_ON_DELETE") == "true"
+	
+	// Lock only for the delete operation to prevent PBS lock contention
+	datastoreMutex.Lock()
 	err := r.client.Datastores.DeleteDatastoreWithOptions(ctx, state.Name.ValueString(), destroyData)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		// Check if the datastore is already gone (desired state achieved)
 		errorMsg := err.Error()
