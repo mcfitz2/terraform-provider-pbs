@@ -198,10 +198,10 @@ func (c *Client) CreateDatastore(ctx context.Context, datastore *Datastore) erro
 		return fmt.Errorf("datastore creation task failed (UPID: %s): %w", upid, err)
 	}
 
-	// Give PBS a moment to register the datastore internally after task completion
-	// This prevents race conditions where the datastore exists but isn't yet visible via API
-	// Increased to 3 seconds to account for S3 network operations and PBS internal state updates
-	time.Sleep(3 * time.Second)
+	// Give PBS a brief moment to register the datastore internally after task completion
+	// This reduces the number of retries needed at the resource level
+	// Note: The resource layer has exponential backoff retry logic to handle eventual consistency
+	time.Sleep(1 * time.Second)
 
 	// Datastore created successfully
 	return nil
