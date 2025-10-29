@@ -345,6 +345,24 @@ func (tc *TestContext) GetResourceFromState(t *testing.T, address string) *tfjso
 	return nil
 }
 
+// GetDataSourceFromState extracts a data source from terraform state by address
+func (tc *TestContext) GetDataSourceFromState(t *testing.T, address string) *tfjson.StateResource {
+	state := tc.GetTerraformState(t)
+	if state == nil || state.Values == nil || state.Values.RootModule == nil {
+		t.Logf("Warning: Terraform state is not available, skipping state verification for %s", address)
+		return nil
+	}
+
+	// Data sources are also in the Resources list, just prefixed with "data."
+	for _, resource := range state.Values.RootModule.Resources {
+		if resource.Address == address {
+			return resource
+		}
+	}
+	t.Fatalf("Data source %s not found in terraform state", address)
+	return nil
+}
+
 // DebugNodeAvailability helps debug Node.js availability issues
 func (tc *TestContext) DebugNodeAvailability(t *testing.T) {
 	t.Logf("=== Node.js Environment Debug ===")

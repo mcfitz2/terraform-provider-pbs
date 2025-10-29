@@ -408,3 +408,297 @@ resource "pbs_notification_matcher" "test_invert" {
 	assert.NotNil(t, matcher.InvertMatch)
 	assert.True(t, *matcher.InvertMatch)
 }
+
+// Data Source Integration Tests
+
+// TestNotificationEndpointDataSourceIntegration tests reading a single notification endpoint via data source
+func TestNotificationEndpointDataSourceIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tc := SetupTest(t)
+	defer tc.DestroyTerraform(t)
+
+	// Use Gotify for the test since it's simpler
+	targetName := GenerateTestName("gotify-ds")
+
+	config := fmt.Sprintf(`
+resource "pbs_gotify_notification" "test" {
+  name    = "%s"
+  server  = "https://gotify.example.com"
+  token   = "Aabcd1234567890" # gitleaks:allow
+  comment = "Integration test gotify endpoint for data source"
+  disable = false
+}
+
+data "pbs_notification_endpoint" "test" {
+  name = pbs_gotify_notification.test.name
+  type = "gotify"
+}
+`, targetName)
+
+	tc.WriteMainTF(t, config)
+	tc.ApplyTerraform(t)
+
+	// Verify data source matches resource
+	dataSource := tc.GetDataSourceFromState(t, "data.pbs_notification_endpoint.test")
+	resource := tc.GetResourceFromState(t, "pbs_gotify_notification.test")
+
+	assert.Equal(t, resource.AttributeValues["name"], dataSource.AttributeValues["name"])
+	assert.Equal(t, "gotify", dataSource.AttributeValues["type"])
+	// Gotify resource uses "server" attribute, data source uses "url"
+	assert.Equal(t, resource.AttributeValues["server"], dataSource.AttributeValues["url"])
+	assert.Equal(t, resource.AttributeValues["comment"], dataSource.AttributeValues["comment"])
+	assert.Equal(t, resource.AttributeValues["disable"], dataSource.AttributeValues["disable"])
+}
+
+// TestNotificationEndpointsDataSourceIntegration tests listing all notification endpoints via data source
+func TestNotificationEndpointsDataSourceIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tc := SetupTest(t)
+	defer tc.DestroyTerraform(t)
+
+	// Create multiple endpoints of different types
+	gotifyName := GenerateTestName("gotify-plural")
+	smtpName := GenerateTestName("smtp-plural")
+
+	config := fmt.Sprintf(`
+resource "pbs_gotify_notification" "test1" {
+  name    = "%s"
+  server  = "https://gotify.example.com"
+  token   = "Aabcd1234567890" # gitleaks:allow
+  comment = "Gotify endpoint 1"
+  disable = false
+}
+
+resource "pbs_smtp_notification" "test2" {
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = ["admin@example.com"]
+  from_address = "pbs@example.com"
+  comment      = "SMTP endpoint 1"
+  disable      = false
+}
+
+data "pbs_notification_endpoints" "all" {
+  depends_on = [
+    pbs_gotify_notification.test1,
+    pbs_smtp_notification.test2
+  ]
+}
+`, gotifyName, smtpName)
+
+	tc.WriteMainTF(t, config)
+	tc.ApplyTerraform(t)
+
+	// Verify the resources were created
+	res1 := tc.GetResourceFromState(t, "pbs_gotify_notification.test1")
+	res2 := tc.GetResourceFromState(t, "pbs_smtp_notification.test2")
+	require.Equal(t, gotifyName, res1.AttributeValues["name"])
+	require.Equal(t, smtpName, res2.AttributeValues["name"])
+
+	// Verify data source contains our endpoints
+	dataSource := tc.GetDataSourceFromState(t, "data.pbs_notification_endpoints.all")
+	endpoints, ok := dataSource.AttributeValues["endpoints"].([]interface{})
+	require.True(t, ok, "endpoints attribute should be a list")
+	require.GreaterOrEqual(t, len(endpoints), 2, "Should have at least 2 endpoints")
+
+	// Count endpoints by type
+	typeCounts := make(map[string]int)
+	for _, ep := range endpoints {
+		endpointMap, ok := ep.(map[string]interface{})
+		require.True(t, ok)
+		if epType, ok := endpointMap["type"].(string); ok {
+			typeCounts[epType]++
+		}
+	}
+
+	// Verify we have at least one of each type we created
+	assert.GreaterOrEqual(t, typeCounts["gotify"], 1, "Should have at least 1 gotify endpoint")
+	assert.GreaterOrEqual(t, typeCounts["smtp"], 1, "Should have at least 1 smtp endpoint")
+
+	// Verify that our specific endpoints are in the list
+	res1Data := res1.AttributeValues
+	res2Data := res2.AttributeValues
+
+	var foundRes1, foundRes2 bool
+	for _, ep := range endpoints {
+		endpointMap, ok := ep.(map[string]interface{})
+		require.True(t, ok)
+		name, ok := endpointMap["name"].(string)
+		if !ok {
+			continue
+		}
+
+		if name == res1Data["name"] {
+			foundRes1 = true
+			assert.Equal(t, "gotify", endpointMap["type"])
+		} else if name == res2Data["name"] {
+			foundRes2 = true
+			assert.Equal(t, "smtp", endpointMap["type"])
+		}
+	}
+
+	require.True(t, foundRes1, "Did not find resource 1 in data source")
+	require.True(t, foundRes2, "Did not find resource 2 in data source")
+}
+
+// TestNotificationMatcherDataSourceIntegration tests reading a single notification matcher via data source
+func TestNotificationMatcherDataSourceIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tc := SetupTest(t)
+	defer tc.DestroyTerraform(t)
+
+	smtpTarget := GenerateTestName("smtp-matcher-ds")
+	matcherName := GenerateTestName("matcher-ds")
+
+	config := fmt.Sprintf(`
+resource "pbs_smtp_notification" "target" {
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = ["admin@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_notification_matcher" "test" {
+  name           = "%s"
+  targets        = [pbs_smtp_notification.target.name]
+  match_severity = ["error", "warning"]
+  mode           = "all"
+  comment        = "Integration test matcher for data source"
+}
+
+data "pbs_notification_matcher" "test" {
+  name = pbs_notification_matcher.test.name
+}
+`, smtpTarget, matcherName)
+
+	tc.WriteMainTF(t, config)
+	tc.ApplyTerraform(t)
+
+	// Verify data source matches resource
+	dataSource := tc.GetDataSourceFromState(t, "data.pbs_notification_matcher.test")
+	resource := tc.GetResourceFromState(t, "pbs_notification_matcher.test")
+
+	assert.Equal(t, resource.AttributeValues["name"], dataSource.AttributeValues["name"])
+	assert.Equal(t, resource.AttributeValues["comment"], dataSource.AttributeValues["comment"])
+	assert.Equal(t, resource.AttributeValues["mode"], dataSource.AttributeValues["mode"])
+
+	// Verify targets list
+	dsTargets, ok := dataSource.AttributeValues["targets"].([]interface{})
+	require.True(t, ok, "targets should be a list")
+	resTargets, ok := resource.AttributeValues["targets"].([]interface{})
+	require.True(t, ok, "targets should be a list in resource")
+	assert.ElementsMatch(t, resTargets, dsTargets)
+
+	// Verify match_severity list
+	dsSeverity, ok := dataSource.AttributeValues["match_severity"].([]interface{})
+	require.True(t, ok, "match_severity should be a list")
+	resSeverity, ok := resource.AttributeValues["match_severity"].([]interface{})
+	require.True(t, ok, "match_severity should be a list in resource")
+	assert.ElementsMatch(t, resSeverity, dsSeverity)
+}
+
+// TestNotificationMatchersDataSourceIntegration tests listing all notification matchers via data source
+func TestNotificationMatchersDataSourceIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tc := SetupTest(t)
+	defer tc.DestroyTerraform(t)
+
+	smtpTarget := GenerateTestName("smtp-matchers")
+	matcher1 := GenerateTestName("matcher1")
+	matcher2 := GenerateTestName("matcher2")
+
+	config := fmt.Sprintf(`
+resource "pbs_smtp_notification" "target" {
+  name         = "%s"
+  server       = "smtp.example.com"
+  port         = 587
+  username     = "test@example.com"
+  password     = "secret"
+  mailto       = ["admin@example.com"]
+  from_address = "pbs@example.com"
+}
+
+resource "pbs_notification_matcher" "test1" {
+  name           = "%s"
+  targets        = [pbs_smtp_notification.target.name]
+  match_severity = ["error"]
+  mode           = "all"
+  comment        = "Matcher 1"
+}
+
+resource "pbs_notification_matcher" "test2" {
+  name           = "%s"
+  targets        = [pbs_smtp_notification.target.name]
+  match_severity = ["warning"]
+  mode           = "any"
+  comment        = "Matcher 2"
+}
+
+data "pbs_notification_matchers" "all" {
+  depends_on = [
+    pbs_notification_matcher.test1,
+    pbs_notification_matcher.test2
+  ]
+}
+`, smtpTarget, matcher1, matcher2)
+
+	tc.WriteMainTF(t, config)
+	tc.ApplyTerraform(t)
+
+	// Verify the resources were created
+	res1 := tc.GetResourceFromState(t, "pbs_notification_matcher.test1")
+	res2 := tc.GetResourceFromState(t, "pbs_notification_matcher.test2")
+	require.Equal(t, matcher1, res1.AttributeValues["name"])
+	require.Equal(t, matcher2, res2.AttributeValues["name"])
+
+	// Verify data source contains our matchers
+	dataSource := tc.GetDataSourceFromState(t, "data.pbs_notification_matchers.all")
+	matchers, ok := dataSource.AttributeValues["matchers"].([]interface{})
+	require.True(t, ok, "matchers attribute should be a list")
+	require.GreaterOrEqual(t, len(matchers), 2, "Should have at least 2 matchers")
+
+	// Verify that our specific matchers are in the list
+	res1Data := res1.AttributeValues
+	res2Data := res2.AttributeValues
+
+	var foundRes1, foundRes2 bool
+	for _, m := range matchers {
+		matcherMap, ok := m.(map[string]interface{})
+		require.True(t, ok)
+		name, ok := matcherMap["name"].(string)
+		if !ok {
+			continue
+		}
+
+		if name == res1Data["name"] {
+			foundRes1 = true
+			assert.Equal(t, "Matcher 1", matcherMap["comment"])
+			assert.Equal(t, "all", matcherMap["mode"])
+		} else if name == res2Data["name"] {
+			foundRes2 = true
+			assert.Equal(t, "Matcher 2", matcherMap["comment"])
+			assert.Equal(t, "any", matcherMap["mode"])
+		}
+	}
+
+	require.True(t, foundRes1, "Did not find matcher 1 in data source")
+	require.True(t, foundRes2, "Did not find matcher 2 in data source")
+}

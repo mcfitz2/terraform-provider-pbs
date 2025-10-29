@@ -57,22 +57,33 @@ type MetricsServer struct {
 
 // ListMetricsServers lists all metrics server configurations
 func (c *Client) ListMetricsServers(ctx context.Context) ([]MetricsServer, error) {
-	resp, err := c.api.Get(ctx, "/config/metrics")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list metrics servers: %w", err)
+	var allServers []MetricsServer
+
+	// PBS doesn't have a single endpoint for all metrics servers
+	// We need to query each type separately
+	serverTypes := []MetricsServerType{MetricsServerTypeInfluxDBHTTP, MetricsServerTypeInfluxDBUDP}
+
+	for _, serverType := range serverTypes {
+		resp, err := c.api.Get(ctx, fmt.Sprintf("/config/metrics/%s", serverType))
+		if err != nil {
+			return nil, fmt.Errorf("failed to list %s servers: %w", serverType, err)
+		}
+
+		var servers []MetricsServer
+		if err := json.Unmarshal(resp.Data, &servers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal %s servers: %w", serverType, err)
+		}
+
+		// Set the type for each server (not returned by list endpoint)
+		for i := range servers {
+			servers[i].Type = serverType
+			servers[i].parseURLFields()
+		}
+
+		allServers = append(allServers, servers...)
 	}
 
-	var servers []MetricsServer
-	if err := json.Unmarshal(resp.Data, &servers); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal metrics servers: %w", err)
-	}
-
-	// PBS 4.0 returns URL/Host, parse them to Server+Port for backwards compatibility
-	for i := range servers {
-		servers[i].parseURLFields()
-	}
-
-	return servers, nil
+	return allServers, nil
 }
 
 // GetMetricsServer gets a specific metrics server configuration by name

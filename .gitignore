@@ -18,3 +18,4 @@ config.env
 test/*.log
 test/.terraform/
 test/.terraform.lock.hcl
+coverage.out

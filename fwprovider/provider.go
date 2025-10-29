@@ -25,6 +25,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/micah/terraform-provider-pbs/fwprovider/config"
+	datasourcesdatastores "github.com/micah/terraform-provider-pbs/fwprovider/datasources/datastores"
+	datasourcesendpoints "github.com/micah/terraform-provider-pbs/fwprovider/datasources/endpoints"
+	datasourcesjobs "github.com/micah/terraform-provider-pbs/fwprovider/datasources/jobs"
+	datasourcesmetrics "github.com/micah/terraform-provider-pbs/fwprovider/datasources/metrics"
+	datasourcesnotifications "github.com/micah/terraform-provider-pbs/fwprovider/datasources/notifications"
 	"github.com/micah/terraform-provider-pbs/fwprovider/datasources/remotes"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/datastores"
 	"github.com/micah/terraform-provider-pbs/fwprovider/resources/endpoints"
@@ -239,6 +244,27 @@ func (p *pbsProvider) DataSources(_ context.Context) []func() datasource.DataSou
 		remotes.NewRemoteStoresDataSource,
 		remotes.NewRemoteNamespacesDataSource,
 		remotes.NewRemoteGroupsDataSource,
+		// Datastores
+		datasourcesdatastores.NewDatastoreDataSource,
+		datasourcesdatastores.NewDatastoresDataSource,
+		// Endpoints
+		datasourcesendpoints.NewS3EndpointDataSource,
+		datasourcesendpoints.NewS3EndpointsDataSource,
+		// Jobs
+		datasourcesjobs.NewPruneJobDataSource,
+		datasourcesjobs.NewPruneJobsDataSource,
+		datasourcesjobs.NewSyncJobDataSource,
+		datasourcesjobs.NewSyncJobsDataSource,
+		datasourcesjobs.NewVerifyJobDataSource,
+		datasourcesjobs.NewVerifyJobsDataSource,
+		// Metrics
+		datasourcesmetrics.NewMetricsServerDataSource,
+		datasourcesmetrics.NewMetricsServersDataSource,
+		// Notifications
+		datasourcesnotifications.NewNotificationEndpointDataSource,
+		datasourcesnotifications.NewNotificationEndpointsDataSource,
+		datasourcesnotifications.NewNotificationMatcherDataSource,
+		datasourcesnotifications.NewNotificationMatchersDataSource,
 	}
 }
 

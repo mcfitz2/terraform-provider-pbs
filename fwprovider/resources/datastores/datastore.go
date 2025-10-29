@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -37,6 +38,10 @@ var (
 	_ resource.Resource                = &datastoreResource{}
 	_ resource.ResourceWithConfigure   = &datastoreResource{}
 	_ resource.ResourceWithImportState = &datastoreResource{}
+
+	// datastoreMutex prevents concurrent datastore operations that would conflict
+	// with PBS's exclusive lock on /etc/proxmox-backup/.datastore.lck
+	datastoreMutex sync.Mutex
 )
 
 // NewDatastoreResource is a helper function to simplify the provider implementation.
@@ -453,8 +458,12 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	// Create the datastore with retry logic for PBS lock contention
+	// Lock only for the create operation to prevent PBS lock contention
+	// Don't hold the lock during the post-create retries
+	datastoreMutex.Lock()
 	err = r.createDatastoreWithRetry(ctx, datastore)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Datastore",
@@ -466,11 +475,48 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	// Log that the resource was created
 	tflog.Trace(ctx, "created datastore resource", map[string]any{"name": plan.Name.ValueString()})
 
-	createdDatastore, err := r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+	// Get the created datastore with retry logic for eventual consistency
+	// PBS may need a moment to make the datastore visible via the API
+	// CI environments are significantly slower than local, so use generous retry limits
+	var createdDatastore *datastores.Datastore
+	maxRetries := 30 // Generous retry count for slower CI hardware
+	var lastErr error
+	totalWait := 0
+	for i := 0; i < maxRetries; i++ {
+		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+		if err == nil {
+			tflog.Debug(ctx, "Datastore found after creation", map[string]any{
+				"name":     plan.Name.ValueString(),
+				"attempts": i + 1,
+			})
+			break
+		}
+		
+		lastErr = err
+
+		// If it's the last attempt, don't wait
+		if i < maxRetries-1 {
+			// Wait with exponential backoff: 1s, 2s, 4s, 8s, 16s, then cap at 10s
+			wait := time.Duration(1<<i) * time.Second
+			if wait > 10*time.Second {
+				wait = 10 * time.Second
+			}
+			totalWait += int(wait.Seconds())
+			tflog.Warn(ctx, "Datastore not yet available after creation, retrying", map[string]any{
+				"name":    plan.Name.ValueString(),
+				"attempt": i + 1,
+				"max":     maxRetries,
+				"wait":    wait.String(),
+				"error":   err.Error(),
+			})
+			time.Sleep(wait)
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Datastore",
-			"Could not read datastore "+plan.Name.ValueString()+" after creation: "+err.Error(),
+			fmt.Sprintf("Could not read datastore %s after creation (tried %d times over ~%d seconds): %s",
+				plan.Name.ValueString(), maxRetries, totalWait, lastErr.Error()),
 		)
 		return
 	}
@@ -608,8 +654,11 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Update the datastore
+	// Lock only for the update operation to prevent PBS lock contention
+	datastoreMutex.Lock()
 	err = r.client.Datastores.UpdateDatastore(ctx, plan.Name.ValueString(), datastore)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Datastore",
@@ -638,7 +687,12 @@ func (r *datastoreResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Delete existing datastore
 	// Check if we should destroy data (useful for tests)
 	destroyData := os.Getenv("PBS_DESTROY_DATA_ON_DELETE") == "true"
+	
+	// Lock only for the delete operation to prevent PBS lock contention
+	datastoreMutex.Lock()
 	err := r.client.Datastores.DeleteDatastoreWithOptions(ctx, state.Name.ValueString(), destroyData)
+	datastoreMutex.Unlock()
+	
 	if err != nil {
 		// Check if the datastore is already gone (desired state achieved)
 		errorMsg := err.Error()
