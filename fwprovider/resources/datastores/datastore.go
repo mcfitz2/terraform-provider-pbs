@@ -477,9 +477,11 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Get the created datastore with retry logic for eventual consistency
 	// PBS may need a moment to make the datastore visible via the API
+	// CI environments are significantly slower than local, so use generous retry limits
 	var createdDatastore *datastores.Datastore
-	maxRetries := 20 // Increased from 10 for CI environments
+	maxRetries := 30 // Generous retry count for slower CI hardware
 	var lastErr error
+	totalWait := 0
 	for i := 0; i < maxRetries; i++ {
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
 		if err == nil {
@@ -494,11 +496,12 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 
 		// If it's the last attempt, don't wait
 		if i < maxRetries-1 {
-			// Wait with exponential backoff: 1s, 2s, 4s, 8s, but cap at 5s
+			// Wait with exponential backoff: 1s, 2s, 4s, 8s, 16s, then cap at 10s
 			wait := time.Duration(1<<i) * time.Second
-			if wait > 5*time.Second {
-				wait = 5 * time.Second
+			if wait > 10*time.Second {
+				wait = 10 * time.Second
 			}
+			totalWait += int(wait.Seconds())
 			tflog.Warn(ctx, "Datastore not yet available after creation, retrying", map[string]any{
 				"name":    plan.Name.ValueString(),
 				"attempt": i + 1,
@@ -513,7 +516,7 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError(
 			"Error Reading Datastore",
 			fmt.Sprintf("Could not read datastore %s after creation (tried %d times over ~%d seconds): %s",
-				plan.Name.ValueString(), maxRetries, (1+2+4+5*16), lastErr.Error()),
+				plan.Name.ValueString(), maxRetries, totalWait, lastErr.Error()),
 		)
 		return
 	}
