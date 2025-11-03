@@ -52,7 +52,7 @@ resource "pbs_datastore" "test_directory" {
 	datastoreClient := datastores.NewClient(tc.APIClient)
 	datastore, err := datastoreClient.GetDatastore(context.Background(), datastoreName)
 	if err != nil {
-		t.Logf("INFO: Datastore %s not yet visible in PBS (may still be processing async): %v", datastoreName, err)
+		debugLog(t, "INFO: Datastore %s not yet visible in PBS (may still be processing async): %v", datastoreName, err)
 	} else {
 		assert.Equal(t, fmt.Sprintf("/datastore/%s", datastoreName), datastore.Path)
 		t.Logf("SUCCESS: Datastore %s found via API", datastoreName)
