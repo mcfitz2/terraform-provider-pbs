@@ -469,7 +469,21 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		"name": plan.Name.ValueString(),
 	})
 	
+	startCreate := time.Now()
+	tflog.Info(ctx, "⏱️ TIMING: Starting CreateDatastore", map[string]any{
+		"name":      plan.Name.ValueString(),
+		"timestamp": startCreate.Format(time.RFC3339Nano),
+	})
+	
 	err = r.createDatastoreWithRetry(ctx, datastore)
+	
+	endCreate := time.Now()
+	tflog.Info(ctx, "⏱️ TIMING: CreateDatastore completed", map[string]any{
+		"name":      plan.Name.ValueString(),
+		"timestamp": endCreate.Format(time.RFC3339Nano),
+		"duration":  endCreate.Sub(startCreate).String(),
+		"success":   err == nil,
+	})
 	
 	datastoreMutex.Unlock()
 	tflog.Debug(ctx, "Mutex released after create operation", map[string]any{
@@ -514,7 +528,24 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 			"max":     maxRetries,
 		})
 		
+		startGet := time.Now()
+		tflog.Info(ctx, "⏱️ TIMING: Starting GetDatastore", map[string]any{
+			"name":      plan.Name.ValueString(),
+			"attempt":   i + 1,
+			"timestamp": startGet.Format(time.RFC3339Nano),
+		})
+		
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
+		
+		endGet := time.Now()
+		tflog.Info(ctx, "⏱️ TIMING: GetDatastore completed", map[string]any{
+			"name":      plan.Name.ValueString(),
+			"attempt":   i + 1,
+			"timestamp": endGet.Format(time.RFC3339Nano),
+			"duration":  endGet.Sub(startGet).String(),
+			"success":   err == nil,
+		})
+		
 		if err == nil {
 			tflog.Debug(ctx, "Successfully read datastore after creation", map[string]any{
 				"name":     plan.Name.ValueString(),
