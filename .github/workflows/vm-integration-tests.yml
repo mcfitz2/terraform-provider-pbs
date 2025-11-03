@@ -165,7 +165,7 @@ jobs:
         
         # Run ALL integration tests sequentially to avoid PBS resource contention
         # Use -failfast to stop on first failure for faster feedback
-        go test -v -p 1 -failfast -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
+        go test -v -failfast -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4
