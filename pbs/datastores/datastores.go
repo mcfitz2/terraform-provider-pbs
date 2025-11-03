@@ -118,11 +118,19 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 
 	// Try to get individual datastore details first
 	escapedName := url.PathEscape(name)
-	resp, err := c.api.Get(ctx, fmt.Sprintf("/config/datastore/%s", escapedName))
-	if err == nil {
+	path := fmt.Sprintf("/config/datastore/%s", escapedName)
+	
+	// Log the GET request for debugging
+	fmt.Printf("[DEBUG] GetDatastore: Attempting GET %s (escaped from '%s')\n", path, name)
+	
+	resp, getErr := c.api.Get(ctx, path)
+	if getErr == nil {
+		fmt.Printf("[DEBUG] GetDatastore: GET succeeded, response size: %d bytes\n", len(resp.Data))
+		
 		var ds Datastore
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
+			fmt.Printf("[DEBUG] GetDatastore: Successfully unmarshaled datastore %s\n", name)
 
 			// Parse backend configuration if present
 			c.parseBackendConfig(&ds)
@@ -144,21 +152,38 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 			}
 
 			return &ds, nil
+		} else {
+			fmt.Printf("[DEBUG] GetDatastore: Unmarshal failed: %v\n", unmarshalErr)
 		}
+	} else {
+		fmt.Printf("[DEBUG] GetDatastore: GET failed with error: %v\n", getErr)
 	}
 
 	// If individual get fails, fall back to list and find
-	datastores, err := c.ListDatastores(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list datastores to find %s: %w", name, err)
+	// This handles cases where the direct endpoint might not work but the datastore exists
+	fmt.Printf("[DEBUG] GetDatastore: Falling back to list operation\n")
+	datastores, listErr := c.ListDatastores(ctx)
+	if listErr != nil {
+		// Both GET and LIST failed - return detailed error
+		fmt.Printf("[DEBUG] GetDatastore: List also failed: %v\n", listErr)
+		return nil, fmt.Errorf("failed to get datastore %s (GET error: %v, LIST error: %w)", name, getErr, listErr)
 	}
 
-	for _, ds := range datastores {
+	fmt.Printf("[DEBUG] GetDatastore: List returned %d datastores\n", len(datastores))
+	for i, ds := range datastores {
+		fmt.Printf("[DEBUG] GetDatastore: List[%d]: name='%s'\n", i, ds.Name)
 		if ds.Name == name {
+			fmt.Printf("[DEBUG] GetDatastore: Found %s in list, but returning minimal data (no digest/full config)\n", name)
+			// NOTE: This returns incomplete data - only Name and Path are populated from list
 			return &ds, nil
 		}
 	}
 
+	// Datastore not found in list - include the original GET error for debugging
+	fmt.Printf("[DEBUG] GetDatastore: Datastore %s not found in list of %d items\n", name, len(datastores))
+	if getErr != nil {
+		return nil, fmt.Errorf("datastore %s not found (GET error: %v)", name, getErr)
+	}
 	return nil, fmt.Errorf("datastore %s not found", name)
 }
 

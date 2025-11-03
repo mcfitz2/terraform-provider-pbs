@@ -475,48 +475,45 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	// Log that the resource was created
 	tflog.Trace(ctx, "created datastore resource", map[string]any{"name": plan.Name.ValueString()})
 
-	// Get the created datastore with retry logic for eventual consistency
-	// PBS may need a moment to make the datastore visible via the API
-	// CI environments are significantly slower than local, so use generous retry limits
+	// Read back the created datastore to populate state
+	// Since CreateDatastore waits for task completion, the datastore should exist immediately
+	// We do a few retries just in case of transient issues
 	var createdDatastore *datastores.Datastore
-	maxRetries := 30 // Generous retry count for slower CI hardware
+	maxRetries := 3
 	var lastErr error
-	totalWait := 0
+	
 	for i := 0; i < maxRetries; i++ {
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
 		if err == nil {
-			tflog.Debug(ctx, "Datastore found after creation", map[string]any{
-				"name":     plan.Name.ValueString(),
-				"attempts": i + 1,
-			})
+			if i > 0 {
+				tflog.Info(ctx, "Datastore found after retry", map[string]any{
+					"name":     plan.Name.ValueString(),
+					"attempts": i + 1,
+				})
+			}
 			break
 		}
 		
 		lastErr = err
+		tflog.Warn(ctx, "GetDatastore failed, will retry", map[string]any{
+			"name":    plan.Name.ValueString(),
+			"attempt": i + 1,
+			"max":     maxRetries,
+			"error":   err.Error(),
+		})
 
-		// If it's the last attempt, don't wait
 		if i < maxRetries-1 {
-			// Wait with exponential backoff: 1s, 2s, 4s, 8s, 16s, then cap at 10s
-			wait := time.Duration(1<<i) * time.Second
-			if wait > 10*time.Second {
-				wait = 10 * time.Second
-			}
-			totalWait += int(wait.Seconds())
-			tflog.Warn(ctx, "Datastore not yet available after creation, retrying", map[string]any{
-				"name":    plan.Name.ValueString(),
-				"attempt": i + 1,
-				"max":     maxRetries,
-				"wait":    wait.String(),
-				"error":   err.Error(),
-			})
-			time.Sleep(wait)
+			// Brief wait before retry (CreateDatastore already waited for task + 1s)
+			time.Sleep(2 * time.Second)
 		}
 	}
+	
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading Datastore",
-			fmt.Sprintf("Could not read datastore %s after creation (tried %d times over ~%d seconds): %s",
-				plan.Name.ValueString(), maxRetries, totalWait, lastErr.Error()),
+			"Error Reading Datastore After Creation",
+			fmt.Sprintf("Datastore %s was created successfully (task completed), but reading it back failed after %d attempts. "+
+				"This may indicate a PBS API issue. Last error: %s",
+				plan.Name.ValueString(), maxRetries, lastErr.Error()),
 		)
 		return
 	}
