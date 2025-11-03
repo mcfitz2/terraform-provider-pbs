@@ -180,7 +180,8 @@ if [ -n "$1" ]; then
     go test ./test/integration/... -v -p 1 -timeout 30m -run "$1"
 else
     # Run all integration tests sequentially to avoid PBS resource contention
-    go test ./test/integration/... -v -p 1 -timeout 30m
+    # Use -failfast to stop on first failure for faster feedback
+    go test ./test/integration/... -v -p 1 -failfast -timeout 30m
 fi
 
 exit_code=$?
