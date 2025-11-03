@@ -49,6 +49,7 @@ From the project root:
 
 ```bash
 # Run all HCL tests
+terraform test -chdir=test/tftest/datastores_datasource
 terraform test -chdir=test/tftest/prune_job_datasource
 terraform test -chdir=test/tftest/prune_jobs_datasource
 terraform test -chdir=test/tftest/sync_job_datasource
@@ -73,6 +74,12 @@ terraform test -chdir=test/tftest/prune_job_datasource
 ## Test Coverage
 
 These tests verify:
+
+### Datastores Data Source (`datastores_datasource/`)
+- ✅ Multiple datastore creation
+- ✅ Datastores data source lists all datastores
+- ✅ Test datastores appear in the list
+- ✅ Datastore attributes correctly populated
 
 ### Prune Job Data Source (`prune_job_datasource/`)
 - ✅ Datastore creation
@@ -171,6 +178,7 @@ Additional tests to consider converting:
 - Verify job data source
 - Verify jobs data source
 - Metrics server data source
+- Metrics servers data source
 - Notification endpoint/matcher data sources
 - Remote stores/groups/namespaces data sources
 

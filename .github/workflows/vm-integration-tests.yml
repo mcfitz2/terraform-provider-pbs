@@ -193,7 +193,12 @@ jobs:
         echo "They replace the flaky tfexec tests with native execution."
         echo ""
         
+        # Run datastores data source test (list all datastores)
+        echo "→ Testing datastores data source..."
+        terraform test -chdir=test/tftest/datastores_datasource
+        
         # Run prune job data source test
+        echo ""
         echo "→ Testing prune job data source..."
         terraform test -chdir=test/tftest/prune_job_datasource
         

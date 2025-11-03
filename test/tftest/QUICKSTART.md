@@ -36,6 +36,12 @@ export TF_VAR_pbs_password="your-password"
 
 ## Test Coverage
 
+✅ **Datastores Data Source** (`datastores_datasource/`)
+- Creates multiple datastores
+- Lists all datastores via data source
+- Verifies test datastores appear in list
+- Checks datastore attributes
+
 ✅ **Prune Job Data Source** (`prune_job_datasource/`)
 - Creates datastore and prune job
 - Reads job via data source
@@ -64,6 +70,7 @@ These tests run automatically in GitHub Actions after the Go integration tests:
 ```yaml
 - name: Run Terraform HCL tests
   run: |
+    terraform test -chdir=test/tftest/datastores_datasource
     terraform test -chdir=test/tftest/prune_job_datasource
     terraform test -chdir=test/tftest/prune_jobs_datasource
     terraform test -chdir=test/tftest/sync_job_datasource
@@ -80,6 +87,6 @@ terraform test -chdir=test/tftest/prune_job_datasource
 
 ## Status
 
-- ✅ All 3 HCL tests passing reliably in CI
-- ✅ Replace 3 flaky Go tests (now skipped)
+- ✅ All 4 HCL tests passing reliably in CI
+- ✅ Replace 4 flaky Go tests (now skipped)
 - ✅ Same test coverage, better reliability
