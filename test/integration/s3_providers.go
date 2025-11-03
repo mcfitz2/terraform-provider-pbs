@@ -154,7 +154,7 @@ func (p *S3ProviderConfig) SetupS3Client(t *testing.T) {
 }
 
 // CreateTestBucket creates a test bucket for the provider
-func (p *S3TestProvider) CreateBucket(t *testing.T) {
+func (p *S3ProviderConfig) CreateTestBucket(t *testing.T) {
 	debugLog(t, "Creating test bucket %s on %s", p.BucketName, p.Name)
 
 	// Create bucket with appropriate location constraint based on provider
