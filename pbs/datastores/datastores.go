@@ -11,12 +11,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
+
+var debugLog *log.Logger
+
+func init() {
+	// Enable debug logging if PBS_DEBUG environment variable is set
+	if os.Getenv("PBS_DEBUG") != "" {
+		debugLog = log.New(os.Stderr, "[PBS-DEBUG] ", log.LstdFlags)
+	}
+}
 
 // Client represents the datastores API client
 type Client struct {
@@ -121,16 +132,22 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 	path := fmt.Sprintf("/config/datastore/%s", escapedName)
 	
 	// Log the GET request for debugging
-	fmt.Printf("[DEBUG] GetDatastore: Attempting GET %s (escaped from '%s')\n", path, name)
+	if debugLog != nil {
+		debugLog.Printf("GetDatastore: Attempting GET %s (escaped from '%s')", path, name)
+	}
 	
 	resp, getErr := c.api.Get(ctx, path)
 	if getErr == nil {
-		fmt.Printf("[DEBUG] GetDatastore: GET succeeded, response size: %d bytes\n", len(resp.Data))
+		if debugLog != nil {
+			debugLog.Printf("GetDatastore: GET succeeded, response size: %d bytes", len(resp.Data))
+		}
 		
 		var ds Datastore
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
-			fmt.Printf("[DEBUG] GetDatastore: Successfully unmarshaled datastore %s\n", name)
+			if debugLog != nil {
+				debugLog.Printf("GetDatastore: Successfully unmarshaled datastore %s", name)
+			}
 
 			// Parse backend configuration if present
 			c.parseBackendConfig(&ds)
@@ -153,34 +170,51 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 
 			return &ds, nil
 		} else {
-			fmt.Printf("[DEBUG] GetDatastore: Unmarshal failed: %v\n", unmarshalErr)
+			if debugLog != nil {
+				debugLog.Printf("GetDatastore: Unmarshal failed: %v", unmarshalErr)
+			}
 		}
 	} else {
-		fmt.Printf("[DEBUG] GetDatastore: GET failed with error: %v\n", getErr)
+		if debugLog != nil {
+			debugLog.Printf("GetDatastore: GET failed with error: %v", getErr)
+		}
 	}
 
 	// If individual get fails, fall back to list and find
 	// This handles cases where the direct endpoint might not work but the datastore exists
-	fmt.Printf("[DEBUG] GetDatastore: Falling back to list operation\n")
+	if debugLog != nil {
+		debugLog.Printf("GetDatastore: Falling back to list operation")
+	}
 	datastores, listErr := c.ListDatastores(ctx)
 	if listErr != nil {
 		// Both GET and LIST failed - return detailed error
-		fmt.Printf("[DEBUG] GetDatastore: List also failed: %v\n", listErr)
+		if debugLog != nil {
+			debugLog.Printf("GetDatastore: List also failed: %v", listErr)
+		}
 		return nil, fmt.Errorf("failed to get datastore %s (GET error: %v, LIST error: %w)", name, getErr, listErr)
 	}
 
-	fmt.Printf("[DEBUG] GetDatastore: List returned %d datastores\n", len(datastores))
-	for i, ds := range datastores {
-		fmt.Printf("[DEBUG] GetDatastore: List[%d]: name='%s'\n", i, ds.Name)
+	if debugLog != nil {
+		debugLog.Printf("GetDatastore: List returned %d datastores", len(datastores))
+		for i, ds := range datastores {
+			debugLog.Printf("GetDatastore: List[%d]: name='%s'", i, ds.Name)
+		}
+	}
+	
+	for _, ds := range datastores {
 		if ds.Name == name {
-			fmt.Printf("[DEBUG] GetDatastore: Found %s in list, but returning minimal data (no digest/full config)\n", name)
+			if debugLog != nil {
+				debugLog.Printf("GetDatastore: Found %s in list, but returning minimal data (no digest/full config)", name)
+			}
 			// NOTE: This returns incomplete data - only Name and Path are populated from list
 			return &ds, nil
 		}
 	}
 
 	// Datastore not found in list - include the original GET error for debugging
-	fmt.Printf("[DEBUG] GetDatastore: Datastore %s not found in list of %d items\n", name, len(datastores))
+	if debugLog != nil {
+		debugLog.Printf("GetDatastore: Datastore %s not found in list of %d items", name, len(datastores))
+	}
 	if getErr != nil {
 		return nil, fmt.Errorf("datastore %s not found (GET error: %v)", name, getErr)
 	}
