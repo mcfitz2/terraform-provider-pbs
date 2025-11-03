@@ -106,7 +106,7 @@ echo -e "${GREEN}✓ Provider installed to $PLUGIN_DIR${NC}"
 TEST_NAME="${1:-}"
 if [ -z "$TEST_NAME" ]; then
     # Run all tests
-    TESTS=(prune_job_datasource sync_job_datasource)
+    TESTS=(prune_job_datasource prune_jobs_datasource sync_job_datasource)
 else
     # Run specific test
     TESTS=("$TEST_NAME")

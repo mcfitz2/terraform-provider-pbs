@@ -176,6 +176,8 @@ data "pbs_prune_job" "test" {
 
 // TestPruneJobsDataSourceIntegration tests listing prune jobs via data source
 func TestPruneJobsDataSourceIntegration(t *testing.T) {
+	t.Skip("Replaced by Terraform HCL test: test/tftest/prune_jobs_datasource/test.tftest.hcl - tfexec timing issue")
+	
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

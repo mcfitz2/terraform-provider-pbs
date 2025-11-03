@@ -41,6 +41,12 @@ export TF_VAR_pbs_password="your-password"
 - Reads job via data source
 - Verifies all attributes match
 
+✅ **Prune Jobs Data Source** (`prune_jobs_datasource/`)
+- Creates multiple datastores and prune jobs
+- Lists all jobs via data source
+- Filters jobs by store
+- Verifies filtering works correctly
+
 ✅ **Sync Job Data Source** (`sync_job_datasource/`)
 - Creates datastore, remote, and sync job
 - Reads job via data source  
@@ -59,6 +65,7 @@ These tests run automatically in GitHub Actions after the Go integration tests:
 - name: Run Terraform HCL tests
   run: |
     terraform test -chdir=test/tftest/prune_job_datasource
+    terraform test -chdir=test/tftest/prune_jobs_datasource
     terraform test -chdir=test/tftest/sync_job_datasource
 ```
 
@@ -73,6 +80,6 @@ terraform test -chdir=test/tftest/prune_job_datasource
 
 ## Status
 
-- ✅ Both HCL tests passing reliably in CI
-- ✅ Replace 2 flaky Go tests (now skipped)
+- ✅ All 3 HCL tests passing reliably in CI
+- ✅ Replace 3 flaky Go tests (now skipped)
 - ✅ Same test coverage, better reliability

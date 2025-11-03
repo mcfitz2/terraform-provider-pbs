@@ -50,6 +50,7 @@ From the project root:
 ```bash
 # Run all HCL tests
 terraform test -chdir=test/tftest/prune_job_datasource
+terraform test -chdir=test/tftest/prune_jobs_datasource
 terraform test -chdir=test/tftest/sync_job_datasource
 ```
 
@@ -78,6 +79,13 @@ These tests verify:
 - ✅ Prune job creation with datastore reference
 - ✅ Prune job data source reads job correctly
 - ✅ All attributes match between resource and data source
+
+### Prune Jobs Data Source (`prune_jobs_datasource/`)
+- ✅ Multiple datastore creation
+- ✅ Multiple prune job creation
+- ✅ Prune jobs data source lists all jobs
+- ✅ Prune jobs data source filters by store
+- ✅ Filtered results contain only specified store's jobs
 
 ### Sync Job Data Source (`sync_job_datasource/`)
 - ✅ Datastore creation
@@ -159,7 +167,9 @@ provider_installation {
 ## Future Tests
 
 Additional tests to consider converting:
+- Sync jobs data source (list with filters)
 - Verify job data source
+- Verify jobs data source
 - Metrics server data source
 - Notification endpoint/matcher data sources
 - Remote stores/groups/namespaces data sources
