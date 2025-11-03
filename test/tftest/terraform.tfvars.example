@@ -1,0 +1,13 @@
+# Example terraform.tfvars for local testing
+#
+# Copy this file to each test directory and update with your PBS server details.
+# This file should NOT be committed to version control (add to .gitignore).
+#
+# Alternatively, set these as environment variables with TF_VAR_ prefix:
+#   export TF_VAR_pbs_endpoint="https://192.168.1.108:8007"
+#   export TF_VAR_pbs_username="root@pam"
+#   export TF_VAR_pbs_password="your-password"
+
+pbs_endpoint = "https://192.168.1.108:8007"
+pbs_username = "root@pam"
+pbs_password = "your-password"

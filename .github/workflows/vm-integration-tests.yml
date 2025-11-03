@@ -96,7 +96,7 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: "1.5.7"
+        terraform_version: "1.7.0"  # Updated to 1.7.0 for HCL test support
         terraform_wrapper: false
 
     - name: Download dependencies
@@ -104,6 +104,15 @@ jobs:
 
     - name: Build provider binary
       run: go build .
+    
+    - name: Install provider for HCL tests
+      run: |
+        # Install provider to local plugin directory for Terraform HCL tests
+        PROVIDER_DIR="$HOME/.terraform.d/plugins/registry.terraform.io/micah/pbs/1.0.0/linux_amd64"
+        mkdir -p "$PROVIDER_DIR"
+        cp terraform-provider-pbs "$PROVIDER_DIR/"
+        chmod +x "$PROVIDER_DIR/terraform-provider-pbs"
+        echo "Provider installed to $PROVIDER_DIR"
 
     - name: Get runner IP address
       id: get_ip
@@ -166,6 +175,35 @@ jobs:
         # Run ALL integration tests sequentially to avoid PBS resource contention
         # Use -failfast to stop on first failure for faster feedback
         go test -v -failfast -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
+
+    - name: Run Terraform HCL tests
+      env:
+        # Set Terraform variables for HCL tests
+        TF_VAR_pbs_endpoint: "https://192.168.1.108:8007"
+        TF_VAR_pbs_username: "root@pam"
+        TF_VAR_pbs_password: "pbspbs123"
+        TF_LOG: "INFO"
+      run: |
+        echo ""
+        echo "========================================"
+        echo "Running Terraform HCL Tests"
+        echo "========================================"
+        echo ""
+        echo "These tests use Terraform's native test framework (v1.6+)"
+        echo "They replace the flaky tfexec tests with native execution."
+        echo ""
+        
+        # Run prune job data source test
+        echo "→ Testing prune job data source..."
+        terraform test -chdir=test/tftest/prune_job_datasource
+        
+        # Run sync job data source test
+        echo ""
+        echo "→ Testing sync job data source..."
+        terraform test -chdir=test/tftest/sync_job_datasource
+        
+        echo ""
+        echo "✅ All HCL tests passed!"
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4
