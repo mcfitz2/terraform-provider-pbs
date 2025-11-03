@@ -127,6 +127,9 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 	escapedName := url.PathEscape(name)
 	path := fmt.Sprintf("/config/datastore/%s", escapedName)
 	
+	// CRITICAL DEBUG: Log when we attempt to get datastore
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: Attempting GET '%s' at %s\n", name, time.Now().Format(time.RFC3339Nano))
+	
 	// Log the GET request for debugging
 	if isDebugEnabled() {
 		tflog.Debug(ctx, "GetDatastore: Attempting GET", map[string]interface{}{
@@ -136,6 +139,13 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 	}
 	
 	resp, getErr := c.api.Get(ctx, path)
+	
+	// CRITICAL DEBUG: Log the result
+	if getErr != nil {
+		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' FAILED at %s: %v\n", name, time.Now().Format(time.RFC3339Nano), getErr)
+	} else {
+		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' SUCCEEDED at %s\n", name, time.Now().Format(time.RFC3339Nano))
+	}
 	if getErr == nil {
 		if isDebugEnabled() {
 			tflog.Debug(ctx, "GetDatastore: GET succeeded", map[string]interface{}{
@@ -317,6 +327,9 @@ func (c *Client) CreateDatastore(ctx context.Context, datastore *Datastore) erro
 		return fmt.Errorf("datastore creation task failed (UPID: %s): %w", upid, err)
 	}
 
+	// CRITICAL DEBUG: Log immediately when task completes
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] CreateDatastore: Task completed for '%s' at %s\n", datastore.Name, time.Now().Format(time.RFC3339Nano))
+
 	if isDebugEnabled() {
 		tflog.Debug(ctx, "CreateDatastore: Task completed successfully, sleeping 3s")
 	}
@@ -326,6 +339,8 @@ func (c *Client) CreateDatastore(ctx context.Context, datastore *Datastore) erro
 	// internal registration after the async task finishes
 	// The resource layer still has retry logic for additional eventual consistency handling
 	time.Sleep(3 * time.Second)
+
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] CreateDatastore: Completed 3s sleep for '%s' at %s\n", datastore.Name, time.Now().Format(time.RFC3339Nano))
 
 	if isDebugEnabled() {
 		tflog.Debug(ctx, "CreateDatastore: Successfully created datastore", map[string]interface{}{
