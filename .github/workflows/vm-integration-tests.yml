@@ -160,8 +160,8 @@ jobs:
         echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway - if credentials provided)"
         echo ""
         
-        # Run ALL integration tests
-        go test -v -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
+        # Run ALL integration tests sequentially to avoid PBS resource contention
+        go test -v -p 1 -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4

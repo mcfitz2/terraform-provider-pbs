@@ -177,10 +177,10 @@ cd "${PROJECT_ROOT}"
 if [ -n "$1" ]; then
     # Run specific test if provided
     echo -e "${YELLOW}Running test: $1${NC}"
-    go test ./test/integration/... -v -timeout 30m -run "$1"
+    go test ./test/integration/... -v -p 1 -timeout 30m -run "$1"
 else
-    # Run all integration tests
-    go test ./test/integration/... -v -timeout 30m
+    # Run all integration tests sequentially to avoid PBS resource contention
+    go test ./test/integration/... -v -p 1 -timeout 30m
 fi
 
 exit_code=$?
