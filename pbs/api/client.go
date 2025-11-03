@@ -14,12 +14,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"time"
 )
+
+var debugLog *log.Logger
+
+func init() {
+	// Enable debug logging if PBS_DEBUG environment variable is set
+	if os.Getenv("PBS_DEBUG") != "" {
+		debugLog = log.New(os.Stderr, "[PBS-API] ", log.LstdFlags|log.Lmicroseconds)
+	}
+}
 
 // Client represents a PBS API client
 type Client struct {
@@ -118,10 +129,21 @@ type AuthResponse struct {
 func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body interface{}) (*APIResponse, error) {
 	u := fmt.Sprintf("%s/api2/json%s", c.endpoint, apiPath)
 
+	if debugLog != nil {
+		debugLog.Printf(">>> %s %s", method, u)
+		if body != nil {
+			bodyJSON, _ := json.Marshal(body)
+			debugLog.Printf(">>> Request Body: %s", string(bodyJSON))
+		}
+	}
+
 	var reqBody io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
+			if debugLog != nil {
+				debugLog.Printf("!!! Failed to marshal request body: %v", err)
+			}
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewReader(jsonBody)
@@ -129,6 +151,9 @@ func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body int
 
 	req, err := http.NewRequestWithContext(ctx, method, u, reqBody)
 	if err != nil {
+		if debugLog != nil {
+			debugLog.Printf("!!! Failed to create request: %v", err)
+		}
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -140,37 +165,73 @@ func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body int
 	// Set authentication
 	if c.apiToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("PBSAPIToken=%s", c.apiToken))
+		if debugLog != nil {
+			debugLog.Printf(">>> Auth: API Token (hidden)")
+		}
 	} else if c.authenticated && c.ticket != "" {
 		// Use ticket-based authentication
 		req.Header.Set("Cookie", fmt.Sprintf("PBSAuthCookie=%s", c.ticket))
 		if method != "GET" && c.csrfToken != "" {
 			req.Header.Set("CSRFPreventionToken", c.csrfToken)
 		}
+		if debugLog != nil {
+			debugLog.Printf(">>> Auth: Ticket-based (ticket hidden)")
+		}
 	} else {
+		if debugLog != nil {
+			debugLog.Printf("!!! No authentication credentials available")
+		}
 		return nil, fmt.Errorf("authentication failed - no authentication credentials provided")
 	}
 
+	startTime := time.Now()
 	resp, err := c.httpClient.Do(req)
+	elapsed := time.Since(startTime)
+	
 	if err != nil {
+		if debugLog != nil {
+			debugLog.Printf("!!! Request failed after %v: %v", elapsed, err)
+		}
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		if debugLog != nil {
+			debugLog.Printf("!!! Failed to read response body: %v", err)
+		}
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if debugLog != nil {
+		debugLog.Printf("<<< %s %s -> %d (took %v, %d bytes)", method, apiPath, resp.StatusCode, elapsed, len(respBody))
+		if len(respBody) < 2000 { // Only log small responses
+			debugLog.Printf("<<< Response Body: %s", string(respBody))
+		} else {
+			debugLog.Printf("<<< Response Body: (too large, %d bytes)", len(respBody))
+		}
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if debugLog != nil {
+			debugLog.Printf("!!! API error %d: %s", resp.StatusCode, string(respBody))
+		}
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var apiResp APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		if debugLog != nil {
+			debugLog.Printf("!!! Failed to unmarshal response: %v", err)
+		}
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if apiResp.Errors != nil {
+		if debugLog != nil {
+			debugLog.Printf("!!! API returned errors: %v", apiResp.Errors)
+		}
 		return nil, fmt.Errorf("API returned errors: %v", apiResp.Errors)
 	}
 

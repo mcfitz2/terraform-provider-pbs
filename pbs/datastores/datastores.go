@@ -227,40 +227,70 @@ func (c *Client) CreateDatastore(ctx context.Context, datastore *Datastore) erro
 		return fmt.Errorf("datastore name is required")
 	}
 
+	if debugLog != nil {
+		debugLog.Printf("CreateDatastore: Starting creation of datastore '%s'", datastore.Name)
+	}
+
 	// Convert struct to map for API request
 	body := c.datastoreToMap(datastore)
 
 	// Creating datastore with PBS API
 	resp, err := c.api.Post(ctx, "/config/datastore", body)
 	if err != nil {
+		if debugLog != nil {
+			debugLog.Printf("CreateDatastore: POST failed for '%s': %v", datastore.Name, err)
+		}
 		return fmt.Errorf("failed to create datastore %s: %w", datastore.Name, err)
 	}
 
 	// Parse the UPID from the response
 	var upid string
 	if err := json.Unmarshal(resp.Data, &upid); err != nil {
+		if debugLog != nil {
+			debugLog.Printf("CreateDatastore: Failed to parse UPID from response: %v", err)
+		}
 		return fmt.Errorf("failed to parse UPID from response: %w", err)
 	}
 
-	// Parse successful, proceeding with task monitoring
+	if debugLog != nil {
+		debugLog.Printf("CreateDatastore: Got UPID '%s' for datastore '%s'", upid, datastore.Name)
+	}
 
 	// Get the node name from the UPID or by querying nodes
 	node, err := c.getNodeForTask(ctx, upid)
 	if err != nil {
+		if debugLog != nil {
+			debugLog.Printf("CreateDatastore: Failed to get node for UPID '%s': %v", upid, err)
+		}
 		return fmt.Errorf("failed to determine node for task: %w", err)
+	}
+
+	if debugLog != nil {
+		debugLog.Printf("CreateDatastore: Waiting for task on node '%s' (UPID: %s)", node, upid)
 	}
 
 	// Wait for the task to complete with a reasonable timeout
 	// For S3 datastores, this involves file I/O which can take time on slow connections
 	// Wait for task completion
 	if err := c.api.WaitForTask(ctx, node, upid, 5*time.Minute); err != nil {
+		if debugLog != nil {
+			debugLog.Printf("CreateDatastore: Task failed (UPID: %s): %v", upid, err)
+		}
 		return fmt.Errorf("datastore creation task failed (UPID: %s): %w", upid, err)
+	}
+
+	if debugLog != nil {
+		debugLog.Printf("CreateDatastore: Task completed successfully, sleeping 1s before returning")
 	}
 
 	// Give PBS a brief moment to register the datastore internally after task completion
 	// This reduces the number of retries needed at the resource level
 	// Note: The resource layer has exponential backoff retry logic to handle eventual consistency
 	time.Sleep(1 * time.Second)
+
+	if debugLog != nil {
+		debugLog.Printf("CreateDatastore: Successfully created datastore '%s'", datastore.Name)
+	}
 
 	// Datastore created successfully
 	return nil

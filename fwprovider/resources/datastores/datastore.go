@@ -458,13 +458,30 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	tflog.Debug(ctx, "Acquiring datastore creation mutex", map[string]any{
+		"name": plan.Name.ValueString(),
+	})
+	
 	// Lock only for the create operation to prevent PBS lock contention
 	// Don't hold the lock during the post-create retries
 	datastoreMutex.Lock()
+	tflog.Debug(ctx, "Mutex acquired, calling createDatastoreWithRetry", map[string]any{
+		"name": plan.Name.ValueString(),
+	})
+	
 	err = r.createDatastoreWithRetry(ctx, datastore)
+	
 	datastoreMutex.Unlock()
+	tflog.Debug(ctx, "Mutex released after create operation", map[string]any{
+		"name":    plan.Name.ValueString(),
+		"success": err == nil,
+	})
 	
 	if err != nil {
+		tflog.Error(ctx, "Failed to create datastore", map[string]any{
+			"name":  plan.Name.ValueString(),
+			"error": err.Error(),
+		})
 		resp.Diagnostics.AddError(
 			"Error Creating Datastore",
 			"Could not create datastore, unexpected error: "+err.Error(),
@@ -473,7 +490,9 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Log that the resource was created
-	tflog.Trace(ctx, "created datastore resource", map[string]any{"name": plan.Name.ValueString()})
+	tflog.Info(ctx, "Datastore creation task completed successfully", map[string]any{
+		"name": plan.Name.ValueString(),
+	})
 
 	// Read back the created datastore to populate state
 	// Since CreateDatastore waits for task completion, the datastore should exist immediately
@@ -482,9 +501,25 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	maxRetries := 3
 	var lastErr error
 	
+	tflog.Debug(ctx, "Starting post-creation datastore read attempts", map[string]any{
+		"name":        plan.Name.ValueString(),
+		"maxRetries":  maxRetries,
+		"retryDelay":  "2s",
+	})
+	
 	for i := 0; i < maxRetries; i++ {
+		tflog.Debug(ctx, "Attempting to read datastore after creation", map[string]any{
+			"name":    plan.Name.ValueString(),
+			"attempt": i + 1,
+			"max":     maxRetries,
+		})
+		
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
 		if err == nil {
+			tflog.Debug(ctx, "Successfully read datastore after creation", map[string]any{
+				"name":     plan.Name.ValueString(),
+				"attempts": i + 1,
+			})
 			if i > 0 {
 				tflog.Info(ctx, "Datastore found after retry", map[string]any{
 					"name":     plan.Name.ValueString(),
@@ -503,6 +538,10 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		})
 
 		if i < maxRetries-1 {
+			tflog.Debug(ctx, "Sleeping before retry", map[string]any{
+				"duration": "2s",
+				"attempt":  i + 1,
+			})
 			// Brief wait before retry (CreateDatastore already waited for task + 1s)
 			time.Sleep(2 * time.Second)
 		}
