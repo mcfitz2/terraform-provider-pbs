@@ -70,10 +70,10 @@ These tests run automatically in GitHub Actions after the Go integration tests:
 ```yaml
 - name: Run Terraform HCL tests
   run: |
-    terraform test -chdir=test/tftest/datastores_datasource
-    terraform test -chdir=test/tftest/prune_job_datasource
-    terraform test -chdir=test/tftest/prune_jobs_datasource
-    terraform test -chdir=test/tftest/sync_job_datasource
+    (cd test/tftest/datastores_datasource && terraform test)
+    (cd test/tftest/prune_job_datasource && terraform test)
+    (cd test/tftest/prune_jobs_datasource && terraform test)
+    (cd test/tftest/sync_job_datasource && terraform test)
 ```
 
 ## Debugging

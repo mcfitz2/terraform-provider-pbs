@@ -48,18 +48,26 @@ pbs_password = "your-password"
 From the project root:
 
 ```bash
-# Run all HCL tests
-terraform test -chdir=test/tftest/datastores_datasource
-terraform test -chdir=test/tftest/prune_job_datasource
-terraform test -chdir=test/tftest/prune_jobs_datasource
-terraform test -chdir=test/tftest/sync_job_datasource
+# Run all HCL tests (from project root)
+(cd test/tftest/datastores_datasource && terraform test)
+(cd test/tftest/prune_job_datasource && terraform test)
+(cd test/tftest/prune_jobs_datasource && terraform test)
+(cd test/tftest/sync_job_datasource && terraform test)
+
+# Or run individual test by changing to its directory
+cd test/tftest/prune_job_datasource
+terraform test
 ```
 
 ### Run Specific Test
 
 ```bash
+# Change to test directory and run
 cd test/tftest/prune_job_datasource
 terraform test
+
+# Or from project root
+(cd test/tftest/prune_job_datasource && terraform test)
 ```
 
 ### Debug Mode
