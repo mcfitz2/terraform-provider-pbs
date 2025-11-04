@@ -195,22 +195,22 @@ jobs:
         
         # Run datastores data source test (list all datastores)
         echo "→ Testing datastores data source..."
-        (cd test/tftest/datastores_datasource && terraform test)
+        (cd test/tftest/datastores_datasource && terraform init -input=false && terraform test)
         
         # Run prune job data source test
         echo ""
         echo "→ Testing prune job data source..."
-        (cd test/tftest/prune_job_datasource && terraform test)
+        (cd test/tftest/prune_job_datasource && terraform init -input=false && terraform test)
         
         # Run prune jobs data source test (list with filter)
         echo ""
         echo "→ Testing prune jobs data source..."
-        (cd test/tftest/prune_jobs_datasource && terraform test)
+        (cd test/tftest/prune_jobs_datasource && terraform init -input=false && terraform test)
         
         # Run sync job data source test
         echo ""
         echo "→ Testing sync job data source..."
-        (cd test/tftest/sync_job_datasource && terraform test)
+        (cd test/tftest/sync_job_datasource && terraform init -input=false && terraform test)
         
         echo ""
         echo "✅ All HCL tests passed!"

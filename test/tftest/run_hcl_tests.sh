@@ -38,13 +38,17 @@ if ! command -v terraform &> /dev/null; then
 fi
 
 # Check Terraform version
-TF_VERSION=$(terraform version -json | grep -o '"terraform_version":"[^"]*"' | cut -d'"' -f4)
+TF_VERSION=$(terraform version -json | python3 -c "import sys, json; print(json.load(sys.stdin)['terraform_version'])" 2>/dev/null || echo "")
+if [ -z "$TF_VERSION" ]; then
+    echo -e "${RED}❌ Could not determine Terraform version${NC}"
+    exit 1
+fi
 echo -e "${BLUE}→ Terraform version: ${TF_VERSION}${NC}"
 
 # Verify version is 1.6.0 or later
 REQUIRED_VERSION="1.6.0"
 if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$TF_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
-    echo -e "${RED}❌ Terraform version must be 1.6.0 or later for HCL tests${NC}"
+    echo -e "${RED}❌ Terraform version must be 1.6.0 or later for HCL tests (found ${TF_VERSION})${NC}"
     exit 1
 fi
 
@@ -132,7 +136,8 @@ for test in "${TESTS[@]}"; do
     echo -e "${BLUE}→ Running test: ${test}${NC}"
     echo ""
     
-    if terraform test -chdir="$TEST_DIR"; then
+    # Change to test directory, init, and run terraform test
+    if (cd "$TEST_DIR" && terraform init -input=false > /dev/null 2>&1 && terraform test); then
         echo -e "${GREEN}✓ Test passed: ${test}${NC}"
     else
         echo -e "${RED}❌ Test failed: ${test}${NC}"
