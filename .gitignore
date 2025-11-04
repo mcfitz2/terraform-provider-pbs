@@ -18,3 +18,12 @@ config.env
 test/*.log
 test/.terraform/
 test/.terraform.lock.hcl
+coverage.out
+
+# Terraform HCL test artifacts
+test/tftest/**/.terraform/
+test/tftest/**/.terraform.lock.hcl
+test/tftest/**/terraform.tfstate
+test/tftest/**/terraform.tfstate.backup
+test/tftest/**/terraform.tfvars
+test/tftest/**/*.tfplan

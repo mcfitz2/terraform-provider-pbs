@@ -155,7 +155,7 @@ func (p *S3ProviderConfig) SetupS3Client(t *testing.T) {
 
 // CreateTestBucket creates a test bucket for the provider
 func (p *S3ProviderConfig) CreateTestBucket(t *testing.T) {
-	t.Logf("Creating test bucket %s on %s", p.BucketName, p.Name)
+	debugLog(t, "Creating test bucket %s on %s", p.BucketName, p.Name)
 
 	// Create bucket with appropriate location constraint based on provider
 	var locationConstraint *string
@@ -188,7 +188,7 @@ func (p *S3ProviderConfig) CreateTestBucket(t *testing.T) {
 	require.NoError(t, err, "Failed to create bucket %s on %s", p.BucketName, p.Name)
 
 	// Wait for bucket to be available
-	t.Logf("Waiting for bucket %s to be available on %s", p.BucketName, p.Name)
+	debugLog(t, "Waiting for bucket %s to be available on %s", p.BucketName, p.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -197,7 +197,7 @@ func (p *S3ProviderConfig) CreateTestBucket(t *testing.T) {
 	})
 	require.NoError(t, err, "Bucket %s not available on %s after 30 seconds", p.BucketName, p.Name)
 
-	t.Logf("Successfully created bucket %s on %s", p.BucketName, p.Name)
+	debugLog(t, "Successfully created bucket %s on %s", p.BucketName, p.Name)
 }
 
 // DeleteTestBucket deletes the test bucket
@@ -206,7 +206,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 		return
 	}
 
-	t.Logf("Deleting test bucket %s on %s", p.BucketName, p.Name)
+	debugLog(t, "Deleting test bucket %s on %s", p.BucketName, p.Name)
 
 	// For Backblaze B2, we need to handle versioned objects
 	// B2 keeps all versions of objects by default, so we need to delete all versions
@@ -234,13 +234,13 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 			}
 
 			if len(objects) > 0 {
-				t.Logf("Deleting %d object versions/markers from B2 bucket %s", len(objects), p.BucketName)
+				debugLog(t, "Deleting %d object versions/markers from B2 bucket %s", len(objects), p.BucketName)
 				_, deleteErr := p.S3Client.DeleteObjects(&s3.DeleteObjectsInput{
 					Bucket: aws.String(p.BucketName),
 					Delete: &s3.Delete{Objects: objects, Quiet: aws.Bool(true)},
 				})
 				if deleteErr != nil {
-					t.Logf("Warning: Failed to delete some object versions: %v", deleteErr)
+					debugLog(t, "Warning: Failed to delete some object versions: %v", deleteErr)
 				}
 			}
 
@@ -252,7 +252,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 				// Bucket doesn't exist, nothing to delete
 				return
 			}
-			t.Logf("Failed to list object versions in B2 bucket %s: %v", p.BucketName, err)
+			debugLog(t, "Failed to list object versions in B2 bucket %s: %v", p.BucketName, err)
 		}
 
 		// Wait for deletions to propagate in B2
@@ -267,7 +267,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 				// Bucket doesn't exist, nothing to delete
 				return
 			}
-			t.Logf("Failed to list objects in bucket %s on %s: %v", p.BucketName, p.Name, err)
+			debugLog(t, "Failed to list objects in bucket %s on %s: %v", p.BucketName, p.Name, err)
 			return
 		}
 
@@ -287,7 +287,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 				},
 			})
 			if err != nil {
-				t.Logf("Failed to delete objects from bucket %s on %s: %v", p.BucketName, p.Name, err)
+				debugLog(t, "Failed to delete objects from bucket %s on %s: %v", p.BucketName, p.Name, err)
 				return
 			}
 
@@ -304,7 +304,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 		})
 
 		if deleteErr == nil {
-			t.Logf("Successfully deleted bucket %s on %s (attempt %d)", p.BucketName, p.Name, attempt)
+			debugLog(t, "Successfully deleted bucket %s on %s (attempt %d)", p.BucketName, p.Name, attempt)
 			return
 		}
 
@@ -313,7 +313,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 			case "BucketNotEmpty":
 				if attempt < maxRetries {
 					// Try force-deleting remaining objects (including versions for B2)
-					t.Logf("Bucket %s on %s still not empty (attempt %d/%d), forcing object deletion...",
+					debugLog(t, "Bucket %s on %s still not empty (attempt %d/%d), forcing object deletion...",
 						p.BucketName, p.Name, attempt, maxRetries)
 
 					if p.Name == "Backblaze" {
@@ -340,13 +340,13 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 									Delete: &s3.Delete{Objects: objects, Quiet: aws.Bool(true)},
 								})
 								if deleteErr != nil {
-									t.Logf("Warning: Failed to delete some versions: %v", deleteErr)
+									debugLog(t, "Warning: Failed to delete some versions: %v", deleteErr)
 								}
 							}
 							return true
 						})
 						if listErr != nil {
-							t.Logf("Warning: Failed to list versions for forced deletion: %v", listErr)
+							debugLog(t, "Warning: Failed to list versions for forced deletion: %v", listErr)
 						}
 					} else {
 						// Standard object deletion for non-B2 providers
@@ -363,13 +363,13 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 									Delete: &s3.Delete{Objects: objects},
 								})
 								if deleteErr != nil {
-									t.Logf("Warning: Failed to delete some objects: %v", deleteErr)
+									debugLog(t, "Warning: Failed to delete some objects: %v", deleteErr)
 								}
 							}
 							return true
 						})
 						if listErr != nil {
-							t.Logf("Warning: Failed to list objects for forced deletion: %v", listErr)
+							debugLog(t, "Warning: Failed to list objects for forced deletion: %v", listErr)
 						}
 					}
 
@@ -383,13 +383,13 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 				return
 			case "NoSuchBucket":
 				// Bucket already deleted or doesn't exist
-				t.Logf("Bucket %s on %s already deleted", p.BucketName, p.Name)
+				debugLog(t, "Bucket %s on %s already deleted", p.BucketName, p.Name)
 				return
 			}
 		}
 
 		if attempt < maxRetries {
-			t.Logf("Failed to delete bucket %s on %s (attempt %d/%d): %v, retrying...",
+			debugLog(t, "Failed to delete bucket %s on %s (attempt %d/%d): %v, retrying...",
 				p.BucketName, p.Name, attempt, maxRetries, deleteErr)
 			time.Sleep(time.Duration(attempt) * time.Second)
 		} else {
@@ -401,7 +401,7 @@ func (p *S3ProviderConfig) DeleteTestBucket(t *testing.T) {
 
 // TestS3Connectivity tests basic S3 operations to verify connectivity
 func (p *S3ProviderConfig) TestS3Connectivity(t *testing.T) {
-	t.Logf("Testing S3 connectivity for %s by uploading test object", p.Name)
+	debugLog(t, "Testing S3 connectivity for %s by uploading test object", p.Name)
 
 	// Test object upload
 	testKey := "test-connectivity"
@@ -429,7 +429,7 @@ func (p *S3ProviderConfig) TestS3Connectivity(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to delete test object from %s bucket %s", p.Name, p.BucketName)
 
-	t.Logf("S3 connectivity test successful for %s", p.Name)
+	debugLog(t, "S3 connectivity test successful for %s", p.Name)
 }
 
 // GetPBSEndpointConfig returns the S3 endpoint configuration for PBS

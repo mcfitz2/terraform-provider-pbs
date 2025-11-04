@@ -21,6 +21,18 @@ import (
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
 
+// isDebugMode checks if PBS_DEBUG environment variable is set
+func isDebugMode() bool {
+	return os.Getenv("PBS_DEBUG") != "" || os.Getenv("TEST_DEBUG") != ""
+}
+
+// debugLog logs a message only if debug mode is enabled
+func debugLog(t *testing.T, format string, args ...interface{}) {
+	if isDebugMode() {
+		t.Logf(format, args...)
+	}
+}
+
 // TestContext holds the test configuration and client for PBS integration tests
 type TestContext struct {
 	Config    *Config
@@ -217,11 +229,11 @@ func (tc *TestContext) ApplyTerraformWithRetry(t *testing.T) {
 	retryDelay := time.Second * 5
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		t.Logf("Terraform apply attempt %d/%d", attempt, maxRetries)
+		debugLog(t, "Terraform apply attempt %d/%d", attempt, maxRetries)
 
 		err = tc.TF.Apply(context.Background())
 		if err == nil {
-			t.Logf("Terraform apply succeeded on attempt %d", attempt)
+			debugLog(t, "Terraform apply succeeded on attempt %d", attempt)
 			return
 		}
 
@@ -231,7 +243,7 @@ func (tc *TestContext) ApplyTerraformWithRetry(t *testing.T) {
 			strings.Contains(errorMsg, ".datastore.lck")
 
 		if isLockError && attempt < maxRetries {
-			t.Logf("Lock contention detected, retrying in %v (attempt %d/%d): %v", retryDelay, attempt, maxRetries, err)
+			debugLog(t, "Lock contention detected, retrying in %v (attempt %d/%d): %v", retryDelay, attempt, maxRetries, err)
 			time.Sleep(retryDelay)
 			continue
 		}
@@ -280,14 +292,14 @@ func (tc *TestContext) DestroyTerraform(t *testing.T) {
 			strings.Contains(errMsg, "not found") ||
 			strings.Contains(errMsg, "404") {
 			// Resource already gone - this is fine, desired state achieved
-			t.Logf("Terraform destroy: resource already deleted (desired state achieved)")
+			debugLog(t, "Terraform destroy: resource already deleted (desired state achieved)")
 			return
 		}
 
 		// Log any other errors as warnings, but don't fail the test
 		// This allows cleanup to continue even if there are issues
-		t.Logf("Warning: Terraform destroy encountered error: %v", err)
-		t.Logf("Continuing cleanup despite error...")
+		debugLog(t, "Warning: Terraform destroy encountered error: %v", err)
+		debugLog(t, "Continuing cleanup despite error...")
 	}
 }
 
@@ -300,7 +312,7 @@ func (tc *TestContext) GetTerraformState(t *testing.T) *tfjson.State {
 	if err != nil {
 		// Check if this is a Node.js related error
 		if strings.Contains(err.Error(), "node") || strings.Contains(err.Error(), "No such file") {
-			t.Logf("Warning: Terraform state reading failed due to Node.js dependency: %v", err)
+			debugLog(t, "Warning: Terraform state reading failed due to Node.js dependency: %v", err)
 			// Try to read terraform.tfstate directly as fallback
 			return tc.GetTerraformStateFromFile(t)
 		}
@@ -314,14 +326,14 @@ func (tc *TestContext) GetTerraformStateFromFile(t *testing.T) *tfjson.State {
 	statePath := filepath.Join(tc.Workdir, "terraform.tfstate")
 	stateData, err := os.ReadFile(statePath)
 	if err != nil {
-		t.Logf("Warning: Could not read terraform.tfstate file: %v", err)
+		debugLog(t, "Warning: Could not read terraform.tfstate file: %v", err)
 		return nil
 	}
 
 	// Try to parse JSON manually
 	var state tfjson.State
 	if err := json.Unmarshal(stateData, &state); err != nil {
-		t.Logf("Warning: Could not parse terraform state JSON: %v", err)
+		debugLog(t, "Warning: Could not parse terraform state JSON: %v", err)
 		return nil
 	}
 
@@ -332,7 +344,7 @@ func (tc *TestContext) GetTerraformStateFromFile(t *testing.T) *tfjson.State {
 func (tc *TestContext) GetResourceFromState(t *testing.T, address string) *tfjson.StateResource {
 	state := tc.GetTerraformState(t)
 	if state == nil || state.Values == nil || state.Values.RootModule == nil {
-		t.Logf("Warning: Terraform state is not available, skipping state verification for %s", address)
+		debugLog(t, "Warning: Terraform state is not available, skipping state verification for %s", address)
 		return nil
 	}
 
@@ -345,29 +357,47 @@ func (tc *TestContext) GetResourceFromState(t *testing.T, address string) *tfjso
 	return nil
 }
 
+// GetDataSourceFromState extracts a data source from terraform state by address
+func (tc *TestContext) GetDataSourceFromState(t *testing.T, address string) *tfjson.StateResource {
+	state := tc.GetTerraformState(t)
+	if state == nil || state.Values == nil || state.Values.RootModule == nil {
+		debugLog(t, "Warning: Terraform state is not available, skipping state verification for %s", address)
+		return nil
+	}
+
+	// Data sources are also in the Resources list, just prefixed with "data."
+	for _, resource := range state.Values.RootModule.Resources {
+		if resource.Address == address {
+			return resource
+		}
+	}
+	t.Fatalf("Data source %s not found in terraform state", address)
+	return nil
+}
+
 // DebugNodeAvailability helps debug Node.js availability issues
 func (tc *TestContext) DebugNodeAvailability(t *testing.T) {
-	t.Logf("=== Node.js Environment Debug ===")
-	t.Logf("PATH: %s", os.Getenv("PATH"))
-	t.Logf("NODE_PATH: %s", os.Getenv("NODE_PATH"))
+	debugLog(t, "=== Node.js Environment Debug ===")
+	debugLog(t, "PATH: %s", os.Getenv("PATH"))
+	debugLog(t, "NODE_PATH: %s", os.Getenv("NODE_PATH"))
 
 	// Check for node binary in common locations
 	nodePaths := []string{"/usr/bin/node", "/usr/local/bin/node"}
 	for _, path := range nodePaths {
 		if _, err := os.Stat(path); err == nil {
-			t.Logf("Found Node.js at: %s", path)
+			debugLog(t, "Found Node.js at: %s", path)
 		} else {
-			t.Logf("Node.js not found at: %s", path)
+			debugLog(t, "Node.js not found at: %s", path)
 		}
 	}
 
 	// Try to execute node --version
 	if _, err := os.Stat("/usr/bin/node"); err == nil {
 		if output, err := exec.Command("/usr/bin/node", "--version").Output(); err == nil {
-			t.Logf("Node.js version: %s", strings.TrimSpace(string(output)))
+			debugLog(t, "Node.js version: %s", strings.TrimSpace(string(output)))
 		} else {
-			t.Logf("Failed to get Node.js version: %v", err)
+			debugLog(t, "Failed to get Node.js version: %v", err)
 		}
 	}
-	t.Logf("=== End Node.js Environment Debug ===")
+	debugLog(t, "=== End Node.js Environment Debug ===")
 }

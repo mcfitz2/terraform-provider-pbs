@@ -12,11 +12,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/micah/terraform-provider-pbs/pbs/api"
 )
+
+// isDebugEnabled checks if debug logging should be enabled
+func isDebugEnabled() bool {
+	return os.Getenv("PBS_DEBUG") != "" || os.Getenv("TF_LOG") != ""
+}
 
 // Client represents the datastores API client
 type Client struct {
@@ -118,11 +125,42 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 
 	// Try to get individual datastore details first
 	escapedName := url.PathEscape(name)
-	resp, err := c.api.Get(ctx, fmt.Sprintf("/config/datastore/%s", escapedName))
-	if err == nil {
+	path := fmt.Sprintf("/config/datastore/%s", escapedName)
+	
+	// CRITICAL DEBUG: Log when we attempt to get datastore
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: Attempting GET '%s' at %s\n", name, time.Now().Format(time.RFC3339Nano))
+	
+	// Log the GET request for debugging
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "GetDatastore: Attempting GET", map[string]interface{}{
+			"path":         path,
+			"original_name": name,
+		})
+	}
+	
+	resp, getErr := c.api.Get(ctx, path)
+	
+	// CRITICAL DEBUG: Log the result
+	if getErr != nil {
+		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' FAILED at %s: %v\n", name, time.Now().Format(time.RFC3339Nano), getErr)
+	} else {
+		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' SUCCEEDED at %s\n", name, time.Now().Format(time.RFC3339Nano))
+	}
+	if getErr == nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "GetDatastore: GET succeeded", map[string]interface{}{
+				"response_size": len(resp.Data),
+			})
+		}
+		
 		var ds Datastore
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
+			if isDebugEnabled() {
+				tflog.Debug(ctx, "GetDatastore: Successfully unmarshaled datastore", map[string]interface{}{
+					"name": name,
+				})
+			}
 
 			// Parse backend configuration if present
 			c.parseBackendConfig(&ds)
@@ -144,21 +182,71 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 			}
 
 			return &ds, nil
+		} else {
+			if isDebugEnabled() {
+				tflog.Debug(ctx, "GetDatastore: Unmarshal failed", map[string]interface{}{
+					"error": unmarshalErr.Error(),
+				})
+			}
+		}
+	} else {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "GetDatastore: GET failed", map[string]interface{}{
+				"error": getErr.Error(),
+			})
 		}
 	}
 
 	// If individual get fails, fall back to list and find
-	datastores, err := c.ListDatastores(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list datastores to find %s: %w", name, err)
+	// This handles cases where the direct endpoint might not work but the datastore exists
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "GetDatastore: Falling back to list operation")
+	}
+	datastores, listErr := c.ListDatastores(ctx)
+	if listErr != nil {
+		// Both GET and LIST failed - return detailed error
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "GetDatastore: List also failed", map[string]interface{}{
+				"error": listErr.Error(),
+			})
+		}
+		return nil, fmt.Errorf("failed to get datastore %s (GET error: %v, LIST error: %w)", name, getErr, listErr)
 	}
 
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "GetDatastore: List returned datastores", map[string]interface{}{
+			"count": len(datastores),
+		})
+		for i, ds := range datastores {
+			tflog.Debug(ctx, "GetDatastore: Datastore in list", map[string]interface{}{
+				"index": i,
+				"name":  ds.Name,
+			})
+		}
+	}
+	
 	for _, ds := range datastores {
 		if ds.Name == name {
+			if isDebugEnabled() {
+				tflog.Debug(ctx, "GetDatastore: Found in list (minimal data)", map[string]interface{}{
+					"name": name,
+				})
+			}
+			// NOTE: This returns incomplete data - only Name and Path are populated from list
 			return &ds, nil
 		}
 	}
 
+	// Datastore not found in list - include the original GET error for debugging
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "GetDatastore: Datastore not found in list", map[string]interface{}{
+			"name":       name,
+			"list_count": len(datastores),
+		})
+	}
+	if getErr != nil {
+		return nil, fmt.Errorf("datastore %s not found (GET error: %v)", name, getErr)
+	}
 	return nil, fmt.Errorf("datastore %s not found", name)
 }
 
@@ -168,40 +256,97 @@ func (c *Client) CreateDatastore(ctx context.Context, datastore *Datastore) erro
 		return fmt.Errorf("datastore name is required")
 	}
 
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "CreateDatastore: Starting creation", map[string]interface{}{
+			"name": datastore.Name,
+		})
+	}
+
 	// Convert struct to map for API request
 	body := c.datastoreToMap(datastore)
 
 	// Creating datastore with PBS API
 	resp, err := c.api.Post(ctx, "/config/datastore", body)
 	if err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "CreateDatastore: POST failed", map[string]interface{}{
+				"name":  datastore.Name,
+				"error": err.Error(),
+			})
+		}
 		return fmt.Errorf("failed to create datastore %s: %w", datastore.Name, err)
 	}
 
 	// Parse the UPID from the response
 	var upid string
 	if err := json.Unmarshal(resp.Data, &upid); err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "CreateDatastore: Failed to parse UPID", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
 		return fmt.Errorf("failed to parse UPID from response: %w", err)
 	}
 
-	// Parse successful, proceeding with task monitoring
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "CreateDatastore: Got UPID", map[string]interface{}{
+			"name": datastore.Name,
+			"upid": upid,
+		})
+	}
 
 	// Get the node name from the UPID or by querying nodes
 	node, err := c.getNodeForTask(ctx, upid)
 	if err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "CreateDatastore: Failed to get node", map[string]interface{}{
+				"upid":  upid,
+				"error": err.Error(),
+			})
+		}
 		return fmt.Errorf("failed to determine node for task: %w", err)
+	}
+
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "CreateDatastore: Waiting for task", map[string]interface{}{
+			"node": node,
+			"upid": upid,
+		})
 	}
 
 	// Wait for the task to complete with a reasonable timeout
 	// For S3 datastores, this involves file I/O which can take time on slow connections
 	// Wait for task completion
 	if err := c.api.WaitForTask(ctx, node, upid, 5*time.Minute); err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "CreateDatastore: Task failed", map[string]interface{}{
+				"upid":  upid,
+				"error": err.Error(),
+			})
+		}
 		return fmt.Errorf("datastore creation task failed (UPID: %s): %w", upid, err)
 	}
 
-	// Give PBS a moment to register the datastore internally after task completion
-	// This prevents race conditions where the datastore exists but isn't yet visible via API
-	// Increased to 3 seconds to account for S3 network operations and PBS internal state updates
+	// CRITICAL DEBUG: Log immediately when task completes
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] CreateDatastore: Task completed for '%s' at %s\n", datastore.Name, time.Now().Format(time.RFC3339Nano))
+
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "CreateDatastore: Task completed successfully, sleeping 3s")
+	}
+
+	// Give PBS more time to register the datastore internally after task completion
+	// CI VMs are slower than local machines and need more time for PBS to complete
+	// internal registration after the async task finishes
+	// The resource layer still has retry logic for additional eventual consistency handling
 	time.Sleep(3 * time.Second)
+
+	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] CreateDatastore: Completed 3s sleep for '%s' at %s\n", datastore.Name, time.Now().Format(time.RFC3339Nano))
+
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "CreateDatastore: Successfully created datastore", map[string]interface{}{
+			"name": datastore.Name,
+		})
+	}
 
 	// Datastore created successfully
 	return nil

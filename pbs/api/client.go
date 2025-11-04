@@ -16,10 +16,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
+
+// isDebugEnabled checks if debug logging should be enabled
+func isDebugEnabled() bool {
+	return os.Getenv("PBS_DEBUG") != "" || os.Getenv("TF_LOG") != ""
+}
 
 // Client represents a PBS API client
 type Client struct {
@@ -118,10 +126,28 @@ type AuthResponse struct {
 func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body interface{}) (*APIResponse, error) {
 	u := fmt.Sprintf("%s/api2/json%s", c.endpoint, apiPath)
 
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "API Request", map[string]interface{}{
+			"method": method,
+			"url":    u,
+		})
+		if body != nil {
+			bodyJSON, _ := json.Marshal(body)
+			tflog.Debug(ctx, "API Request Body", map[string]interface{}{
+				"body": string(bodyJSON),
+			})
+		}
+	}
+
 	var reqBody io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
+			if isDebugEnabled() {
+				tflog.Debug(ctx, "Failed to marshal request body", map[string]interface{}{
+					"error": err.Error(),
+				})
+			}
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewReader(jsonBody)
@@ -129,6 +155,11 @@ func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body int
 
 	req, err := http.NewRequestWithContext(ctx, method, u, reqBody)
 	if err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "Failed to create request", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -140,37 +171,91 @@ func (c *Client) DoRequest(ctx context.Context, method, apiPath string, body int
 	// Set authentication
 	if c.apiToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("PBSAPIToken=%s", c.apiToken))
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API Auth: API Token")
+		}
 	} else if c.authenticated && c.ticket != "" {
 		// Use ticket-based authentication
 		req.Header.Set("Cookie", fmt.Sprintf("PBSAuthCookie=%s", c.ticket))
 		if method != "GET" && c.csrfToken != "" {
 			req.Header.Set("CSRFPreventionToken", c.csrfToken)
 		}
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API Auth: Ticket-based")
+		}
 	} else {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API Auth: No credentials available")
+		}
 		return nil, fmt.Errorf("authentication failed - no authentication credentials provided")
 	}
 
+	startTime := time.Now()
 	resp, err := c.httpClient.Do(req)
+	elapsed := time.Since(startTime)
+	
 	if err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API Request failed", map[string]interface{}{
+				"elapsed": elapsed.String(),
+				"error":   err.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "Failed to read response body", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if isDebugEnabled() {
+		tflog.Debug(ctx, "API Response", map[string]interface{}{
+			"method":      method,
+			"path":        apiPath,
+			"status":      resp.StatusCode,
+			"elapsed":     elapsed.String(),
+			"body_length": len(respBody),
+		})
+		if len(respBody) < 2000 { // Only log small responses
+			tflog.Debug(ctx, "API Response Body", map[string]interface{}{
+				"body": string(respBody),
+			})
+		}
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API Error", map[string]interface{}{
+				"status": resp.StatusCode,
+				"body":   string(respBody),
+			})
+		}
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var apiResp APIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "Failed to unmarshal response", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if apiResp.Errors != nil {
+		if isDebugEnabled() {
+			tflog.Debug(ctx, "API returned errors", map[string]interface{}{
+				"errors": fmt.Sprintf("%v", apiResp.Errors),
+			})
+		}
 		return nil, fmt.Errorf("API returned errors: %v", apiResp.Errors)
 	}
 
