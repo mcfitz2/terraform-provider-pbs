@@ -9,7 +9,7 @@ terraform {
   required_providers {
     pbs = {
       source = "registry.terraform.io/micah/pbs"
-      version = "1.0.0"
+      version = "0.2.0"
     }
   }
 }

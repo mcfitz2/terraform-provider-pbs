@@ -14,6 +14,8 @@ import (
 
 // TestSMTPNotificationIntegration tests SMTP notification target lifecycle
 func TestSMTPNotificationIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/smtp.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -101,6 +103,8 @@ resource "pbs_smtp_notification" "test_smtp" {
 
 // TestGotifyNotificationIntegration tests Gotify notification target lifecycle
 func TestGotifyNotificationIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -137,6 +141,8 @@ resource "pbs_gotify_notification" "test_gotify" {
 
 // TestSendmailNotificationIntegration tests Sendmail notification target lifecycle
 func TestSendmailNotificationIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -178,6 +184,8 @@ resource "pbs_sendmail_notification" "test_sendmail" {
 
 // TestWebhookNotificationIntegration tests Webhook notification target lifecycle
 func TestWebhookNotificationIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -219,6 +227,8 @@ resource "pbs_webhook_notification" "test_webhook" {
 
 // TestNotificationMatcherIntegration tests notification matcher lifecycle
 func TestNotificationMatcherIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -274,6 +284,8 @@ resource "pbs_notification_matcher" "test_matcher" {
 
 // TestNotificationMatcherModes tests different matcher modes
 func TestNotificationMatcherModes(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -319,6 +331,8 @@ resource "pbs_notification_matcher" "test_any" {
 
 // TestNotificationMatcherWithCalendar tests matcher with calendar filter
 func TestNotificationMatcherWithCalendar(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -365,6 +379,8 @@ resource "pbs_notification_matcher" "test_calendar" {
 
 // TestNotificationMatcherInvertMatch tests matcher with inverted matching
 func TestNotificationMatcherInvertMatch(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/notifications/endpoints_and_matcher.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -413,6 +429,8 @@ resource "pbs_notification_matcher" "test_invert" {
 
 // TestNotificationEndpointDataSourceIntegration tests reading a single notification endpoint via data source
 func TestNotificationEndpointDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/notification_endpoint.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -455,6 +473,8 @@ data "pbs_notification_endpoint" "test" {
 
 // TestNotificationEndpointsDataSourceIntegration tests listing all notification endpoints via data source
 func TestNotificationEndpointsDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/notification_endpoints.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -552,6 +572,8 @@ data "pbs_notification_endpoints" "all" {
 
 // TestNotificationMatcherDataSourceIntegration tests reading a single notification matcher via data source
 func TestNotificationMatcherDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/notification_matcher.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -614,6 +636,8 @@ data "pbs_notification_matcher" "test" {
 
 // TestNotificationMatchersDataSourceIntegration tests listing all notification matchers via data source
 func TestNotificationMatchersDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/notification_matchers.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

@@ -54,6 +54,8 @@ func getInfluxDBUDPPort() int {
 
 // TestMetricsServerInfluxDBHTTPIntegration tests InfluxDB HTTP metrics server lifecycle
 func TestMetricsServerInfluxDBHTTPIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/metrics/influxdb_http.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -125,6 +127,8 @@ resource "pbs_metrics_server" "test_influxdb_http" {
 
 // TestMetricsServerInfluxDBUDPIntegration tests InfluxDB UDP metrics server lifecycle
 func TestMetricsServerInfluxDBUDPIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/metrics/influxdb_udp.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -170,6 +174,8 @@ resource "pbs_metrics_server" "test_influxdb_udp" {
 
 // TestMetricsServerMTU tests metrics server with custom MTU
 func TestMetricsServerMTU(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/metrics/influxdb_udp.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -249,6 +255,8 @@ resource "pbs_metrics_server" "test_tls" {
 
 // TestMetricsServerDisabled tests creating a disabled metrics server
 func TestMetricsServerDisabled(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/metrics/influxdb_udp.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -331,6 +339,8 @@ resource "pbs_metrics_server" "test_bodysize" {
 
 // TestMetricsServerHTTPToUDPUpdate tests updating from HTTP to UDP type (should force replacement)
 func TestMetricsServerTypeChange(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: covered by other tests")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

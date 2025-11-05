@@ -14,6 +14,8 @@ import (
 
 // TestPruneJobIntegration tests the complete lifecycle of a prune job
 func TestPruneJobIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/jobs/prune_job.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -98,6 +100,8 @@ resource "pbs_prune_job" "test_prune" {
 
 // TestSyncJobIntegration tests the complete lifecycle of a sync job
 func TestSyncJobIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/jobs/sync_job.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -218,6 +222,8 @@ resource "pbs_sync_job" "test_sync" {
 
 // TestVerifyJobIntegration tests the complete lifecycle of a verify job
 func TestVerifyJobIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/jobs/verify_job.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -300,6 +306,8 @@ resource "pbs_verify_job" "test_verify" {
 
 // TestPruneJobWithFilters tests prune job with backup filters
 func TestPruneJobWithFilters(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/jobs/prune_job.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -336,6 +344,8 @@ resource "pbs_prune_job" "test_filter" {
 
 // TestSyncJobWithGroupFilter tests sync job with group filters
 func TestSyncJobWithGroupFilter(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/jobs/sync_job.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
