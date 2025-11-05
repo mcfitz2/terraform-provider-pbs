@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -140,6 +141,9 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description:         "Filesystem path to the datastore data (required for directory datastores and S3 cache).",
 				MarkdownDescription: "Filesystem path to the datastore data. Required for directory datastores and used as the local cache directory for S3 datastores.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"removable": schema.BoolAttribute{
 				Description:         "Whether the datastore is backed by a removable device.",
@@ -147,11 +151,17 @@ func (r *datastoreResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
 			},
 			"backing_device": schema.StringAttribute{
 				Description:         "UUID of the filesystem partition for a removable datastore.",
 				MarkdownDescription: "UUID of the filesystem partition for a removable datastore (e.g., `01234567-89ab-cdef-0123-456789abcdef`).",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(
 						regexp.MustCompile(`^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$`),
@@ -714,8 +724,8 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Convert plan to datastore struct
-	datastore, err := r.planToDatastore(&plan, &state)
+	// Convert plan to datastore struct, excluding immutable backend fields
+	datastore, err := r.planToDatastoreForUpdate(&plan, &state)
 	if err != nil {
 		resp.Diagnostics.AddError("Configuration Error", err.Error())
 		return
@@ -1156,6 +1166,219 @@ func boolValueOrNull(ptr *bool) types.Bool {
 		return types.BoolNull()
 	}
 	return types.BoolValue(*ptr)
+}
+
+// planToDatastoreForUpdate converts a Terraform plan to a datastore struct for updates,
+// excluding immutable backend fields that PBS API rejects in update requests.
+// The PBS API does not allow changing backend configuration (path, s3_client, s3_bucket, backing_device, removable)
+// after creation. These fields are marked with RequiresReplace in the schema, but we also need to
+// ensure they're never sent in update API calls.
+func (r *datastoreResource) planToDatastoreForUpdate(plan *datastoreResourceModel, state *datastoreResourceModel) (*datastores.Datastore, error) {
+	ds := &datastores.Datastore{
+		Name: plan.Name.ValueString(),
+	}
+
+	// UPDATABLE fields only - do NOT include:
+	// - path (backend config - immutable)
+	// - s3_client (backend config - immutable)
+	// - s3_bucket (backend config - immutable)
+	// - backing_device (backend config - immutable)
+	// - removable (backend config - immutable)
+	// - backend (derived from above - immutable)
+
+	// Comment is updatable
+	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
+		ds.Comment = plan.Comment.ValueString()
+	}
+	
+	// Disabled is updatable
+	if ptr := optionalBoolPointer(plan.Disabled); ptr != nil {
+		ds.Disabled = ptr
+		if ds.Disabled != nil && !*ds.Disabled {
+			ds.Disabled = nil
+		}
+	}
+	
+	// GC schedule is updatable
+	if !plan.GCSchedule.IsNull() && !plan.GCSchedule.IsUnknown() {
+		ds.GCSchedule = plan.GCSchedule.ValueString()
+	}
+	
+	// Prune settings are updatable
+	if ptr := optionalInt64Pointer(plan.KeepLast); ptr != nil {
+		ds.KeepLast = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepHourly); ptr != nil {
+		ds.KeepHourly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepDaily); ptr != nil {
+		ds.KeepDaily = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepWeekly); ptr != nil {
+		ds.KeepWeekly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepMonthly); ptr != nil {
+		ds.KeepMonthly = ptr
+	}
+	if ptr := optionalInt64Pointer(plan.KeepYearly); ptr != nil {
+		ds.KeepYearly = ptr
+	}
+
+	// Advanced options & toggles are updatable
+	if !plan.NotifyUser.IsNull() && !plan.NotifyUser.IsUnknown() {
+		ds.NotifyUser = plan.NotifyUser.ValueString()
+	}
+	if !plan.NotifyLevel.IsNull() && !plan.NotifyLevel.IsUnknown() {
+		ds.NotifyLevel = plan.NotifyLevel.ValueString()
+	}
+	if !plan.NotificationMode.IsNull() && !plan.NotificationMode.IsUnknown() {
+		ds.NotificationMode = plan.NotificationMode.ValueString()
+	}
+	if ptr := optionalBoolPointer(plan.VerifyNew); ptr != nil {
+		ds.VerifyNew = ptr
+	}
+	if ptr := optionalBoolPointer(plan.ReuseDatastore); ptr != nil {
+		ds.ReuseDatastore = ptr
+	}
+	if ptr := optionalBoolPointer(plan.OverwriteInUse); ptr != nil {
+		ds.OverwriteInUse = ptr
+	}
+
+	// Notify configuration is updatable
+	notifyBlockDefined := plan.Notify != nil
+	notifyHasValues := false
+	if plan.Notify != nil {
+		notify := &datastores.DatastoreNotify{}
+		if !plan.Notify.GC.IsNull() && !plan.Notify.GC.IsUnknown() {
+			notify.GC = strings.ToLower(plan.Notify.GC.ValueString())
+			notifyHasValues = notifyHasValues || notify.GC != ""
+		}
+		if !plan.Notify.Prune.IsNull() && !plan.Notify.Prune.IsUnknown() {
+			notify.Prune = strings.ToLower(plan.Notify.Prune.ValueString())
+			notifyHasValues = notifyHasValues || notify.Prune != ""
+		}
+		if !plan.Notify.Sync.IsNull() && !plan.Notify.Sync.IsUnknown() {
+			notify.Sync = strings.ToLower(plan.Notify.Sync.ValueString())
+			notifyHasValues = notifyHasValues || notify.Sync != ""
+		}
+		if !plan.Notify.Verify.IsNull() && !plan.Notify.Verify.IsUnknown() {
+			notify.Verify = strings.ToLower(plan.Notify.Verify.ValueString())
+			notifyHasValues = notifyHasValues || notify.Verify != ""
+		}
+		if notifyHasValues {
+			ds.Notify = notify
+		}
+	}
+
+	// Maintenance mode is updatable
+	if plan.MaintenanceMode != nil {
+		mmType := ""
+		if !plan.MaintenanceMode.Type.IsNull() && !plan.MaintenanceMode.Type.IsUnknown() {
+			mmType = strings.ToLower(plan.MaintenanceMode.Type.ValueString())
+		}
+		mm := &datastores.MaintenanceMode{Type: mmType}
+		if !plan.MaintenanceMode.Message.IsNull() && !plan.MaintenanceMode.Message.IsUnknown() {
+			mm.Message = plan.MaintenanceMode.Message.ValueString()
+		}
+		if mm.Type != "" || mm.Message != "" {
+			ds.MaintenanceMode = mm
+		}
+	}
+
+	// Tuning configuration is updatable
+	tuningBlockDefined := plan.Tuning != nil
+	tuningHasValues := false
+	if plan.Tuning != nil {
+		tuning := &datastores.DatastoreTuning{}
+		if !plan.Tuning.ChunkOrder.IsNull() && !plan.Tuning.ChunkOrder.IsUnknown() {
+			tuning.ChunkOrder = strings.ToLower(plan.Tuning.ChunkOrder.ValueString())
+		}
+		if ptr := optionalInt64Pointer(plan.Tuning.GCAtimeCutoff); ptr != nil {
+			tuning.GCAtimeCutoff = ptr
+		}
+		if ptr := optionalBoolPointer(plan.Tuning.GCAtimeSafetyCheck); ptr != nil {
+			tuning.GCAtimeSafetyCheck = ptr
+		}
+		if ptr := optionalInt64Pointer(plan.Tuning.GCCacheCapacity); ptr != nil {
+			tuning.GCCacheCapacity = ptr
+		}
+		if !plan.Tuning.SyncLevel.IsNull() && !plan.Tuning.SyncLevel.IsUnknown() {
+			tuning.SyncLevel = strings.ToLower(plan.Tuning.SyncLevel.ValueString())
+		}
+		if !isEmptyTuning(tuning) {
+			ds.Tuning = tuning
+			tuningHasValues = true
+		}
+	}
+
+	// Legacy tune_level is updatable
+	if !plan.TuneLevel.IsNull() && !plan.TuneLevel.IsUnknown() {
+		syncLevel, err := tuneLevelToSyncLevel(int(plan.TuneLevel.ValueInt64()))
+		if err != nil {
+			return nil, err
+		}
+		if ds.Tuning == nil {
+			ds.Tuning = &datastores.DatastoreTuning{}
+		}
+		ds.Tuning.SyncLevel = syncLevel
+		tuningHasValues = true
+	}
+
+	// Fingerprint is updatable
+	if !plan.Fingerprint.IsNull() && !plan.Fingerprint.IsUnknown() {
+		ds.Fingerprint = plan.Fingerprint.ValueString()
+	}
+
+	// Digest is required for optimistic locking
+	if !plan.Digest.IsNull() && !plan.Digest.IsUnknown() {
+		ds.Digest = plan.Digest.ValueString()
+	}
+
+	// Handle field deletions (when fields are removed from plan)
+	if state != nil {
+		var deletes []string
+		addDelete := func(key string) {
+			for _, existing := range deletes {
+				if existing == key {
+					return
+				}
+			}
+			deletes = append(deletes, key)
+		}
+
+		if shouldDeleteStringAttr(plan.NotifyUser, state.NotifyUser) {
+			addDelete("notify-user")
+		}
+		if shouldDeleteStringAttr(plan.NotifyLevel, state.NotifyLevel) {
+			addDelete("notify-level")
+		}
+		if shouldDeleteStringAttr(plan.NotificationMode, state.NotificationMode) {
+			addDelete("notification-mode")
+		}
+		if (plan.Notify == nil && state.Notify != nil) || (notifyBlockDefined && !notifyHasValues && state.Notify != nil) {
+			addDelete("notify")
+		}
+		if plan.MaintenanceMode == nil && state.MaintenanceMode != nil {
+			addDelete("maintenance-mode")
+		}
+		if ((plan.Tuning == nil && plan.TuneLevel.IsNull()) || (tuningBlockDefined && !tuningHasValues && plan.TuneLevel.IsNull())) && state.Tuning != nil {
+			addDelete("tuning")
+		}
+		if plan.VerifyNew.IsNull() && hasBoolValue(state.VerifyNew) {
+			addDelete("verify-new")
+		}
+		if plan.ReuseDatastore.IsNull() && hasBoolValue(state.ReuseDatastore) {
+			addDelete("reuse-datastore")
+		}
+		if plan.OverwriteInUse.IsNull() && hasBoolValue(state.OverwriteInUse) {
+			addDelete("overwrite-in-use")
+		}
+		if len(deletes) > 0 {
+			ds.Delete = deletes
+		}
+	}
+
+	return ds, nil
 }
 
 // datastoreToState converts a datastore struct to Terraform state

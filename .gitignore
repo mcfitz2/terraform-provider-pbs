@@ -1,6 +1,10 @@
 terraform-provider-pbs
 test.test
 
+# Terraform directories
+.terraform/
+.terraform.lock.hcl
+
 # Environment files with credentials
 .env
 *.env
