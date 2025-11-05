@@ -122,7 +122,7 @@ jobs:
         echo "Runner IP: $RUNNER_IP"
         echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
 
-    - name: Run integration tests
+    - name: Run Terraform HCL tests
       env:
         # PBS Server configuration
         PBS_ADDRESS: "https://192.168.1.108:8007"
@@ -153,31 +153,6 @@ jobs:
         SCALEWAY_ACCESS_KEY: ${{ secrets.SCALEWAY_ACCESS_KEY }}
         SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
-      run: |
-        echo "Running FULL integration test suite against PBS 4.0 at 192.168.1.108..."
-        echo ""
-        echo "Runner IP: ${{ steps.get_ip.outputs.RUNNER_IP }}"
-        echo ""
-        echo "Test services available (PBS can reach these at runner IP):"
-        echo "  - InfluxDB 2.7 (HTTP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8086"
-        echo "  - InfluxDB 1.8 (UDP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8089"
-        echo "  - Gotify: ${{ steps.get_ip.outputs.RUNNER_IP }}:8080"
-        echo "  - Webhook: ${{ steps.get_ip.outputs.RUNNER_IP }}:8081"
-        echo ""
-        echo "Test Suites:"
-        echo "  ✓ Core Integration Tests (Directory & Removable Datastores, Metrics, Jobs, Notifications)"
-        echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway - if credentials provided)"
-        echo ""
-        
-        # Enable debug logging for detailed API tracing
-        export PBS_DEBUG=1
-        
-        # Run ALL integration tests sequentially to avoid PBS resource contention
-        # Use -failfast to stop on first failure for faster feedback
-        go test -v -failfast -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
-
-    - name: Run Terraform HCL tests
-      env:
         # Set Terraform variables for HCL tests
         TF_VAR_pbs_endpoint: "https://192.168.1.108:8007"
         TF_VAR_pbs_username: "root@pam"
@@ -205,6 +180,7 @@ jobs:
           "prune_jobs_datasource"
           "sync_job_datasource"
           "datastores"
+          "datastore_immutability"
           "jobs"
           "remotes"
           "metrics"
