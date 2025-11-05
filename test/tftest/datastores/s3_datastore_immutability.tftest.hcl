@@ -146,5 +146,3 @@ run "plan_immutable_field_change" {
     error_message = "Variable should be set to new bucket"
   }
 }
-
-
