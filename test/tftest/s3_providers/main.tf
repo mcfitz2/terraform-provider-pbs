@@ -156,7 +156,9 @@ resource "pbs_datastore" "test" {
   s3_bucket = aws_s3_bucket.test.bucket
   comment   = "Test S3 datastore for ${var.s3_provider_name}"
   
-  depends_on = [pbs_s3_endpoint.test]
+  # Note: Implicit dependency via pbs_s3_endpoint.test.id reference
+  # Terraform should create endpoint first, then datastore
+  # and destroy in reverse order (datastore first, then endpoint)
 }
 
 # Outputs
