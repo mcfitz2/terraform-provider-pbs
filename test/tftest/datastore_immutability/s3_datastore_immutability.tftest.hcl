@@ -13,7 +13,7 @@ run "setup" {
   
   variables {
     datastore_name = "s3-immut-${var.test_id}"
-    datastore_path = "s3-immut-${var.test_id}"
+    datastore_path = "/s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
     s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
@@ -25,7 +25,7 @@ run "create_s3_datastore" {
   
   variables {
     datastore_name = "s3-immut-${var.test_id}"
-    datastore_path = "s3-immut-${var.test_id}"
+    datastore_path = "/s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
     s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
@@ -37,7 +37,7 @@ run "create_s3_datastore" {
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.path == "s3-immut-${var.test_id}"
+    condition     = pbs_datastore.s3_test.path == "/s3-immut-${var.test_id}"
     error_message = "Datastore path should match input"
   }
   
@@ -64,7 +64,7 @@ run "reapply_without_changes" {
   
   variables {
     datastore_name = "s3-immut-${var.test_id}"
-    datastore_path = "s3-immut-${var.test_id}"
+    datastore_path = "/s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
     s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
@@ -88,7 +88,7 @@ run "update_mutable_field" {
   
   variables {
     datastore_name = "s3-immut-${var.test_id}"
-    datastore_path = "s3-immut-${var.test_id}"
+    datastore_path = "/s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
     s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Updated comment - this should not recreate"
@@ -106,7 +106,7 @@ run "update_mutable_field" {
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.path == "s3-immut-${var.test_id}"
+    condition     = pbs_datastore.s3_test.path == "/s3-immut-${var.test_id}"
     error_message = "Path should remain unchanged"
   }
 }
@@ -117,7 +117,7 @@ run "plan_immutable_field_change" {
   
   variables {
     datastore_name = "s3-immut-${var.test_id}"
-    datastore_path = "s3-immut-${var.test_id}"
+    datastore_path = "/s3-immut-${var.test_id}"
     s3_bucket      = "different-backup-bucket"  # Changed immutable field
     s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Updated comment - this should not recreate"
