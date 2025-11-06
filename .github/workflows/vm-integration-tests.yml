@@ -272,7 +272,8 @@ jobs:
           "remotes"
           "metrics_influxdb_http"
           "metrics_influxdb_udp"
-          "notifications"
+          "notifications_endpoints"
+          "notifications_smtp"
           "datasources"
         )
         
