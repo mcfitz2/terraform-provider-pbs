@@ -22,28 +22,26 @@ variable "pbs_insecure" {
 
 # Create an S3 endpoint
 resource "pbs_s3_endpoint" "test" {
-  name       = "tftest-s3-ds"
-  provider   = "aws"
+  id         = "tftest-s3-ds"
   endpoint   = "https://s3.amazonaws.com"
   region     = "us-east-1"
   access_key = "test-access-key"
   secret_key = "test-secret-key"
-  comment    = "Test S3 endpoint for data source"
 }
 
 # Read it via data source
 data "pbs_s3_endpoint" "test" {
-  name = pbs_s3_endpoint.test.name
+  id = pbs_s3_endpoint.test.id
 }
 
-output "resource_name" {
-  value = pbs_s3_endpoint.test.name
+output "resource_id" {
+  value = pbs_s3_endpoint.test.id
 }
 
-output "datasource_name" {
-  value = data.pbs_s3_endpoint.test.name
+output "datasource_id" {
+  value = data.pbs_s3_endpoint.test.id
 }
 
-output "datasource_provider" {
-  value = data.pbs_s3_endpoint.test.provider
+output "datasource_endpoint" {
+  value = data.pbs_s3_endpoint.test.endpoint
 }
