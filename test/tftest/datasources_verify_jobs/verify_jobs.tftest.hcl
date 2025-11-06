@@ -1,7 +1,5 @@
 run "list_verify_jobs" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
   }
 
   assert {

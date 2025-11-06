@@ -1,7 +1,5 @@
 run "read_datastore_datasource" {
   variables {
-    pbs_endpoint    = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure    = true
     datastore_name  = "tftest-ds-datasource"
   }
 
