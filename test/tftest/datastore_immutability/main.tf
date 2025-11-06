@@ -63,7 +63,7 @@ variable "comment" {
 # Create S3 endpoint first
 resource "pbs_s3_endpoint" "test" {
   id         = var.s3_endpoint_id
-  endpoint   = "https://s3.amazonaws.com"
+  endpoint   = "s3.amazonaws.com"
   region     = "us-east-1"
   access_key = "test-access-key"
   secret_key = "test-secret-key"
