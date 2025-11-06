@@ -10,7 +10,7 @@
 variables {
   s3_provider_name = "AWS"
   s3_endpoint      = "s3.${var.s3_region}.amazonaws.com"
-  s3_region        = "us-west-2"
+  s3_region        = "us-east-1"
   s3_bucket_name   = "pbs-test-aws-${var.test_id}"
   s3_endpoint_id   = "pbs-aws-${var.test_id}"
   datastore_name   = "aws-ds-${var.test_id}"
