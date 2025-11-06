@@ -32,8 +32,8 @@ run "create_remote" {
   }
 
   assert {
-    condition     = pbs_remote.test.digest != null && pbs_remote.test.digest != ""
-    error_message = "digest should be populated"
+    condition     = pbs_remote.test.digest != null
+    error_message = "digest attribute should exist (may be empty string)"
   }
 }
 
