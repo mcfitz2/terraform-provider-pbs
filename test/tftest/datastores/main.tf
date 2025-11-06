@@ -25,6 +25,12 @@ variable "pbs_password" {
   sensitive   = true
 }
 
+variable "test_id" {
+  type        = string
+  description = "Unique test run identifier to avoid name conflicts"
+  default     = "local"
+}
+
 variable "test_name" {
   type        = string
   description = "Unique test identifier"

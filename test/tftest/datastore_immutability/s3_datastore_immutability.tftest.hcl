@@ -12,10 +12,10 @@ run "setup" {
   command = plan
   
   variables {
-    datastore_name = "s3-test-immut"
-    datastore_path = "s3-test-immut"
+    datastore_name = "s3-immut-${var.test_id}"
+    datastore_path = "s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
-    s3_endpoint_id = "test-s3-immut"
+    s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
   }
 }
@@ -24,25 +24,25 @@ run "create_s3_datastore" {
   command = apply
   
   variables {
-    datastore_name = "s3-test-immut"
-    datastore_path = "s3-test-immut"
+    datastore_name = "s3-immut-${var.test_id}"
+    datastore_path = "s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
-    s3_endpoint_id = "test-s3-immut"
+    s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.name == "s3-test-immut"
+    condition     = pbs_datastore.s3_test.name == "s3-immut-${var.test_id}"
     error_message = "Datastore name should match input"
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.path == "s3-test-immut"
+    condition     = pbs_datastore.s3_test.path == "s3-immut-${var.test_id}"
     error_message = "Datastore path should match input"
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.s3_client == "test-s3-immut"
+    condition     = pbs_datastore.s3_test.s3_client == "s3ep-${var.test_id}"
     error_message = "S3 client should match endpoint ID"
   }
   
@@ -63,16 +63,16 @@ run "reapply_without_changes" {
   command = apply
   
   variables {
-    datastore_name = "s3-test-immut"
-    datastore_path = "s3-test-immut"
+    datastore_name = "s3-immut-${var.test_id}"
+    datastore_path = "s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
-    s3_endpoint_id = "test-s3-immut"
+    s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Initial comment"
   }
   
   # Should succeed without errors (no changes)
   assert {
-    condition     = pbs_datastore.s3_test.name == "s3-test-immut"
+    condition     = pbs_datastore.s3_test.name == "s3-immut-${var.test_id}"
     error_message = "Datastore should remain unchanged"
   }
   
@@ -87,10 +87,10 @@ run "update_mutable_field" {
   command = apply
   
   variables {
-    datastore_name = "s3-test-immut"
-    datastore_path = "s3-test-immut"
+    datastore_name = "s3-immut-${var.test_id}"
+    datastore_path = "s3-immut-${var.test_id}"
     s3_bucket      = "test-backup-bucket"
-    s3_endpoint_id = "test-s3-immut"
+    s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Updated comment - this should not recreate"
   }
   
@@ -106,7 +106,7 @@ run "update_mutable_field" {
   }
   
   assert {
-    condition     = pbs_datastore.s3_test.path == "s3-test-immut"
+    condition     = pbs_datastore.s3_test.path == "s3-immut-${var.test_id}"
     error_message = "Path should remain unchanged"
   }
 }
@@ -116,10 +116,10 @@ run "plan_immutable_field_change" {
   command = plan
   
   variables {
-    datastore_name = "s3-test-immut"
-    datastore_path = "s3-test-immut"
+    datastore_name = "s3-immut-${var.test_id}"
+    datastore_path = "s3-immut-${var.test_id}"
     s3_bucket      = "different-backup-bucket"  # Changed immutable field
-    s3_endpoint_id = "test-s3-immut"
+    s3_endpoint_id = "s3ep-${var.test_id}"
     comment        = "Updated comment - this should not recreate"
   }
   

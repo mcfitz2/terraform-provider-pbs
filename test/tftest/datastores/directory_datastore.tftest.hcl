@@ -7,7 +7,7 @@ provider "pbs" {
 
 run "create_directory_datastore" {
   variables {
-    test_name   = "tftest-dir-datastore"
+    test_name   = "tftest-dir-${var.test_id}"
     comment     = "Test directory datastore"
     gc_schedule = "daily"
   }
@@ -41,7 +41,7 @@ run "create_directory_datastore" {
 
 run "update_directory_datastore" {
   variables {
-    test_name   = "tftest-dir-datastore"
+    test_name   = "tftest-dir-${var.test_id}"
     comment     = "Updated test directory datastore"
     gc_schedule = "weekly"
   }

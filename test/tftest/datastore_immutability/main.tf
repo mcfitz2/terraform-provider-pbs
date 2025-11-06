@@ -25,6 +25,12 @@ variable "pbs_password" {
   sensitive   = true
 }
 
+variable "test_id" {
+  type        = string
+  description = "Unique test run identifier to avoid name conflicts"
+  default     = "local"
+}
+
 provider "pbs" {
   endpoint = var.pbs_endpoint
   username = var.pbs_username
