@@ -138,7 +138,72 @@ jobs:
         RUNNER_IP=$(hostname -I | awk '{print $1}')
         echo "Runner IP: $RUNNER_IP"
         echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
-
+    - name: Trigger PBS cleanup workflow
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          console.log('Triggering cleanup workflow in mcfitz2/lab2...');
+          
+          const response = await github.rest.actions.createWorkflowDispatch({
+            owner: 'mcfitz2',
+            repo: 'lab2',
+            workflow_id: 'pbs-testing-cleanup-datastore.yml',
+            ref: 'main'
+          });
+          
+          console.log('Cleanup workflow triggered successfully');
+          console.log('Response status:', response.status);
+          
+          // Wait a few seconds for the workflow to start
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Get the latest run
+          const runs = await github.rest.actions.listWorkflowRuns({
+            owner: 'mcfitz2',
+            repo: 'lab2',
+            workflow_id: 'pbs-testing-cleanup-datastore.yml',
+            per_page: 1
+          });
+          
+          if (runs.data.workflow_runs.length > 0) {
+            const runId = runs.data.workflow_runs[0].id;
+            console.log(`Monitoring cleanup workflow run: ${runId}`);
+            console.log(`URL: https://github.com/mcfitz2/lab2/actions/runs/${runId}`);
+            
+            // Poll for completion
+            let completed = false;
+            let attempts = 0;
+            const maxAttempts = 60; // 5 minutes (5 seconds per attempt)
+            
+            while (!completed && attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              attempts++;
+              
+              const run = await github.rest.actions.getWorkflowRun({
+                owner: 'mcfitz2',
+                repo: 'lab2',
+                run_id: runId
+              });
+              
+              console.log(`Attempt ${attempts}: Status = ${run.data.status}, Conclusion = ${run.data.conclusion}`);
+              
+              if (run.data.status === 'completed') {
+                completed = true;
+                if (run.data.conclusion === 'success') {
+                  console.log('✅ Cleanup workflow completed successfully');
+                } else {
+                  console.log(`⚠️  Cleanup workflow completed with conclusion: ${run.data.conclusion}`);
+                }
+              }
+            }
+            
+            if (!completed) {
+              console.log('⚠️  Cleanup workflow did not complete within timeout period');
+            }
+          } else {
+            console.log('⚠️  Could not find the triggered workflow run');
+          }
     - name: Run Terraform HCL tests
       env:
         # PBS Server configuration
@@ -221,75 +286,60 @@ jobs:
           fi
         done
         
+        # Run S3 provider tests if credentials are available
+        echo ""
+        echo "Checking S3 provider credentials..."
+        
+        S3_TESTS_RUN=false
+        
+        if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+          echo "→ Testing s3_providers (AWS)..."
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$AWS_ACCESS_KEY_ID" \
+           TF_VAR_s3_secret_key="$AWS_SECRET_ACCESS_KEY" \
+           TF_VAR_s3_region="${AWS_REGION:-us-west-2}" \
+           terraform test -filter=aws.tftest.hcl) || {
+            echo "❌ AWS S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ -n "$B2_ACCESS_KEY_ID" ] && [ -n "$B2_SECRET_ACCESS_KEY" ]; then
+          echo "→ Testing s3_providers (Backblaze B2)..."
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$B2_ACCESS_KEY_ID" \
+           TF_VAR_s3_secret_key="$B2_SECRET_ACCESS_KEY" \
+           TF_VAR_s3_region="${B2_REGION:-us-west-004}" \
+           terraform test -filter=backblaze.tftest.hcl) || {
+            echo "❌ Backblaze B2 S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ -n "$SCALEWAY_ACCESS_KEY" ] && [ -n "$SCALEWAY_SECRET_KEY" ]; then
+          echo "→ Testing s3_providers (Scaleway)..."
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$SCALEWAY_ACCESS_KEY" \
+           TF_VAR_s3_secret_key="$SCALEWAY_SECRET_KEY" \
+           TF_VAR_s3_region="${SCALEWAY_REGION:-fr-par}" \
+           terraform test -filter=scaleway.tftest.hcl) || {
+            echo "❌ Scaleway S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ "$S3_TESTS_RUN" = false ]; then
+          echo "⚠️  No S3 provider credentials found - S3 tests skipped"
+          echo "   Set AWS_ACCESS_KEY_ID, B2_ACCESS_KEY_ID, or SCALEWAY_ACCESS_KEY to run S3 tests"
+        fi
+        
         echo ""
         echo "✅ All HCL tests passed!"
 
-    - name: Trigger PBS cleanup workflow
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          console.log('Triggering cleanup workflow in mcfitz2/lab2...');
-          
-          const response = await github.rest.actions.createWorkflowDispatch({
-            owner: 'mcfitz2',
-            repo: 'lab2',
-            workflow_id: 'pbs-testing-cleanup-datastore.yml',
-            ref: 'main'
-          });
-          
-          console.log('Cleanup workflow triggered successfully');
-          console.log('Response status:', response.status);
-          
-          // Wait a few seconds for the workflow to start
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Get the latest run
-          const runs = await github.rest.actions.listWorkflowRuns({
-            owner: 'mcfitz2',
-            repo: 'lab2',
-            workflow_id: 'pbs-testing-cleanup-datastore.yml',
-            per_page: 1
-          });
-          
-          if (runs.data.workflow_runs.length > 0) {
-            const runId = runs.data.workflow_runs[0].id;
-            console.log(`Monitoring cleanup workflow run: ${runId}`);
-            console.log(`URL: https://github.com/mcfitz2/lab2/actions/runs/${runId}`);
-            
-            // Poll for completion
-            let completed = false;
-            let attempts = 0;
-            const maxAttempts = 60; // 5 minutes (5 seconds per attempt)
-            
-            while (!completed && attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              attempts++;
-              
-              const run = await github.rest.actions.getWorkflowRun({
-                owner: 'mcfitz2',
-                repo: 'lab2',
-                run_id: runId
-              });
-              
-              console.log(`Attempt ${attempts}: Status = ${run.data.status}, Conclusion = ${run.data.conclusion}`);
-              
-              if (run.data.status === 'completed') {
-                completed = true;
-                if (run.data.conclusion === 'success') {
-                  console.log('✅ Cleanup workflow completed successfully');
-                } else {
-                  console.log(`⚠️  Cleanup workflow completed with conclusion: ${run.data.conclusion}`);
-                }
-              }
-            }
-            
-            if (!completed) {
-              console.log('⚠️  Cleanup workflow did not complete within timeout period');
-            }
-          } else {
-            console.log('⚠️  Could not find the triggered workflow run');
-          }
+    
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4

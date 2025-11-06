@@ -38,11 +38,6 @@ provider "pbs" {
   insecure = true
 }
 
-variable "s3_endpoint_id" {
-  type    = string
-  default = "test-s3-immut"
-}
-
 variable "datastore_name" {
   type = string
 }
@@ -51,55 +46,36 @@ variable "datastore_path" {
   type = string
 }
 
-variable "s3_bucket" {
-  type = string
-}
-
 variable "comment" {
   type    = string
-  default = "Test S3 datastore"
+  default = "Test directory datastore"
 }
 
-# Create S3 endpoint first
-resource "pbs_s3_endpoint" "test" {
-  id         = var.s3_endpoint_id
-  endpoint   = "s3.amazonaws.com"
-  region     = "us-east-1"
-  access_key = "test-access-key"
-  secret_key = "test-secret-key"
+variable "gc_schedule" {
+  type    = string
+  default = null
 }
 
-# Create S3-backed datastore
-resource "pbs_datastore" "s3_test" {
-  name      = var.datastore_name
-  path      = var.datastore_path
-  s3_client = pbs_s3_endpoint.test.id
-  s3_bucket = var.s3_bucket
-  comment   = var.comment
-  
-  depends_on = [pbs_s3_endpoint.test]
+# Create directory-backed datastore
+resource "pbs_datastore" "dir_test" {
+  name        = var.datastore_name
+  path        = var.datastore_path
+  comment     = var.comment
+  gc_schedule = var.gc_schedule
 }
 
 output "datastore_name" {
-  value = pbs_datastore.s3_test.name
+  value = pbs_datastore.dir_test.name
 }
 
 output "datastore_path" {
-  value = pbs_datastore.s3_test.path
-}
-
-output "datastore_s3_client" {
-  value = pbs_datastore.s3_test.s3_client
-}
-
-output "datastore_s3_bucket" {
-  value = pbs_datastore.s3_test.s3_bucket
+  value = pbs_datastore.dir_test.path
 }
 
 output "datastore_comment" {
-  value = pbs_datastore.s3_test.comment
+  value = pbs_datastore.dir_test.comment
 }
 
-output "s3_endpoint_id" {
-  value = pbs_s3_endpoint.test.id
+output "datastore_gc_schedule" {
+  value = pbs_datastore.dir_test.gc_schedule
 }
