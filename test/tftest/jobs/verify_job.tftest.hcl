@@ -1,7 +1,7 @@
 run "create_verify_job" {
   variables {
     job_type        = "verify"
-    job_id          = "tftest-verify-job-${var.test_id}"
+    job_id          = "verify-${var.test_id}"
     schedule        = "weekly"
     namespace       = "prod"
     ignore_verified = true
@@ -54,7 +54,7 @@ run "create_verify_job" {
 run "update_verify_job" {
   variables {
     job_type        = "verify"
-    job_id          = "tftest-verify-job-${var.test_id}"
+    job_id          = "verify-${var.test_id}"
     schedule        = "monthly"
     namespace       = "prod"
     ignore_verified = false

@@ -1,7 +1,7 @@
 run "create_sync_job" {
   variables {
     job_type         = "sync"
-    job_id           = "tftest-sync-job-${var.test_id}"
+    job_id           = "sync-${var.test_id}"
     remote           = "remote1"
     remote_store     = "backup"
     remote_namespace = "prod"
@@ -85,7 +85,7 @@ run "create_sync_job" {
 run "update_sync_job" {
   variables {
     job_type         = "sync"
-    job_id           = "tftest-sync-job-${var.test_id}"
+    job_id           = "sync-${var.test_id}"
     remote           = "remote1"
     remote_store     = "backup"
     remote_namespace = "prod"
@@ -156,7 +156,7 @@ run "update_sync_job" {
 run "sync_job_with_group_filter" {
   variables {
     job_type     = "sync"
-    job_id       = "tftest-sync-filter-${var.test_id}"
+    job_id       = "sync-f-${var.test_id}"
     remote       = "remote1"
     remote_store = "backup"
     schedule     = "daily"
