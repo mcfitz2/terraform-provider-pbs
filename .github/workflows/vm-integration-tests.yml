@@ -148,7 +148,7 @@ jobs:
           const response = await github.rest.actions.createWorkflowDispatch({
             owner: 'mcfitz2',
             repo: 'lab2',
-            workflow_id: 'pbs-testing-cleanup-datastore.yml',
+            workflow_id: 204359526,  // PBS Testing - Cleanup Datastore workflow ID
             ref: 'main'
           });
           
@@ -162,7 +162,7 @@ jobs:
           const runs = await github.rest.actions.listWorkflowRuns({
             owner: 'mcfitz2',
             repo: 'lab2',
-            workflow_id: 'pbs-testing-cleanup-datastore.yml',
+            workflow_id: 204359526,  // PBS Testing - Cleanup Datastore workflow ID
             per_page: 1
           });
           
