@@ -141,7 +141,7 @@ jobs:
     - name: Trigger PBS cleanup workflow
       uses: actions/github-script@v7
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GH_PAT }}
         script: |
           console.log('Triggering cleanup workflow in mcfitz2/lab2...');
           
