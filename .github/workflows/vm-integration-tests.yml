@@ -240,7 +240,8 @@ jobs:
         TF_VAR_pbs_username: "root@pam"
         TF_VAR_pbs_password: "pbspbs123"
         # Unique test run identifier to avoid name conflicts
-        TF_VAR_test_id: "run-${{ github.run_number }}-${{ github.run_attempt }}"
+        # Using timestamp to ensure absolute uniqueness even across retries
+        TF_VAR_test_id: "run-${{ github.run_number }}-${{ github.run_attempt }}-$(date +%s)"
         # Service endpoints for metrics/notification tests
         TF_VAR_influxdb_host: ${{ steps.get_ip.outputs.RUNNER_IP }}
         TF_VAR_influxdb_port: "8086"
