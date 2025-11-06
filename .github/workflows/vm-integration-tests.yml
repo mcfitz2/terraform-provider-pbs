@@ -270,7 +270,8 @@ jobs:
           "datastore_immutability"
           "jobs"
           "remotes"
-          "metrics"
+          "metrics_influxdb_http"
+          "metrics_influxdb_udp"
           "notifications"
           "datasources"
         )
