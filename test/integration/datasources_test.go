@@ -63,7 +63,7 @@ data "pbs_datastore" "test" {
 // TestDatastoresDataSourceIntegration tests listing all datastores via data source
 func TestDatastoresDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/datastores_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -123,7 +123,7 @@ data "pbs_datastores" "all" {
 // TestPruneJobDataSourceIntegration tests reading a single prune job via data source
 func TestPruneJobDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/prune_job_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -181,7 +181,7 @@ data "pbs_prune_job" "test" {
 // TestPruneJobsDataSourceIntegration tests listing prune jobs via data source
 func TestPruneJobsDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/prune_jobs_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -278,7 +278,7 @@ data "pbs_prune_jobs" "filtered" {
 // TestSyncJobDataSourceIntegration tests reading a single sync job via data source
 func TestSyncJobDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/sync_job_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

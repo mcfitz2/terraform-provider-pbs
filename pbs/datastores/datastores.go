@@ -126,20 +126,20 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 	// Try to get individual datastore details first
 	escapedName := url.PathEscape(name)
 	path := fmt.Sprintf("/config/datastore/%s", escapedName)
-	
+
 	// CRITICAL DEBUG: Log when we attempt to get datastore
 	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: Attempting GET '%s' at %s\n", name, time.Now().Format(time.RFC3339Nano))
-	
+
 	// Log the GET request for debugging
 	if isDebugEnabled() {
 		tflog.Debug(ctx, "GetDatastore: Attempting GET", map[string]interface{}{
-			"path":         path,
+			"path":          path,
 			"original_name": name,
 		})
 	}
-	
+
 	resp, getErr := c.api.Get(ctx, path)
-	
+
 	// CRITICAL DEBUG: Log the result
 	if getErr != nil {
 		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' FAILED at %s: %v\n", name, time.Now().Format(time.RFC3339Nano), getErr)
@@ -152,7 +152,7 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 				"response_size": len(resp.Data),
 			})
 		}
-		
+
 		var ds Datastore
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
@@ -224,7 +224,7 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 			})
 		}
 	}
-	
+
 	for _, ds := range datastores {
 		if ds.Name == name {
 			if isDebugEnabled() {
