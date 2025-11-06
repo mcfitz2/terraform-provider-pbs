@@ -1,8 +1,7 @@
 run "create_prune_job" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    job_id       = "tftest-prune-job"
+    job_type     = "prune"
+    job_id       = "tftest-prune-job-${var.test_id}"
     schedule     = "daily"
     keep_last    = 7
     keep_daily   = 14
@@ -66,9 +65,8 @@ run "create_prune_job" {
 
 run "update_prune_job" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    job_id       = "tftest-prune-job"
+    job_type     = "prune"
+    job_id       = "tftest-prune-job-${var.test_id}"
     schedule     = "weekly"
     keep_last    = 10
     keep_daily   = 21
@@ -122,9 +120,8 @@ run "update_prune_job" {
 
 run "prune_job_with_namespace_filter" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    job_id       = "tftest-prune-filter"
+    job_type     = "prune"
+    job_id       = "tftest-prune-filter-${var.test_id}"
     schedule     = "daily"
     keep_last    = 5
     keep_daily   = 0

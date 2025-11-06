@@ -1,8 +1,7 @@
 run "create_verify_job" {
   variables {
-    pbs_endpoint    = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure    = true
-    job_id          = "tftest-verify-job"
+    job_type        = "verify"
+    job_id          = "tftest-verify-job-${var.test_id}"
     schedule        = "weekly"
     namespace       = "prod"
     ignore_verified = true
@@ -54,9 +53,8 @@ run "create_verify_job" {
 
 run "update_verify_job" {
   variables {
-    pbs_endpoint    = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure    = true
-    job_id          = "tftest-verify-job"
+    job_type        = "verify"
+    job_id          = "tftest-verify-job-${var.test_id}"
     schedule        = "monthly"
     namespace       = "prod"
     ignore_verified = false

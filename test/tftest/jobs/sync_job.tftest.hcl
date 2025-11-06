@@ -1,8 +1,8 @@
 run "create_sync_job" {
   variables {
-    pbs_endpoint     = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure     = true
-    job_id           = "tftest-sync-job"
+    job_type         = "sync"
+    job_id           = "tftest-sync-job-${var.test_id}"
+    remote           = "remote1"
     remote_store     = "backup"
     remote_namespace = "prod"
     namespace        = "mirror"
@@ -84,9 +84,9 @@ run "create_sync_job" {
 
 run "update_sync_job" {
   variables {
-    pbs_endpoint     = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure     = true
-    job_id           = "tftest-sync-job"
+    job_type         = "sync"
+    job_id           = "tftest-sync-job-${var.test_id}"
+    remote           = "remote1"
     remote_store     = "backup"
     remote_namespace = "prod"
     namespace        = "mirror"
@@ -155,9 +155,9 @@ run "update_sync_job" {
 
 run "sync_job_with_group_filter" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    job_id       = "tftest-sync-filter"
+    job_type     = "sync"
+    job_id       = "tftest-sync-filter-${var.test_id}"
+    remote       = "remote1"
     remote_store = "backup"
     schedule     = "daily"
     namespace    = "production"
