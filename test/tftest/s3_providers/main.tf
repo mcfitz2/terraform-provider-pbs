@@ -111,6 +111,7 @@ provider "aws" {
   s3_use_path_style = var.s3_provider_name != "AWS"
 
   skip_credentials_validation = var.s3_provider_name != "AWS"
+  skip_region_validation      = var.s3_provider_name != "AWS"
   skip_requesting_account_id  = var.s3_provider_name != "AWS"
   skip_metadata_api_check     = var.s3_provider_name != "AWS"
 }

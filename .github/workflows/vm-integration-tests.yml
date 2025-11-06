@@ -326,7 +326,7 @@ jobs:
           (cd "test/tftest/s3_providers" && terraform init -input=false && \
            TF_VAR_s3_access_key="$B2_ACCESS_KEY_ID" \
            TF_VAR_s3_secret_key="$B2_SECRET_ACCESS_KEY" \
-           TF_VAR_s3_region="${B2_REGION:-us-west-004}" \
+           TF_VAR_s3_region="${B2_REGION:-us-east-005}" \
            terraform test -filter=backblaze.tftest.hcl) || {
             echo "❌ Backblaze B2 S3 tests failed"
             exit 1
