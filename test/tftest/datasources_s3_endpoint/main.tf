@@ -23,7 +23,7 @@ variable "pbs_insecure" {
 # Create an S3 endpoint
 resource "pbs_s3_endpoint" "test" {
   id         = "tftest-s3-ds"
-  endpoint   = "https://s3.amazonaws.com"
+  endpoint   = "s3.us-east-1.amazonaws.com"
   region     = "us-east-1"
   access_key = "test-access-key"
   secret_key = "test-secret-key"

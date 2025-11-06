@@ -23,7 +23,7 @@ run "read_s3_endpoint_datasource" {
   }
 
   assert {
-    condition     = output.datasource_endpoint == "https://s3.amazonaws.com"
+    condition     = output.datasource_endpoint == "s3.us-east-1.amazonaws.com"
     error_message = "Output endpoint mismatch"
   }
 }
