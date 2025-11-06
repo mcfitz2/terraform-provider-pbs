@@ -12,14 +12,11 @@ run "setup" {
   command = plan
   
   variables {
-    pbs_endpoint      = "https://pbs.example.com:8007"
-    pbs_username      = "root@pam"
-    pbs_password      = "test-password"
-    datastore_name    = "s3-test-immut"
-    datastore_path    = "s3-test-immut"
-    s3_bucket         = "test-backup-bucket"
-    s3_endpoint_id    = "test-s3-immut"
-    comment           = "Initial comment"
+    datastore_name = "s3-test-immut"
+    datastore_path = "s3-test-immut"
+    s3_bucket      = "test-backup-bucket"
+    s3_endpoint_id = "test-s3-immut"
+    comment        = "Initial comment"
   }
 }
 
@@ -27,14 +24,11 @@ run "create_s3_datastore" {
   command = apply
   
   variables {
-    pbs_endpoint      = "https://pbs.example.com:8007"
-    pbs_username      = "root@pam"
-    pbs_password      = "test-password"
-    datastore_name    = "s3-test-immut"
-    datastore_path    = "s3-test-immut"
-    s3_bucket         = "test-backup-bucket"
-    s3_endpoint_id    = "test-s3-immut"
-    comment           = "Initial comment"
+    datastore_name = "s3-test-immut"
+    datastore_path = "s3-test-immut"
+    s3_bucket      = "test-backup-bucket"
+    s3_endpoint_id = "test-s3-immut"
+    comment        = "Initial comment"
   }
   
   assert {
@@ -69,14 +63,11 @@ run "reapply_without_changes" {
   command = apply
   
   variables {
-    pbs_endpoint      = "https://pbs.example.com:8007"
-    pbs_username      = "root@pam"
-    pbs_password      = "test-password"
-    datastore_name    = "s3-test-immut"
-    datastore_path    = "s3-test-immut"
-    s3_bucket         = "test-backup-bucket"
-    s3_endpoint_id    = "test-s3-immut"
-    comment           = "Initial comment"
+    datastore_name = "s3-test-immut"
+    datastore_path = "s3-test-immut"
+    s3_bucket      = "test-backup-bucket"
+    s3_endpoint_id = "test-s3-immut"
+    comment        = "Initial comment"
   }
   
   # Should succeed without errors (no changes)
@@ -96,14 +87,11 @@ run "update_mutable_field" {
   command = apply
   
   variables {
-    pbs_endpoint      = "https://pbs.example.com:8007"
-    pbs_username      = "root@pam"
-    pbs_password      = "test-password"
-    datastore_name    = "s3-test-immut"
-    datastore_path    = "s3-test-immut"
-    s3_bucket         = "test-backup-bucket"
-    s3_endpoint_id    = "test-s3-immut"
-    comment           = "Updated comment - this should not recreate"
+    datastore_name = "s3-test-immut"
+    datastore_path = "s3-test-immut"
+    s3_bucket      = "test-backup-bucket"
+    s3_endpoint_id = "test-s3-immut"
+    comment        = "Updated comment - this should not recreate"
   }
   
   assert {
@@ -128,14 +116,11 @@ run "plan_immutable_field_change" {
   command = plan
   
   variables {
-    pbs_endpoint      = "https://pbs.example.com:8007"
-    pbs_username      = "root@pam"
-    pbs_password      = "test-password"
-    datastore_name    = "s3-test-immut"
-    datastore_path    = "s3-test-immut"
-    s3_bucket         = "different-backup-bucket"  # Changed immutable field
-    s3_endpoint_id    = "test-s3-immut"
-    comment           = "Updated comment - this should not recreate"
+    datastore_name = "s3-test-immut"
+    datastore_path = "s3-test-immut"
+    s3_bucket      = "different-backup-bucket"  # Changed immutable field
+    s3_endpoint_id = "test-s3-immut"
+    comment        = "Updated comment - this should not recreate"
   }
   
   # Plan should show replacement due to s3_bucket change
