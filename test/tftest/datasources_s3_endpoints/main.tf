@@ -22,18 +22,16 @@ variable "pbs_insecure" {
 
 # Create multiple S3 endpoints
 resource "pbs_s3_endpoint" "test1" {
-  name       = "tftest-s3-list-1"
-  provider   = "aws"
-  endpoint   = "https://s3.amazonaws.com"
+  id         = "tftest-s3-list-1"
+  endpoint   = "s3.us-east-1.amazonaws.com"
   region     = "us-east-1"
   access_key = "test-key-1"
   secret_key = "test-secret-1"
 }
 
 resource "pbs_s3_endpoint" "test2" {
-  name       = "tftest-s3-list-2"
-  provider   = "aws"
-  endpoint   = "https://s3.amazonaws.com"
+  id         = "tftest-s3-list-2"
+  endpoint   = "s3.us-west-2.amazonaws.com"
   region     = "us-west-2"
   access_key = "test-key-2"
   secret_key = "test-secret-2"
@@ -51,6 +49,6 @@ output "endpoint_count" {
   value = length(data.pbs_s3_endpoints.all.endpoints)
 }
 
-output "endpoint_names" {
-  value = [for e in data.pbs_s3_endpoints.all.endpoints : e.name]
+output "endpoint_ids" {
+  value = [for e in data.pbs_s3_endpoints.all.endpoints : e.id]
 }

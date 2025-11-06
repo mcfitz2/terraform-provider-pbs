@@ -8,12 +8,12 @@ run "list_s3_endpoints" {
   }
 
   assert {
-    condition     = contains([for e in data.pbs_s3_endpoints.all.endpoints : e.name], "tftest-s3-list-1")
+    condition     = contains([for e in data.pbs_s3_endpoints.all.endpoints : e.id], "tftest-s3-list-1")
     error_message = "Should contain test S3 endpoint 1"
   }
 
   assert {
-    condition     = contains([for e in data.pbs_s3_endpoints.all.endpoints : e.name], "tftest-s3-list-2")
+    condition     = contains([for e in data.pbs_s3_endpoints.all.endpoints : e.id], "tftest-s3-list-2")
     error_message = "Should contain test S3 endpoint 2"
   }
 
