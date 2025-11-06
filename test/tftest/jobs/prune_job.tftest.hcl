@@ -13,52 +13,52 @@ run "create_prune_job" {
   }
 
   assert {
-    condition     = pbs_prune_job.test.id == var.job_id
+    condition     = pbs_prune_job.test[0].id == var.job_id
     error_message = "Job ID mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.store == "datastore1"
+    condition     = pbs_prune_job.test[0].store == "datastore1"
     error_message = "Store mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.schedule == "daily"
+    condition     = pbs_prune_job.test[0].schedule == "daily"
     error_message = "Schedule mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_last == 7
+    condition     = pbs_prune_job.test[0].keep_last == 7
     error_message = "keep_last mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_daily == 14
+    condition     = pbs_prune_job.test[0].keep_daily == 14
     error_message = "keep_daily mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_weekly == 8
+    condition     = pbs_prune_job.test[0].keep_weekly == 8
     error_message = "keep_weekly mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_monthly == 12
+    condition     = pbs_prune_job.test[0].keep_monthly == 12
     error_message = "keep_monthly mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_yearly == 3
+    condition     = pbs_prune_job.test[0].keep_yearly == 3
     error_message = "keep_yearly mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.max_depth == 3
+    condition     = pbs_prune_job.test[0].max_depth == 3
     error_message = "max_depth mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.comment == "Test prune job"
+    condition     = pbs_prune_job.test[0].comment == "Test prune job"
     error_message = "comment mismatch"
   }
 }
@@ -78,42 +78,42 @@ run "update_prune_job" {
   }
 
   assert {
-    condition     = pbs_prune_job.test.schedule == "weekly"
+    condition     = pbs_prune_job.test[0].schedule == "weekly"
     error_message = "Schedule was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_last == 10
+    condition     = pbs_prune_job.test[0].keep_last == 10
     error_message = "keep_last was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_daily == 21
+    condition     = pbs_prune_job.test[0].keep_daily == 21
     error_message = "keep_daily was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_weekly == 12
+    condition     = pbs_prune_job.test[0].keep_weekly == 12
     error_message = "keep_weekly was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_monthly == 18
+    condition     = pbs_prune_job.test[0].keep_monthly == 18
     error_message = "keep_monthly was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.keep_yearly == 5
+    condition     = pbs_prune_job.test[0].keep_yearly == 5
     error_message = "keep_yearly was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.max_depth == 5
+    condition     = pbs_prune_job.test[0].max_depth == 5
     error_message = "max_depth was not updated"
   }
 
   assert {
-    condition     = pbs_prune_job.test.comment == "Updated test prune job"
+    condition     = pbs_prune_job.test[0].comment == "Updated test prune job"
     error_message = "comment was not updated"
   }
 }
@@ -134,12 +134,12 @@ run "prune_job_with_namespace_filter" {
   }
 
   assert {
-    condition     = pbs_prune_job.test.namespace == "vm"
+    condition     = pbs_prune_job.test[0].namespace == "vm"
     error_message = "namespace filter mismatch"
   }
 
   assert {
-    condition     = pbs_prune_job.test.max_depth == 2
+    condition     = pbs_prune_job.test[0].max_depth == 2
     error_message = "max_depth mismatch for filtered job"
   }
 }
