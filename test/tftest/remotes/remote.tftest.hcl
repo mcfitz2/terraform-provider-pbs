@@ -1,8 +1,10 @@
+variables {
+  test_id = "local"  # Can be overridden by TF_VAR_test_id
+}
+
 run "create_remote" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    remote_name  = "tftest-remote"
+    remote_name  = "tftest-remote-${var.test_id}"
     host         = "pbs.example.com"
     auth_id      = "sync@pbs!test-token"
     password     = "test-password-12345"
@@ -37,9 +39,7 @@ run "create_remote" {
 
 run "update_remote" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    remote_name  = "tftest-remote"
+    remote_name  = "tftest-remote-${var.test_id}"
     host         = "backup.example.com"
     port         = 8008
     auth_id      = "sync@pbs!test-token"
@@ -76,9 +76,7 @@ run "update_remote" {
 
 run "clear_optional_fields" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    remote_name  = "tftest-remote"
+    remote_name  = "tftest-remote-${var.test_id}"
     host         = "backup.example.com"
     auth_id      = "sync@pbs!test-token"
     password     = "test-password-12345"
@@ -107,9 +105,7 @@ run "clear_optional_fields" {
 
 run "update_password" {
   variables {
-    pbs_endpoint = "https://${PBS_ADDRESS}:8007"
-    pbs_insecure = true
-    remote_name  = "tftest-pass-remote"
+    remote_name  = "tftest-pass-remote-${var.test_id}"
     host         = "pbs.example.com"
     auth_id      = "admin@pam"
     password     = "new-password-54321"

@@ -22,6 +22,12 @@ variable "pbs_insecure" {
   description = "Skip TLS verification"
 }
 
+variable "test_id" {
+  type        = string
+  description = "Unique test run identifier"
+  default     = "local"
+}
+
 variable "remote_name" {
   type = string
 }
