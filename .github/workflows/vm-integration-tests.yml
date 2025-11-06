@@ -323,10 +323,12 @@ jobs:
         
         if [ -n "$B2_ACCESS_KEY_ID" ] && [ -n "$B2_SECRET_ACCESS_KEY" ]; then
           echo "→ Testing s3_providers (Backblaze B2)..."
+          # For B2: use generic region for AWS provider (bucket creation), actual B2 region for PBS
           (cd "test/tftest/s3_providers" && terraform init -input=false && \
            TF_VAR_s3_access_key="$B2_ACCESS_KEY_ID" \
            TF_VAR_s3_secret_key="$B2_SECRET_ACCESS_KEY" \
-           TF_VAR_s3_region="${B2_REGION:-us-east-005}" \
+           TF_VAR_s3_region="us-east-1" \
+           TF_VAR_pbs_s3_region="${B2_REGION:-us-east-005}" \
            terraform test -filter=backblaze.tftest.hcl) || {
             echo "❌ Backblaze B2 S3 tests failed"
             exit 1
@@ -336,10 +338,12 @@ jobs:
         
         if [ -n "$SCALEWAY_ACCESS_KEY" ] && [ -n "$SCALEWAY_SECRET_KEY" ]; then
           echo "→ Testing s3_providers (Scaleway)..."
+          # For Scaleway: use generic region for AWS provider, actual Scaleway region for PBS
           (cd "test/tftest/s3_providers" && terraform init -input=false && \
            TF_VAR_s3_access_key="$SCALEWAY_ACCESS_KEY" \
            TF_VAR_s3_secret_key="$SCALEWAY_SECRET_KEY" \
-           TF_VAR_s3_region="${SCALEWAY_REGION:-fr-par}" \
+           TF_VAR_s3_region="us-east-1" \
+           TF_VAR_pbs_s3_region="${SCALEWAY_REGION:-fr-par}" \
            terraform test -filter=scaleway.tftest.hcl) || {
             echo "❌ Scaleway S3 tests failed"
             exit 1

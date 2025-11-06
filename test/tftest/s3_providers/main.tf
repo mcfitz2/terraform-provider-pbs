@@ -59,7 +59,13 @@ variable "s3_endpoint" {
 
 variable "s3_region" {
   type        = string
-  description = "S3 region"
+  description = "S3 region (used for AWS provider configuration)"
+}
+
+variable "pbs_s3_region" {
+  type        = string
+  description = "S3 region for PBS endpoint configuration (optional, defaults to s3_region)"
+  default     = ""
 }
 
 variable "s3_access_key" {
@@ -142,7 +148,8 @@ resource "pbs_s3_endpoint" "test" {
   
   id              = var.s3_endpoint_id
   endpoint        = var.s3_endpoint
-  region          = var.s3_region
+  # Use pbs_s3_region if provided, otherwise fall back to s3_region
+  region          = var.pbs_s3_region != "" ? var.pbs_s3_region : var.s3_region
   access_key      = var.s3_access_key
   secret_key      = var.s3_secret_key
   path_style      = true # Required for PBS compatibility
