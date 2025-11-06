@@ -274,7 +274,18 @@ jobs:
           "metrics_influxdb_udp"
           "notifications_endpoints"
           "notifications_smtp"
-          "datasources"
+          "datasources_datastore"
+          "datasources_metrics_server"
+          "datasources_metrics_servers"
+          "datasources_notification_endpoint"
+          "datasources_notification_endpoints"
+          "datasources_notification_matcher"
+          "datasources_notification_matchers"
+          "datasources_s3_endpoint"
+          "datasources_s3_endpoints"
+          "datasources_sync_jobs"
+          "datasources_verify_job"
+          "datasources_verify_jobs"
         )
         
         # Run tests in each directory
