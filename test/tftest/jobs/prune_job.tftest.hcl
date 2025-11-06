@@ -120,17 +120,13 @@ run "update_prune_job" {
 
 run "prune_job_with_namespace_filter" {
   variables {
-    job_type     = "prune"
-    job_id       = "prune-f-${var.test_id}"
-    schedule     = "daily"
-    keep_last    = 5
-    keep_daily   = 0
-    keep_weekly  = 0
-    keep_monthly = 0
-    keep_yearly  = 0
-    max_depth    = 2
-    comment      = "Prune job with filters"
-    namespace    = "vm"
+    job_type   = "prune"
+    job_id     = "prune-f-${var.test_id}"
+    schedule   = "daily"
+    keep_last  = 5
+    max_depth  = 2
+    comment    = "Prune job with filters"
+    namespace  = "vm"
   }
 
   assert {
