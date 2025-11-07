@@ -8,21 +8,19 @@
 # 5. Cleans up all resources (bucket, endpoint, datastore)
 
 variables {
-  s3_provider_name = "AWS"
-  s3_endpoint      = "s3.${var.s3_region}.amazonaws.com"
-  s3_region        = "us-east-1"
-  s3_bucket_name   = "pbs-test-aws-${var.test_id}"
-  s3_endpoint_id   = "pbs-aws-${var.test_id}"
-  datastore_name   = "aws-ds-${var.test_id}"
-  s3_provider_quirks = []
+  s3_endpoint    = "s3.${var.s3_region}.amazonaws.com"
+  s3_region      = "us-east-1"
+  s3_bucket_name = "pbs-test-aws-${var.test_id}"
+  s3_endpoint_id = "pbs-aws-${var.test_id}"
+  datastore_name = "aws-ds-${var.test_id}"
 }
 
 run "setup_aws" {
   command = plan
   
   assert {
-    condition     = var.s3_provider_name == "AWS"
-    error_message = "Provider name should be AWS"
+    condition     = var.s3_region == "us-east-1"
+    error_message = "Region should be us-east-1"
   }
 }
 
@@ -30,7 +28,7 @@ run "create_aws_s3_infrastructure" {
   command = apply
   
   assert {
-    condition     = local.bucket.bucket == "pbs-test-aws-${var.test_id}"
+    condition     = aws_s3_bucket.test.bucket == "pbs-test-aws-${var.test_id}"
     error_message = "S3 bucket name should match expected pattern"
   }
   
@@ -65,7 +63,7 @@ run "create_aws_s3_infrastructure" {
   }
   
   assert {
-    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
+    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
     error_message = "Datastore should reference the S3 bucket"
   }
 }
@@ -89,7 +87,7 @@ run "update_aws_datastore_comment" {
   # Update only happens if we modify the resource, but we're testing that
   # updating mutable fields works without errors
   assert {
-    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
+    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
     error_message = "S3 bucket should remain unchanged after update"
   }
 }
