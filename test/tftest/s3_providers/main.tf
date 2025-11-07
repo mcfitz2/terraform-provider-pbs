@@ -122,31 +122,38 @@ provider "aws" {
   skip_metadata_api_check     = var.s3_provider_name != "AWS"
 }
 
-# Create S3 bucket
+# Create S3 bucket for AWS
 resource "aws_s3_bucket" "test" {
+  count = var.s3_provider_name == "AWS" ? 1 : 0
+  
   bucket        = var.s3_bucket_name
   force_destroy = true # Allow Terraform to delete non-empty bucket
   
-  # Only set tags for AWS - Backblaze and Scaleway don't support PutBucketTagging
-  tags = var.s3_provider_name == "AWS" ? {
+  tags = {
     Name        = "PBS Test Bucket"
     TestID      = var.test_id
     Provider    = var.s3_provider_name
     ManagedBy   = "Terraform"
     Purpose     = "PBS Provider Testing"
-  } : null
+  }
+}
+
+# Create S3 bucket for S3-compatible services (Backblaze, Scaleway)
+# These services don't support many AWS S3 features, so we use lifecycle ignore_changes
+# to prevent the AWS provider from failing when it tries to read unsupported configurations
+resource "aws_s3_bucket" "test_compat" {
+  count = var.s3_provider_name != "AWS" ? 1 : 0
   
-  # For non-AWS S3-compatible providers, we need to use a lifecycle block to handle
-  # the fact that AWS provider v5 tries to read bucket configurations (CORS, versioning,
-  # lifecycle, etc.) that these providers don't support. The AWS provider gracefully
-  # handles NoSuchCORSConfiguration errors, but B2/Scaleway return generic 404s that
-  # cause the resource to fail during the read phase after creation.
+  bucket        = var.s3_bucket_name
+  force_destroy = true # Allow Terraform to delete non-empty bucket
+  
+  # Don't set tags - Backblaze and Scaleway don't support PutBucketTagging
+  
   lifecycle {
-    # Ignore all read-only computed attributes for non-AWS providers
-    # This prevents the provider from failing when it tries to read unsupported features
-    ignore_changes = var.s3_provider_name != "AWS" ? [
-      # These are all read-only attributes that AWS provider v5 tries to populate
-      # by calling various Get* APIs that S3-compatible services don't support
+    # AWS provider v5 tries to read bucket configurations (CORS, versioning, etc.)
+    # after creation, but B2/Scaleway return errors for these unsupported APIs.
+    # Ignore these read-only attributes to prevent read phase failures.
+    ignore_changes = [
       lifecycle_rule,
       cors_rule,
       versioning,
@@ -155,13 +162,19 @@ resource "aws_s3_bucket" "test" {
       object_lock_configuration,
       grant,
       website,
-    ] : []
+    ]
   }
+}
+
+# Local values to simplify resource references
+locals {
+  # Select the appropriate bucket resource based on provider type
+  bucket = var.s3_provider_name == "AWS" ? aws_s3_bucket.test[0] : aws_s3_bucket.test_compat[0]
 }
 
 # Wait for bucket to be available
 resource "time_sleep" "bucket_creation" {
-  depends_on      = [aws_s3_bucket.test]
+  depends_on      = [aws_s3_bucket.test, aws_s3_bucket.test_compat]
   create_duration = "10s"
 }
 
@@ -184,7 +197,7 @@ resource "pbs_datastore" "test" {
   name      = var.datastore_name
   path      = "/datastore/${var.datastore_name}"
   s3_client = pbs_s3_endpoint.test.id
-  s3_bucket = aws_s3_bucket.test.bucket
+  s3_bucket = local.bucket.bucket
   comment   = "Test S3 datastore for ${var.s3_provider_name}"
   
   # Note: Implicit dependency via pbs_s3_endpoint.test.id reference
@@ -194,11 +207,11 @@ resource "pbs_datastore" "test" {
 
 # Outputs
 output "bucket_name" {
-  value = aws_s3_bucket.test.bucket
+  value = local.bucket.bucket
 }
 
 output "bucket_arn" {
-  value = aws_s3_bucket.test.arn
+  value = local.bucket.arn
 }
 
 output "s3_endpoint_id" {
