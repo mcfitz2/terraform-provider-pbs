@@ -8,7 +8,9 @@ terraform {
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      # Use v4 because v5's aws_s3_bucket tries to read CORS/versioning/logging
+      # which fails on S3-compatible services (Backblaze, Scaleway) with 404 errors
+      version = "~> 4.0"
     }
     time = {
       source  = "hashicorp/time"
