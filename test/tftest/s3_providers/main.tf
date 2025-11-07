@@ -127,13 +127,14 @@ resource "aws_s3_bucket" "test" {
   bucket        = var.s3_bucket_name
   force_destroy = true # Allow Terraform to delete non-empty bucket
   
-  tags = {
+  # Only set tags for AWS - Backblaze and Scaleway don't support PutBucketTagging
+  tags = var.s3_provider_name == "AWS" ? {
     Name        = "PBS Test Bucket"
     TestID      = var.test_id
     Provider    = var.s3_provider_name
     ManagedBy   = "Terraform"
     Purpose     = "PBS Provider Testing"
-  }
+  } : null
 }
 
 # Wait for bucket to be available
