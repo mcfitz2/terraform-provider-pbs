@@ -148,23 +148,6 @@ resource "aws_s3_bucket" "test_compat" {
   force_destroy = true # Allow Terraform to delete non-empty bucket
   
   # Don't set tags - Backblaze and Scaleway don't support PutBucketTagging
-  
-  lifecycle {
-    # AWS provider v5 tries to read bucket configurations (CORS, versioning, etc.)
-    # after creation, but B2/Scaleway return errors for these unsupported APIs.
-    # Ignore these read-only attributes to prevent read phase failures.
-    ignore_changes = [
-      lifecycle_rule,
-      cors_rule,
-      versioning,
-      server_side_encryption_configuration,
-      replication_configuration,
-      object_lock_configuration,
-      grant,
-      website,
-      logging,
-    ]
-  }
 }
 
 # Local values to simplify resource references
