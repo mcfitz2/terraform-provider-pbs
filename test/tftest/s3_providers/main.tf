@@ -8,9 +8,7 @@ terraform {
     }
     aws = {
       source  = "hashicorp/aws"
-      # Use v4.x for better S3-compatible service support
-      # v5.x tries to read CORS/versioning which B2/Scaleway don't fully support
-      version = "~> 4.67"
+      version = "~> 5.0"
     }
     time = {
       source  = "hashicorp/time"
@@ -125,9 +123,6 @@ provider "aws" {
 }
 
 # Create S3 bucket
-# Note: For Backblaze B2 and other S3-compatible services, use AWS provider v4.x
-# or handle GetBucketCors errors. AWS provider v5 tries to read CORS config
-# which B2 doesn't support, returning 404 NoSuchCorsConfiguration
 resource "aws_s3_bucket" "test" {
   bucket        = var.s3_bucket_name
   force_destroy = true # Allow Terraform to delete non-empty bucket
@@ -140,6 +135,28 @@ resource "aws_s3_bucket" "test" {
     ManagedBy   = "Terraform"
     Purpose     = "PBS Provider Testing"
   } : null
+  
+  # For non-AWS S3-compatible providers, we need to use a lifecycle block to handle
+  # the fact that AWS provider v5 tries to read bucket configurations (CORS, versioning,
+  # lifecycle, etc.) that these providers don't support. The AWS provider gracefully
+  # handles NoSuchCORSConfiguration errors, but B2/Scaleway return generic 404s that
+  # cause the resource to fail during the read phase after creation.
+  lifecycle {
+    # Ignore all read-only computed attributes for non-AWS providers
+    # This prevents the provider from failing when it tries to read unsupported features
+    ignore_changes = var.s3_provider_name != "AWS" ? [
+      # These are all read-only attributes that AWS provider v5 tries to populate
+      # by calling various Get* APIs that S3-compatible services don't support
+      lifecycle_rule,
+      cors_rule,
+      versioning,
+      server_side_encryption_configuration,
+      replication_configuration,
+      object_lock_configuration,
+      grant,
+      website,
+    ] : []
+  }
 }
 
 # Wait for bucket to be available
