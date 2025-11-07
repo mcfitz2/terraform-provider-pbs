@@ -125,9 +125,10 @@ resource "pbs_s3_endpoint" "test" {
 # Create PBS datastore using the S3 bucket
 resource "pbs_datastore" "test" {
   name      = var.datastore_name
-  path      = "/dev/null" # S3 datastores don't use local path
+  path      = "/datastore/${var.datastore_name}-cache"
   s3_client = pbs_s3_endpoint.test.id
   s3_bucket = aws_s3_bucket.test.bucket
+  comment   = "Test S3 datastore for AWS provider"
 }
 
 # Outputs
