@@ -13,8 +13,9 @@
 
 variables {
   s3_provider_name = "Scaleway"
-  s3_endpoint      = "s3.${var.s3_region}.scw.cloud"
-  s3_region        = "fr-par"
+  s3_endpoint      = "s3.${var.pbs_s3_region}.scw.cloud"
+  s3_region        = "us-east-1"  # Generic region for AWS provider
+  pbs_s3_region    = "fr-par"  # Actual Scaleway region for PBS endpoint
   s3_bucket_name   = "pbs-test-scw-${var.test_id}"
   s3_endpoint_id   = "pbs-scw-${var.test_id}"
   datastore_name   = "scw-ds-${var.test_id}"

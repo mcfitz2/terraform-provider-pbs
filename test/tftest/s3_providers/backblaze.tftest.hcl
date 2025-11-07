@@ -14,8 +14,9 @@
 
 variables {
   s3_provider_name   = "Backblaze"
-  s3_endpoint        = "s3.${var.s3_region}.backblazeb2.com"
-  s3_region          = "us-west-004"
+  s3_endpoint        = "s3.${var.pbs_s3_region}.backblazeb2.com"
+  s3_region          = "us-east-1"  # Generic region for AWS provider
+  pbs_s3_region      = "us-east-005"  # Actual B2 region for PBS endpoint
   s3_bucket_name     = "pbs-test-b2-${var.test_id}"
   s3_endpoint_id     = "pbs-b2-${var.test_id}"
   datastore_name     = "b2-ds-${var.test_id}"
