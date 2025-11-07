@@ -132,11 +132,11 @@ resource "pbs_datastore" "test" {
 
 # Outputs
 output "bucket_name" {
-  value = local.bucket.bucket
+  value = aws_s3_bucket.test.bucket
 }
 
 output "bucket_arn" {
-  value = local.bucket.arn
+  value = aws_s3_bucket.test.arn
 }
 
 output "s3_endpoint_id" {
