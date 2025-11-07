@@ -365,7 +365,9 @@ func (r *s3EndpointResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	// Delete existing endpoint
+	// Delete existing endpoint - PBS API will reject deletion if endpoint is still in use
+	// by a datastore. Terraform should handle dependency ordering, but this provides
+	// a clear error message if dependencies are violated.
 	err := r.client.Endpoints.DeleteS3Endpoint(ctx, state.ID.ValueString())
 	if err != nil {
 		// Check if the endpoint is already gone (desired state achieved)
@@ -376,6 +378,19 @@ func (r *s3EndpointResource) Delete(ctx context.Context, req resource.DeleteRequ
 			strings.Contains(errorMsg, "404") {
 			// Resource already deleted - this is fine, desired state achieved
 			tflog.Info(ctx, "S3 endpoint already deleted", map[string]any{"id": state.ID.ValueString()})
+			return
+		}
+
+		// Check if endpoint is still in use - this indicates a dependency ordering issue
+		if strings.Contains(errorMsg, "in-use by datastore") ||
+			strings.Contains(errorMsg, "in use by") {
+			resp.Diagnostics.AddError(
+				"Error Deleting S3 Endpoint",
+				fmt.Sprintf("S3 endpoint '%s' cannot be deleted because it is still in use by a datastore. "+
+					"PBS requires all datastores using this endpoint to be deleted first. "+
+					"Ensure the datastore resource has a proper depends_on relationship with this S3 endpoint. "+
+					"Error: %s", state.ID.ValueString(), err.Error()),
+			)
 			return
 		}
 

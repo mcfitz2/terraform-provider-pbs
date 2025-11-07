@@ -1,0 +1,95 @@
+run "create_verify_job" {
+  variables {
+    job_type        = "verify"
+    job_id          = "verify-${var.test_id}"
+    schedule        = "weekly"
+    namespace       = "prod"
+    ignore_verified = true
+    outdated_after  = 30
+    max_depth       = 3
+    comment         = "Test verify job"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].id == var.job_id
+    error_message = "Job ID mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].store == "datastore1"
+    error_message = "Store mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].schedule == "weekly"
+    error_message = "Schedule mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].namespace == "prod"
+    error_message = "Namespace mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].ignore_verified == true
+    error_message = "ignore_verified mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].outdated_after == 30
+    error_message = "outdated_after mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].max_depth == 3
+    error_message = "max_depth mismatch"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].comment == "Test verify job"
+    error_message = "comment mismatch"
+  }
+}
+
+run "update_verify_job" {
+  variables {
+    job_type        = "verify"
+    job_id          = "verify-${var.test_id}"
+    schedule        = "monthly"
+    namespace       = "prod"
+    ignore_verified = false
+    outdated_after  = 60
+    max_depth       = 5
+    comment         = "Updated test verify job"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].schedule == "monthly"
+    error_message = "schedule was not updated"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].ignore_verified == false
+    error_message = "ignore_verified was not updated"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].outdated_after == 60
+    error_message = "outdated_after was not updated"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].max_depth == 5
+    error_message = "max_depth was not updated"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].comment == "Updated test verify job"
+    error_message = "comment was not updated"
+  }
+
+  assert {
+    condition     = pbs_verify_job.test[0].namespace == "prod"
+    error_message = "namespace should remain unchanged"
+  }
+}

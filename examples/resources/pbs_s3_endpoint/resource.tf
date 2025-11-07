@@ -4,7 +4,7 @@ resource "pbs_s3_endpoint" "example" {
   # S3 configuration
   access_key = "your-access-key"
   secret_key = "your-secret-key"
-  endpoint   = "https://s3.amazonaws.com"  # S3 service endpoint
+  endpoint   = "s3.amazonaws.com"  # S3 service endpoint (hostname only, no https://)
   region     = "us-west-2"
   
   # Optional settings

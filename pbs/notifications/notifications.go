@@ -644,6 +644,7 @@ type NotificationMatcher struct {
 	Comment       string   `json:"comment,omitempty"`
 	Disable       *bool    `json:"disable,omitempty"`
 	Origin        string   `json:"origin,omitempty"`
+	Delete        []string `json:"delete,omitempty"` // fields to delete on update
 }
 
 // ListNotificationMatchers lists all notification matchers
@@ -751,6 +752,9 @@ func (c *Client) UpdateNotificationMatcher(ctx context.Context, name string, mat
 	}
 	if matcher.Disable != nil {
 		body["disable"] = *matcher.Disable
+	}
+	if len(matcher.Delete) > 0 {
+		body["delete"] = matcher.Delete
 	}
 
 	path := fmt.Sprintf("/config/notifications/matchers/%s", url.PathEscape(name))

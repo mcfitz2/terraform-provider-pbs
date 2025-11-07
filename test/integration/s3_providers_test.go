@@ -17,7 +17,10 @@ import (
 )
 
 // TestS3EndpointMultiProvider tests S3 endpoint functionality with multiple real S3 providers
+// ✅ CONVERTED TO HCL: test/tftest/s3_providers/aws.tftest.hcl, backblaze.tftest.hcl, scaleway.tftest.hcl
 func TestS3EndpointMultiProvider(t *testing.T) {
+	t.Skip("Converted to Terraform HCL tests: test/tftest/s3_providers/*.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping multi-provider integration test in short mode")
 	}
@@ -114,7 +117,10 @@ resource "pbs_s3_endpoint" "test_%s" {
 }
 
 // TestS3EndpointProviderSpecificFeatures tests provider-specific S3 configurations
+// ✅ CONVERTED TO HCL: test/tftest/s3_providers/aws.tftest.hcl, backblaze.tftest.hcl, scaleway.tftest.hcl
 func TestS3EndpointProviderSpecificFeatures(t *testing.T) {
+	t.Skip("Converted to Terraform HCL tests: test/tftest/s3_providers/*.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping provider-specific feature tests in short mode")
 	}
@@ -216,7 +222,10 @@ resource "pbs_s3_endpoint" "test_scaleway_features" {
 }
 
 // TestS3EndpointConcurrentProviders tests creating endpoints for multiple providers simultaneously
+// ✅ CONVERTED TO HCL: test/tftest/s3_providers/*.tftest.hcl (each provider tested independently)
 func TestS3EndpointConcurrentProviders(t *testing.T) {
+	t.Skip("Converted to Terraform HCL tests: test/tftest/s3_providers/*.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping concurrent provider test in short mode")
 	}
@@ -281,7 +290,10 @@ resource "pbs_s3_endpoint" "concurrent_%d" {
 
 // TestS3DatastoreMultiProvider tests S3 datastore functionality with multiple real S3 providers
 // Creates bucket, endpoint, datastore, verifies all, then cleans up for each provider
+// ✅ CONVERTED TO HCL: test/tftest/s3_providers/aws.tftest.hcl, backblaze.tftest.hcl, scaleway.tftest.hcl
 func TestS3DatastoreMultiProvider(t *testing.T) {
+	t.Skip("Converted to Terraform HCL tests: test/tftest/s3_providers/*.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping multi-provider S3 datastore integration test in short mode")
 	}

@@ -471,22 +471,22 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	tflog.Debug(ctx, "Acquiring datastore creation mutex", map[string]any{
 		"name": plan.Name.ValueString(),
 	})
-	
+
 	// Lock only for the create operation to prevent PBS lock contention
 	// Don't hold the lock during the post-create retries
 	datastoreMutex.Lock()
 	tflog.Debug(ctx, "Mutex acquired, calling createDatastoreWithRetry", map[string]any{
 		"name": plan.Name.ValueString(),
 	})
-	
+
 	startCreate := time.Now()
 	tflog.Info(ctx, "⏱️ TIMING: Starting CreateDatastore", map[string]any{
 		"name":      plan.Name.ValueString(),
 		"timestamp": startCreate.Format(time.RFC3339Nano),
 	})
-	
+
 	err = r.createDatastoreWithRetry(ctx, datastore)
-	
+
 	endCreate := time.Now()
 	tflog.Info(ctx, "⏱️ TIMING: CreateDatastore completed", map[string]any{
 		"name":      plan.Name.ValueString(),
@@ -494,13 +494,13 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 		"duration":  endCreate.Sub(startCreate).String(),
 		"success":   err == nil,
 	})
-	
+
 	datastoreMutex.Unlock()
 	tflog.Debug(ctx, "Mutex released after create operation", map[string]any{
 		"name":    plan.Name.ValueString(),
 		"success": err == nil,
 	})
-	
+
 	if err != nil {
 		tflog.Error(ctx, "Failed to create datastore", map[string]any{
 			"name":  plan.Name.ValueString(),
@@ -524,29 +524,29 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 	var createdDatastore *datastores.Datastore
 	maxRetries := 3
 	var lastErr error
-	
+
 	tflog.Debug(ctx, "Starting post-creation datastore read attempts", map[string]any{
-		"name":        plan.Name.ValueString(),
-		"maxRetries":  maxRetries,
-		"retryDelay":  "2s",
+		"name":       plan.Name.ValueString(),
+		"maxRetries": maxRetries,
+		"retryDelay": "2s",
 	})
-	
+
 	for i := 0; i < maxRetries; i++ {
 		tflog.Debug(ctx, "Attempting to read datastore after creation", map[string]any{
 			"name":    plan.Name.ValueString(),
 			"attempt": i + 1,
 			"max":     maxRetries,
 		})
-		
+
 		startGet := time.Now()
 		tflog.Info(ctx, "⏱️ TIMING: Starting GetDatastore", map[string]any{
 			"name":      plan.Name.ValueString(),
 			"attempt":   i + 1,
 			"timestamp": startGet.Format(time.RFC3339Nano),
 		})
-		
+
 		createdDatastore, err = r.client.Datastores.GetDatastore(ctx, plan.Name.ValueString())
-		
+
 		endGet := time.Now()
 		tflog.Info(ctx, "⏱️ TIMING: GetDatastore completed", map[string]any{
 			"name":      plan.Name.ValueString(),
@@ -555,7 +555,7 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 			"duration":  endGet.Sub(startGet).String(),
 			"success":   err == nil,
 		})
-		
+
 		if err == nil {
 			tflog.Debug(ctx, "Successfully read datastore after creation", map[string]any{
 				"name":     plan.Name.ValueString(),
@@ -569,7 +569,7 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 			}
 			break
 		}
-		
+
 		lastErr = err
 		tflog.Warn(ctx, "GetDatastore failed, will retry", map[string]any{
 			"name":    plan.Name.ValueString(),
@@ -587,7 +587,7 @@ func (r *datastoreResource) Create(ctx context.Context, req resource.CreateReque
 			time.Sleep(2 * time.Second)
 		}
 	}
-	
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Datastore After Creation",
@@ -735,7 +735,7 @@ func (r *datastoreResource) Update(ctx context.Context, req resource.UpdateReque
 	datastoreMutex.Lock()
 	err = r.client.Datastores.UpdateDatastore(ctx, plan.Name.ValueString(), datastore)
 	datastoreMutex.Unlock()
-	
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Datastore",
@@ -764,12 +764,12 @@ func (r *datastoreResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Delete existing datastore
 	// Check if we should destroy data (useful for tests)
 	destroyData := os.Getenv("PBS_DESTROY_DATA_ON_DELETE") == "true"
-	
+
 	// Lock only for the delete operation to prevent PBS lock contention
 	datastoreMutex.Lock()
 	err := r.client.Datastores.DeleteDatastoreWithOptions(ctx, state.Name.ValueString(), destroyData)
 	datastoreMutex.Unlock()
-	
+
 	if err != nil {
 		// Check if the datastore is already gone (desired state achieved)
 		errorMsg := err.Error()
@@ -1190,7 +1190,7 @@ func (r *datastoreResource) planToDatastoreForUpdate(plan *datastoreResourceMode
 	if !plan.Comment.IsNull() && !plan.Comment.IsUnknown() {
 		ds.Comment = plan.Comment.ValueString()
 	}
-	
+
 	// Disabled is updatable
 	if ptr := optionalBoolPointer(plan.Disabled); ptr != nil {
 		ds.Disabled = ptr
@@ -1198,12 +1198,12 @@ func (r *datastoreResource) planToDatastoreForUpdate(plan *datastoreResourceMode
 			ds.Disabled = nil
 		}
 	}
-	
+
 	// GC schedule is updatable
 	if !plan.GCSchedule.IsNull() && !plan.GCSchedule.IsUnknown() {
 		ds.GCSchedule = plan.GCSchedule.ValueString()
 	}
-	
+
 	// Prune settings are updatable
 	if ptr := optionalInt64Pointer(plan.KeepLast); ptr != nil {
 		ds.KeepLast = ptr

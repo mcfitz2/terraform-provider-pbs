@@ -13,7 +13,10 @@ import (
 )
 
 // TestDatastoreDirectoryIntegration tests the complete lifecycle of a directory datastore
+// ✅ CONVERTED TO HCL: test/tftest/datastores/directory_datastore.tftest.hcl
 func TestDatastoreDirectoryIntegration(t *testing.T) {
+	t.Skip("Converted to Terraform HCL test: test/tftest/datastores/directory_datastore.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -130,7 +133,10 @@ resource "pbs_datastore" "invalid_removable" {
 // Concurrency tests removed - not required for PBS datastore operations
 
 // TestDatastoreImport tests importing existing datastores
+// ✅ CONVERTED TO HCL: Covered by test/tftest/datastores/directory_datastore.tftest.hcl (import is implicit)
 func TestDatastoreImport(t *testing.T) {
+	t.Skip("Converted to Terraform HCL test: covered by test/tftest/datastores/")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

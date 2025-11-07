@@ -1,0 +1,197 @@
+aws.tftest.hcl... [37min progress[0m
+[0m  run "setup_aws"... [31mfail[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on aws.tftest.hcl line 12, in variables:
+[31m│[0m [0m  12:   s3_endpoint      = "s3.${[4mvar.s3_region[0m}.amazonaws.com"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "s3_region" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on aws.tftest.hcl line 14, in variables:
+[31m│[0m [0m  14:   s3_bucket_name   = "pbs-test-aws-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on aws.tftest.hcl line 15, in variables:
+[31m│[0m [0m  15:   s3_endpoint_id   = "pbs-aws-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on aws.tftest.hcl line 16, in variables:
+[31m│[0m [0m  16:   datastore_name   = "aws-ds-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 65:
+[31m│[0m [0m  65: [4mvariable "s3_access_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_aws" has a required variable
+[31m│[0m [0m"s3_access_key" with no set value. Use a -var or -var-file command line
+[31m│[0m [0margument or add this variable into a "variables" block within the test file
+[31m│[0m [0mor run block.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 71:
+[31m│[0m [0m  71: [4mvariable "s3_secret_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_aws" has a required variable
+[31m│[0m [0m"s3_secret_key" with no set value. Use a -var or -var-file command line
+[31m│[0m [0margument or add this variable into a "variables" block within the test file
+[31m│[0m [0mor run block.
+[31m╵[0m[0m
+  run "create_aws_s3_infrastructure"... [37mskip[0m[0m
+  run "verify_aws_no_drift"... [37mskip[0m[0m
+  run "update_aws_datastore_comment"... [37mskip[0m[0m
+aws.tftest.hcl... [37mtearing down[0m
+[0maws.tftest.hcl... [31mfail[0m[0m
+backblaze.tftest.hcl... [37min progress[0m
+[0m  run "setup_backblaze"... [31mfail[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on backblaze.tftest.hcl line 17, in variables:
+[31m│[0m [0m  17:   s3_endpoint        = "s3.${[4mvar.s3_region[0m}.backblazeb2.com"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "s3_region" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on backblaze.tftest.hcl line 19, in variables:
+[31m│[0m [0m  19:   s3_bucket_name     = "pbs-test-b2-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on backblaze.tftest.hcl line 20, in variables:
+[31m│[0m [0m  20:   s3_endpoint_id     = "pbs-b2-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on backblaze.tftest.hcl line 21, in variables:
+[31m│[0m [0m  21:   datastore_name     = "b2-ds-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 65:
+[31m│[0m [0m  65: [4mvariable "s3_access_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_backblaze" has a required
+[31m│[0m [0mvariable "s3_access_key" with no set value. Use a -var or -var-file command
+[31m│[0m [0mline argument or add this variable into a "variables" block within the test
+[31m│[0m [0mfile or run block.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 71:
+[31m│[0m [0m  71: [4mvariable "s3_secret_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_backblaze" has a required
+[31m│[0m [0mvariable "s3_secret_key" with no set value. Use a -var or -var-file command
+[31m│[0m [0mline argument or add this variable into a "variables" block within the test
+[31m│[0m [0mfile or run block.
+[31m╵[0m[0m
+  run "create_backblaze_s3_infrastructure"... [37mskip[0m[0m
+  run "verify_backblaze_no_drift"... [37mskip[0m[0m
+  run "test_backblaze_compatibility"... [37mskip[0m[0m
+backblaze.tftest.hcl... [37mtearing down[0m
+[0mbackblaze.tftest.hcl... [31mfail[0m[0m
+scaleway.tftest.hcl... [37min progress[0m
+[0m  run "setup_scaleway"... [31mfail[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 65:
+[31m│[0m [0m  65: [4mvariable "s3_access_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_scaleway" has a required
+[31m│[0m [0mvariable "s3_access_key" with no set value. Use a -var or -var-file command
+[31m│[0m [0mline argument or add this variable into a "variables" block within the test
+[31m│[0m [0mfile or run block.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mNo value for required variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on main.tf line 71:
+[31m│[0m [0m  71: [4mvariable "s3_secret_key"[0m {[0m
+[31m│[0m [0m
+[31m│[0m [0mThe module under test for run block "setup_scaleway" has a required
+[31m│[0m [0mvariable "s3_secret_key" with no set value. Use a -var or -var-file command
+[31m│[0m [0mline argument or add this variable into a "variables" block within the test
+[31m│[0m [0mfile or run block.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on scaleway.tftest.hcl line 16, in variables:
+[31m│[0m [0m  16:   s3_endpoint      = "s3.${[4mvar.s3_region[0m}.scw.cloud"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "s3_region" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on scaleway.tftest.hcl line 18, in variables:
+[31m│[0m [0m  18:   s3_bucket_name   = "pbs-test-scw-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on scaleway.tftest.hcl line 19, in variables:
+[31m│[0m [0m  19:   s3_endpoint_id   = "pbs-scw-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mReference to unavailable variable[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  on scaleway.tftest.hcl line 20, in variables:
+[31m│[0m [0m  20:   datastore_name   = "scw-ds-${[4mvar.test_id[0m}"[0m
+[31m│[0m [0m
+[31m│[0m [0mThe input variable "test_id" is not available to the current context. You
+[31m│[0m [0mcan only reference global variables.
+[31m╵[0m[0m
+  run "create_scaleway_s3_infrastructure"... [37mskip[0m[0m
+  run "verify_scaleway_no_drift"... [37mskip[0m[0m
+  run "update_scaleway_datastore_mutable"... [37mskip[0m[0m
+scaleway.tftest.hcl... [37mtearing down[0m
+[0mscaleway.tftest.hcl... [31mfail[0m[0m
+
+[31mFailure![0m[0m 0 passed, 3 failed, 9 skipped.

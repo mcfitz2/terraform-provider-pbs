@@ -187,7 +187,8 @@ func metricsServerToState(server *metrics.MetricsServer, state *metricsServerDat
 	state.Name = types.StringValue(server.Name)
 	state.Type = types.StringValue(string(server.Type))
 	state.Comment = stringValueOrNull(server.Comment)
-	state.Enable = boolValueOrNull(server.Enable)
+	// PBS defaults enable to true when not specified
+	state.Enable = boolValueWithDefault(server.Enable, true)
 
 	// URL and parsed server/port fields
 	state.URL = stringValueOrNull(server.URL)
@@ -232,6 +233,13 @@ func intValueOrNull(ptr *int) types.Int64 {
 func boolValueOrNull(ptr *bool) types.Bool {
 	if ptr == nil {
 		return types.BoolNull()
+	}
+	return types.BoolValue(*ptr)
+}
+
+func boolValueWithDefault(ptr *bool, defaultValue bool) types.Bool {
+	if ptr == nil {
+		return types.BoolValue(defaultValue)
 	}
 	return types.BoolValue(*ptr)
 }

@@ -450,9 +450,19 @@ func (r *notificationMatcherResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
+	var state notificationMatcherResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	matcher := &notifications.NotificationMatcher{
 		Name: plan.Name.ValueString(),
 	}
+
+	// Compute fields to delete (present in state but null in plan)
+	matcher.Delete = computeMatcherDeletes(&plan, &state)
 
 	// Convert lists
 	if !plan.Targets.IsNull() {
@@ -632,4 +642,37 @@ func (r *notificationMatcherResource) Delete(ctx context.Context, req resource.D
 // ImportState imports the resource into Terraform state.
 func (r *notificationMatcherResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+// Helper functions
+
+func shouldDeleteListAttr(plan, state types.List) bool {
+	return plan.IsNull() && !state.IsNull() && !state.IsUnknown()
+}
+
+func shouldDeleteStringAttr(plan, state types.String) bool {
+	return plan.IsNull() && !state.IsNull() && !state.IsUnknown()
+}
+
+func computeMatcherDeletes(plan, state *notificationMatcherResourceModel) []string {
+	if state == nil {
+		return nil
+	}
+
+	var deletes []string
+
+	if shouldDeleteListAttr(plan.MatchSeverity, state.MatchSeverity) {
+		deletes = append(deletes, "match-severity")
+	}
+	if shouldDeleteListAttr(plan.MatchField, state.MatchField) {
+		deletes = append(deletes, "match-field")
+	}
+	if shouldDeleteListAttr(plan.MatchCalendar, state.MatchCalendar) {
+		deletes = append(deletes, "match-calendar")
+	}
+	if shouldDeleteStringAttr(plan.Comment, state.Comment) {
+		deletes = append(deletes, "comment")
+	}
+
+	return deletes
 }

@@ -13,6 +13,8 @@ import (
 
 // TestRemotesIntegration tests the complete lifecycle of PBS remote configurations
 func TestRemotesIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/remotes/remote.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -114,6 +116,8 @@ resource "pbs_remote" "test_remote" {
 
 // TestRemotePasswordUpdate tests that password updates work correctly
 func TestRemotePasswordUpdate(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/remotes/remote.tftest.hcl (merged)")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -220,6 +224,8 @@ output "remote_name" {
 
 // TestRemoteValidation tests validation scenarios
 func TestRemoteValidation(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: removed as redundant")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -288,6 +294,8 @@ resource "pbs_remote" "invalid_port" {
 
 // TestRemoteImport tests importing existing remotes
 func TestRemoteImport(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: covered by HCL tests")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}

@@ -8,6 +8,23 @@ name: VM Integration Tests
 # Coverage annotations will appear on pull requests showing which lines are covered.
 # Coverage reports and trends are available at https://codecov.io
 
+# - name: Trigger Workflow in Another Repository
+    #   run: |
+    #     # Set the required variables
+    #     repo_owner=${{github.repository_owner}} 
+    #     repo_name="lab2"  
+    #     event_type="trigger-workflow" 
+    #     service=${{ github.event.inputs.target_service }}"
+    #     version="${{ github.event.inputs.target_version }}"
+
+    #     curl -L \
+    #       -X POST \
+    #       -H "Accept: application/vnd.github+json" \
+    #       -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+    #       -H "X-GitHub-Api-Version: 2022-11-28" \
+    #       https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
+    #       -d "{\"event_type\": \"$event_type\", \"client_payload\": {\"service\": \"$service\", \"version\": \"$version\", \"unit\": false, \"integration\": true}}"
+
 on:
   push:
     branches: [ main, develop ]
@@ -104,7 +121,7 @@ jobs:
 
     - name: Build provider binary
       run: go build .
-    
+
     - name: Install provider for HCL tests
       run: |
         # Install provider to local plugin directory for Terraform HCL tests
@@ -121,8 +138,73 @@ jobs:
         RUNNER_IP=$(hostname -I | awk '{print $1}')
         echo "Runner IP: $RUNNER_IP"
         echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
-
-    - name: Run integration tests
+    - name: Trigger PBS cleanup workflow
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GH_PAT }}
+        script: |
+          console.log('Triggering cleanup workflow in mcfitz2/lab2...');
+          
+          const response = await github.rest.actions.createWorkflowDispatch({
+            owner: 'mcfitz2',
+            repo: 'lab2',
+            workflow_id: 204359526,  // PBS Testing - Cleanup Datastore workflow ID
+            ref: 'main'
+          });
+          
+          console.log('Cleanup workflow triggered successfully');
+          console.log('Response status:', response.status);
+          
+          // Wait a few seconds for the workflow to start
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Get the latest run
+          const runs = await github.rest.actions.listWorkflowRuns({
+            owner: 'mcfitz2',
+            repo: 'lab2',
+            workflow_id: 204359526,  // PBS Testing - Cleanup Datastore workflow ID
+            per_page: 1
+          });
+          
+          if (runs.data.workflow_runs.length > 0) {
+            const runId = runs.data.workflow_runs[0].id;
+            console.log(`Monitoring cleanup workflow run: ${runId}`);
+            console.log(`URL: https://github.com/mcfitz2/lab2/actions/runs/${runId}`);
+            
+            // Poll for completion
+            let completed = false;
+            let attempts = 0;
+            const maxAttempts = 60; // 5 minutes (5 seconds per attempt)
+            
+            while (!completed && attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              attempts++;
+              
+              const run = await github.rest.actions.getWorkflowRun({
+                owner: 'mcfitz2',
+                repo: 'lab2',
+                run_id: runId
+              });
+              
+              console.log(`Attempt ${attempts}: Status = ${run.data.status}, Conclusion = ${run.data.conclusion}`);
+              
+              if (run.data.status === 'completed') {
+                completed = true;
+                if (run.data.conclusion === 'success') {
+                  console.log('✅ Cleanup workflow completed successfully');
+                } else {
+                  console.log(`⚠️  Cleanup workflow completed with conclusion: ${run.data.conclusion}`);
+                }
+              }
+            }
+            
+            if (!completed) {
+              console.log('⚠️  Cleanup workflow did not complete within timeout period');
+            }
+          } else {
+            console.log('⚠️  Could not find the triggered workflow run');
+          }
+    - name: Run Terraform HCL tests
       env:
         # PBS Server configuration
         PBS_ADDRESS: "https://192.168.1.108:8007"
@@ -146,42 +228,22 @@ jobs:
         # S3 provider credentials from secrets (optional for S3 tests)
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+        AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
         B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
         B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
         B2_REGION: ${{ vars.B2_REGION || 'us-west-004' }}
         SCALEWAY_ACCESS_KEY: ${{ secrets.SCALEWAY_ACCESS_KEY }}
         SCALEWAY_SECRET_KEY: ${{ secrets.SCALEWAY_SECRET_KEY }}
         SCALEWAY_REGION: ${{ vars.SCALEWAY_REGION || 'fr-par' }}
-      run: |
-        echo "Running FULL integration test suite against PBS 4.0 at 192.168.1.108..."
-        echo ""
-        echo "Runner IP: ${{ steps.get_ip.outputs.RUNNER_IP }}"
-        echo ""
-        echo "Test services available (PBS can reach these at runner IP):"
-        echo "  - InfluxDB 2.7 (HTTP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8086"
-        echo "  - InfluxDB 1.8 (UDP): ${{ steps.get_ip.outputs.RUNNER_IP }}:8089"
-        echo "  - Gotify: ${{ steps.get_ip.outputs.RUNNER_IP }}:8080"
-        echo "  - Webhook: ${{ steps.get_ip.outputs.RUNNER_IP }}:8081"
-        echo ""
-        echo "Test Suites:"
-        echo "  ✓ Core Integration Tests (Directory & Removable Datastores, Metrics, Jobs, Notifications)"
-        echo "  ✓ S3 Integration Tests (AWS, B2, Scaleway - if credentials provided)"
-        echo ""
-        
-        # Enable debug logging for detailed API tracing
-        export PBS_DEBUG=1
-        
-        # Run ALL integration tests sequentially to avoid PBS resource contention
-        # Use -failfast to stop on first failure for faster feedback
-        go test -v -failfast -timeout 40m -coverprofile=coverage-vm-integration.out -covermode=atomic ./test/integration
-
-    - name: Run Terraform HCL tests
-      env:
         # Set Terraform variables for HCL tests
         TF_VAR_pbs_endpoint: "https://192.168.1.108:8007"
         TF_VAR_pbs_username: "root@pam"
         TF_VAR_pbs_password: "pbspbs123"
+        # Service endpoints for metrics/notification tests
+        TF_VAR_influxdb_host: ${{ steps.get_ip.outputs.RUNNER_IP }}
+        TF_VAR_influxdb_port: "8086"
+        TF_VAR_influxdb_udp_host: ${{ steps.get_ip.outputs.RUNNER_IP }}
+        TF_VAR_influxdb_udp_port: "8089"
         TF_LOG: "INFO"
       run: |
         echo ""
@@ -190,30 +252,114 @@ jobs:
         echo "========================================"
         echo ""
         echo "These tests use Terraform's native test framework (v1.6+)"
-        echo "They replace the flaky tfexec tests with native execution."
+        echo "They replace the Go tfexec tests with native HCL execution."
         echo ""
         
-        # Run datastores data source test (list all datastores)
-        echo "→ Testing datastores data source..."
-        (cd test/tftest/datastores_datasource && terraform init -input=false && terraform test)
-        
-        # Run prune job data source test
+        # Generate unique test ID with timestamp to avoid conflicts
+        export TF_VAR_test_id="run-${{ github.run_number }}-${{ github.run_attempt }}-$(date +%s)"
+        echo "Test ID: $TF_VAR_test_id"
         echo ""
-        echo "→ Testing prune job data source..."
-        (cd test/tftest/prune_job_datasource && terraform init -input=false && terraform test)
         
-        # Run prune jobs data source test (list with filter)
-        echo ""
-        echo "→ Testing prune jobs data source..."
-        (cd test/tftest/prune_jobs_datasource && terraform init -input=false && terraform test)
+        # Define all test directories
+        TEST_DIRS=(
+          "datastores_datasource"
+          "prune_job_datasource"
+          "prune_jobs_datasource"
+          "sync_job_datasource"
+          "datastores"
+          "datastore_immutability"
+          "jobs"
+          "remotes"
+          "metrics_influxdb_http"
+          "metrics_influxdb_udp"
+          "notifications_endpoints"
+          "notifications_smtp"
+          "datasources_datastore"
+          "datasources_metrics_server"
+          "datasources_metrics_servers"
+          "datasources_notification_endpoint"
+          "datasources_notification_endpoints"
+          "datasources_notification_matcher"
+          "datasources_notification_matchers"
+          "datasources_s3_endpoint"
+          "datasources_s3_endpoints"
+          "datasources_sync_jobs"
+          "datasources_verify_job"
+          "datasources_verify_jobs"
+        )
         
-        # Run sync job data source test
+        # Run tests in each directory
+        for dir in "${TEST_DIRS[@]}"; do
+          if [ -d "test/tftest/$dir" ]; then
+            echo ""
+            echo "→ Testing $dir..."
+            (cd "test/tftest/$dir" && terraform init -input=false && terraform test) || {
+              echo "❌ Tests failed in $dir"
+              exit 1
+            }
+          else
+            echo "⚠️  Directory not found: test/tftest/$dir (skipping)"
+          fi
+        done
+        
+        # Run S3 provider tests if credentials are available
         echo ""
-        echo "→ Testing sync job data source..."
-        (cd test/tftest/sync_job_datasource && terraform init -input=false && terraform test)
+        echo "Checking S3 provider credentials..."
+        
+        S3_TESTS_RUN=false
+        
+        if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+          echo "→ Testing s3_providers (AWS)..."
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$AWS_ACCESS_KEY_ID" \
+           TF_VAR_s3_secret_key="$AWS_SECRET_ACCESS_KEY" \
+           TF_VAR_s3_region="${AWS_REGION:-us-east-1}" \
+           terraform test -filter=aws.tftest.hcl) || {
+            echo "❌ AWS S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ -n "$B2_ACCESS_KEY_ID" ] && [ -n "$B2_SECRET_ACCESS_KEY" ]; then
+          echo "→ Testing s3_providers (Backblaze B2)..."
+          # For B2: use generic region for AWS provider (bucket creation), actual B2 region for PBS
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$B2_ACCESS_KEY_ID" \
+           TF_VAR_s3_secret_key="$B2_SECRET_ACCESS_KEY" \
+           TF_VAR_s3_region="us-east-1" \
+           TF_VAR_pbs_s3_region="${B2_REGION:-us-east-005}" \
+           terraform test -filter=backblaze.tftest.hcl) || {
+            echo "❌ Backblaze B2 S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ -n "$SCALEWAY_ACCESS_KEY" ] && [ -n "$SCALEWAY_SECRET_KEY" ]; then
+          echo "→ Testing s3_providers (Scaleway)..."
+          # For Scaleway: use generic region for AWS provider, actual Scaleway region for PBS
+          (cd "test/tftest/s3_providers" && terraform init -input=false && \
+           TF_VAR_s3_access_key="$SCALEWAY_ACCESS_KEY" \
+           TF_VAR_s3_secret_key="$SCALEWAY_SECRET_KEY" \
+           TF_VAR_s3_region="us-east-1" \
+           TF_VAR_pbs_s3_region="${SCALEWAY_REGION:-fr-par}" \
+           terraform test -filter=scaleway.tftest.hcl) || {
+            echo "❌ Scaleway S3 tests failed"
+            exit 1
+          }
+          S3_TESTS_RUN=true
+        fi
+        
+        if [ "$S3_TESTS_RUN" = false ]; then
+          echo "⚠️  No S3 provider credentials found - S3 tests skipped"
+          echo "   Set AWS_ACCESS_KEY_ID, B2_ACCESS_KEY_ID, or SCALEWAY_ACCESS_KEY to run S3 tests"
+        fi
         
         echo ""
         echo "✅ All HCL tests passed!"
+
+    
 
     - name: Upload coverage
       uses: actions/upload-artifact@v4

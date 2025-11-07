@@ -126,20 +126,20 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 	// Try to get individual datastore details first
 	escapedName := url.PathEscape(name)
 	path := fmt.Sprintf("/config/datastore/%s", escapedName)
-	
+
 	// CRITICAL DEBUG: Log when we attempt to get datastore
 	fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: Attempting GET '%s' at %s\n", name, time.Now().Format(time.RFC3339Nano))
-	
+
 	// Log the GET request for debugging
 	if isDebugEnabled() {
 		tflog.Debug(ctx, "GetDatastore: Attempting GET", map[string]interface{}{
-			"path":         path,
+			"path":          path,
 			"original_name": name,
 		})
 	}
-	
+
 	resp, getErr := c.api.Get(ctx, path)
-	
+
 	// CRITICAL DEBUG: Log the result
 	if getErr != nil {
 		fmt.Fprintf(os.Stderr, "[PBS-DEBUG] GetDatastore: GET '%s' FAILED at %s: %v\n", name, time.Now().Format(time.RFC3339Nano), getErr)
@@ -152,7 +152,7 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 				"response_size": len(resp.Data),
 			})
 		}
-		
+
 		var ds Datastore
 		if unmarshalErr := json.Unmarshal(resp.Data, &ds); unmarshalErr == nil {
 			ds.Name = name // Ensure name is set
@@ -224,7 +224,7 @@ func (c *Client) GetDatastore(ctx context.Context, name string) (*Datastore, err
 			})
 		}
 	}
-	
+
 	for _, ds := range datastores {
 		if ds.Name == name {
 			if isDebugEnabled() {
@@ -375,7 +375,9 @@ func (c *Client) DeleteDatastore(ctx context.Context, name string) error {
 	return c.DeleteDatastoreWithOptions(ctx, name, false)
 }
 
-// DeleteDatastoreWithOptions deletes a datastore configuration with additional options
+// DeleteDatastoreWithOptions removes a datastore with optional parameters
+// This is an asynchronous operation that returns a UPID task identifier.
+// The function waits for the deletion task to complete before returning.
 func (c *Client) DeleteDatastoreWithOptions(ctx context.Context, name string, destroyData bool) error {
 	if name == "" {
 		return fmt.Errorf("datastore name is required")
@@ -384,15 +386,34 @@ func (c *Client) DeleteDatastoreWithOptions(ctx context.Context, name string, de
 	escapedName := url.PathEscape(name)
 	path := fmt.Sprintf("/config/datastore/%s", escapedName)
 
-	// Add destroy-data parameter if requested
 	if destroyData {
 		path += "?destroy-data=1"
 	}
 
-	_, err := c.api.Delete(ctx, path)
+	resp, err := c.api.Delete(ctx, path)
 	if err != nil {
 		return fmt.Errorf("failed to delete datastore %s: %w", name, err)
 	}
+
+	// Parse the UPID from the response
+	var upid string
+	if err := json.Unmarshal(resp.Data, &upid); err != nil {
+		return fmt.Errorf("failed to parse UPID from delete response: %w", err)
+	}
+
+	// Get the node name from the UPID
+	node, err := c.getNodeForTask(ctx, upid)
+	if err != nil {
+		return fmt.Errorf("failed to extract node from UPID: %w", err)
+	}
+
+	// Wait for the deletion task to complete (5 minute timeout like CreateDatastore)
+	if err := c.api.WaitForTask(ctx, node, upid, 5*time.Minute); err != nil {
+		return fmt.Errorf("datastore deletion task failed: %w", err)
+	}
+
+	// Sleep briefly to ensure eventual consistency (like we do for creation)
+	time.Sleep(3 * time.Second)
 
 	return nil
 }

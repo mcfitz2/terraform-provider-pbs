@@ -14,6 +14,8 @@ import (
 
 // TestDatastoreDataSourceIntegration tests reading a single datastore via data source
 func TestDatastoreDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/datastore.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -61,7 +63,7 @@ data "pbs_datastore" "test" {
 // TestDatastoresDataSourceIntegration tests listing all datastores via data source
 func TestDatastoresDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/datastores_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -121,7 +123,7 @@ data "pbs_datastores" "all" {
 // TestPruneJobDataSourceIntegration tests reading a single prune job via data source
 func TestPruneJobDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/prune_job_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -179,7 +181,7 @@ data "pbs_prune_job" "test" {
 // TestPruneJobsDataSourceIntegration tests listing prune jobs via data source
 func TestPruneJobsDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/prune_jobs_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -276,7 +278,7 @@ data "pbs_prune_jobs" "filtered" {
 // TestSyncJobDataSourceIntegration tests reading a single sync job via data source
 func TestSyncJobDataSourceIntegration(t *testing.T) {
 	t.Skip("Replaced by Terraform HCL test: test/tftest/sync_job_datasource/test.tftest.hcl - tfexec timing issue")
-	
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -343,6 +345,8 @@ data "pbs_sync_job" "test" {
 
 // TestSyncJobsDataSourceIntegration tests listing sync jobs with filters
 func TestSyncJobsDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/sync_jobs.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -440,6 +444,8 @@ data "pbs_sync_jobs" "by_remote" {
 
 // TestVerifyJobDataSourceIntegration tests reading a single verify job via data source
 func TestVerifyJobDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/verify_job.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -494,6 +500,8 @@ data "pbs_verify_job" "test" {
 
 // TestVerifyJobsDataSourceIntegration tests listing verify jobs with store filter
 func TestVerifyJobsDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/verify_jobs.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -586,6 +594,8 @@ data "pbs_verify_jobs" "filtered" {
 
 // TestS3EndpointDataSourceIntegration tests reading a single S3 endpoint via data source
 func TestS3EndpointDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/s3_endpoint.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -626,6 +636,8 @@ data "pbs_s3_endpoint" "test" {
 
 // TestS3EndpointsDataSourceIntegration tests listing all S3 endpoints via data source
 func TestS3EndpointsDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/s3_endpoints.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -686,6 +698,8 @@ data "pbs_s3_endpoints" "all" {
 
 // TestMetricsServerDataSourceIntegration tests reading a single metrics server via data source
 func TestMetricsServerDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/metrics_server.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -737,6 +751,8 @@ data "pbs_metrics_server" "test" {
 
 // TestMetricsServersDataSourceIntegration tests listing all metrics servers via data source
 func TestMetricsServersDataSourceIntegration(t *testing.T) {
+	t.Skip("✅ CONVERTED TO HCL: test/tftest/datasources/metrics_servers.tftest.hcl")
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
