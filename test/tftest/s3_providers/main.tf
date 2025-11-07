@@ -162,6 +162,7 @@ resource "aws_s3_bucket" "test_compat" {
       object_lock_configuration,
       grant,
       website,
+      logging,
     ]
   }
 }
