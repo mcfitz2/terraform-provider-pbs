@@ -30,7 +30,7 @@ run "create_aws_s3_infrastructure" {
   command = apply
   
   assert {
-    condition     = aws_s3_bucket.test.bucket == "pbs-test-aws-${var.test_id}"
+    condition     = local.bucket.bucket == "pbs-test-aws-${var.test_id}"
     error_message = "S3 bucket name should match expected pattern"
   }
   
@@ -65,7 +65,7 @@ run "create_aws_s3_infrastructure" {
   }
   
   assert {
-    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
     error_message = "Datastore should reference the S3 bucket"
   }
 }

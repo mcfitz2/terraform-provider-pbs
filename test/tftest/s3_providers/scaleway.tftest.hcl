@@ -1,4 +1,10 @@
-# Scaleway Object Storage S3-Compatible Provider Test
+# Scaleway Object Storage S3-Compati  assert {
+    condition     = local.b  assert {
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
+    error_message = "Datastore should reference the S3 bucket"
+  }t.bucket == "pbs-test-scw-${var.test_id}"
+    error_message = "S3 bucket name should match expected pattern"
+  }Provider Test
 #
 # This test validates the complete lifecycle of S3-backed datastores using Scaleway:
 # 1. Creates a Scaleway Object Storage bucket via S3 API
