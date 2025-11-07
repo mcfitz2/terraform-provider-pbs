@@ -1,10 +1,6 @@
-# Backblaze B2 S3-Compatible Provider Test  assert {
-    condition     = local  assert {
-    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
-    error_message = "Datastore should reference the S3 bucket"
-  }ket.bucket == "pbs-test-b2-${var.test_id}"
-    error_message = "S3 bucket name should match expected pattern"
-  } This test validates the complete lifecycle of S3-backed datastores using Backblaze B2:
+# Backblaze B2 S3-Compatible Provider Test
+#
+# This test validates the complete lifecycle of S3-backed datastores using Backblaze B2:
 # 1. Creates a B2 bucket via S3 API
 # 2. Creates a PBS S3 endpoint with B2-specific quirks
 # 3. Creates a PBS datastore using the B2 backend
@@ -45,7 +41,7 @@ run "create_backblaze_s3_infrastructure" {
   command = apply
   
   assert {
-    condition     = aws_s3_bucket.test.bucket == "pbs-test-b2-${var.test_id}"
+    condition     = local.bucket.bucket == "pbs-test-b2-${var.test_id}"
     error_message = "B2 bucket name should match expected pattern"
   }
   
@@ -80,7 +76,7 @@ run "create_backblaze_s3_infrastructure" {
   }
   
   assert {
-    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
     error_message = "Datastore should reference the B2 bucket"
   }
 }

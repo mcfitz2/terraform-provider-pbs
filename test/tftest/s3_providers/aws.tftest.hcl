@@ -89,7 +89,7 @@ run "update_aws_datastore_comment" {
   # Update only happens if we modify the resource, but we're testing that
   # updating mutable fields works without errors
   assert {
-    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
     error_message = "S3 bucket should remain unchanged after update"
   }
 }
