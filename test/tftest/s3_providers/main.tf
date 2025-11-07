@@ -8,7 +8,9 @@ terraform {
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      # Use v4.x for better S3-compatible service support
+      # v5.x tries to read CORS/versioning which B2/Scaleway don't fully support
+      version = "~> 4.67"
     }
     time = {
       source  = "hashicorp/time"
@@ -123,6 +125,9 @@ provider "aws" {
 }
 
 # Create S3 bucket
+# Note: For Backblaze B2 and other S3-compatible services, use AWS provider v4.x
+# or handle GetBucketCors errors. AWS provider v5 tries to read CORS config
+# which B2 doesn't support, returning 404 NoSuchCorsConfiguration
 resource "aws_s3_bucket" "test" {
   bucket        = var.s3_bucket_name
   force_destroy = true # Allow Terraform to delete non-empty bucket
