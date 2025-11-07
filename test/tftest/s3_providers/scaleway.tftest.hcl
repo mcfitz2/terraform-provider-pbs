@@ -1,10 +1,4 @@
-# Scaleway Object Storage S3-Compati  assert {
-    condition     = local.b  assert {
-    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
-    error_message = "Datastore should reference the S3 bucket"
-  }t.bucket == "pbs-test-scw-${var.test_id}"
-    error_message = "S3 bucket name should match expected pattern"
-  }Provider Test
+# Scaleway Object Storage S3-Compatible Provider Test
 #
 # This test validates the complete lifecycle of S3-backed datastores using Scaleway:
 # 1. Creates a Scaleway Object Storage bucket via S3 API
@@ -41,7 +35,7 @@ run "create_scaleway_s3_infrastructure" {
   command = apply
   
   assert {
-    condition     = aws_s3_bucket.test.bucket == "pbs-test-scw-${var.test_id}"
+    condition     = local.bucket.bucket == "pbs-test-scw-${var.test_id}"
     error_message = "Scaleway bucket name should match expected pattern"
   }
   
@@ -76,7 +70,7 @@ run "create_scaleway_s3_infrastructure" {
   }
   
   assert {
-    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
     error_message = "Datastore should reference the Scaleway bucket"
   }
 }
@@ -95,7 +89,7 @@ run "update_scaleway_datastore_mutable" {
   
   # Verify immutable fields remain unchanged
   assert {
-    condition     = pbs_datastore.test.s3_bucket == aws_s3_bucket.test.bucket
+    condition     = pbs_datastore.test.s3_bucket == local.bucket.bucket
     error_message = "S3 bucket should remain unchanged"
   }
   
